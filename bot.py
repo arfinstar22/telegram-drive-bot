@@ -1,5 +1,4 @@
-"""Telegram Drive Bot — main entry point."""
-
+import asyncio
 import logging
 
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
@@ -16,6 +15,9 @@ async def noop(update, context):
 
 
 def main():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
     app = Application.builder().token(BOT_TOKEN).build()
 
     # ── Commands ───────────────────────────────────────
