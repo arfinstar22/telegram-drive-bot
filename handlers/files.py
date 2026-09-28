@@ -83,13 +83,20 @@ async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
             if saved:
                 emoji = file_emoji(info["file_type"])
                 size = format_size(info.get("file_size", 0))
-                await update.message.reply_text(
-                    f"{emoji} <b>{info['file_name']}</b> ({size}) ✅",
+                # Delete original file message from chat to keep chat clean
+                try:
+                    await update.message.delete()
+                except Exception:
+                    pass
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=f"{emoji} <b>{info['file_name']}</b> ({size}) ✅",
                     parse_mode="HTML",
                 )
             return
 
     # Quick upload: file sent outside upload mode
+    info["_msg_id"] = update.message.message_id
     context.user_data["pending_file"] = info
     folders = db.get_all_folders(user_id)
 
@@ -119,6 +126,14 @@ async def quick_upload_to_folder(update: Update, context: ContextTypes.DEFAULT_T
         await query.edit_message_text("❌ File tidak ditemukan. Coba kirim ulang.")
         return
 
+    # Delete original file message from chat
+    msg_id = pending.pop("_msg_id", None)
+    if msg_id:
+        try:
+            await context.bot.delete_message(chat_id=query.message.chat_id, message_id=msg_id)
+        except Exception:
+            pass
+
     folder = db.get_folder(folder_id)
     saved = db.save_file(user_id, folder_id, **pending)
     if saved:
@@ -138,7 +153,12 @@ async def cancel_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancel folder picker."""
     query = update.callback_query
     await query.answer()
-    context.user_data.pop("pending_file", None)
+    pending = context.user_data.pop("pending_file", None)
+    if pending and "_msg_id" in pending:
+        try:
+            await context.bot.delete_message(chat_id=query.message.chat_id, message_id=pending["_msg_id"])
+        except Exception:
+            pass
     await query.edit_message_text("❌ Dibatalkan.")
 
 
