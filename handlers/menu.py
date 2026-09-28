@@ -122,12 +122,24 @@ async def starred_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def go_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _reset(context)
-    await update.message.reply_text("🏠 Menu utama", reply_markup=kb.main_menu())
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text(
+            WELCOME, parse_mode="HTML", reply_markup=kb.main_menu()
+        )
+    elif update.message:
+        await update.message.reply_text(
+            WELCOME, parse_mode="HTML", reply_markup=kb.main_menu()
+        )
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _reset(context)
-    await update.message.reply_text("❌ Dibatalkan.", reply_markup=kb.main_menu())
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text("❌ Dibatalkan.", reply_markup=kb.main_menu())
+    elif update.message:
+        await update.message.reply_text("❌ Dibatalkan.", reply_markup=kb.main_menu())
 
 
 async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):

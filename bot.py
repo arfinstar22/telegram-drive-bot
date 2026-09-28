@@ -30,9 +30,9 @@ def main():
     app.add_handler(MessageHandler(filters.Regex(r"^🕒 Recent$"), files.recent_files_menu))
     app.add_handler(MessageHandler(filters.Regex(r"^🔍 Search$"), files.search_prompt))
     app.add_handler(MessageHandler(filters.Regex(r"^⚙️ Settings$"), settings.settings_menu))
-    app.add_handler(MessageHandler(filters.Regex(r"^✅ Done$"), files.done_uploading))
-    app.add_handler(MessageHandler(filters.Regex(r"^❌ Cancel$"), menu.cancel))
-    app.add_handler(MessageHandler(filters.Regex(r"^🏠 Home$"), menu.go_home))
+    app.add_handler(MessageHandler(filters.Regex(r"^(✅ Done|✅ Selesai)$"), files.done_uploading))
+    app.add_handler(MessageHandler(filters.Regex(r"^(❌ Cancel|❌ Batal)$"), menu.cancel))
+    app.add_handler(MessageHandler(filters.Regex(r"^🏠 (Beranda|Menu Utama|Home)$"), menu.go_home))
 
     # ── Folder callbacks ───────────────────────────────
     app.add_handler(CallbackQueryHandler(folders.open_folder, pattern=r"^f:\d+$"))

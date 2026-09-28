@@ -9,21 +9,23 @@ def main_menu():
     return ReplyKeyboardMarkup(
         [["📁 My Files", "📤 Upload"],
          ["⭐ Starred", "🕒 Recent"],
-         ["🔍 Search", "⚙️ Settings"]],
+         ["🔍 Search", "⚙️ Settings"],
+         ["🏠 Beranda"]],
         resize_keyboard=True,
     )
 
 
 def upload_mode():
     return ReplyKeyboardMarkup(
-        [["✅ Done", "❌ Cancel"]],
+        [["✅ Done", "❌ Cancel"],
+         ["🏠 Beranda"]],
         resize_keyboard=True,
     )
 
 
 def cancel_only():
     return ReplyKeyboardMarkup(
-        [["❌ Cancel"]],
+        [["❌ Cancel", "🏠 Beranda"]],
         resize_keyboard=True,
     )
 
@@ -46,7 +48,12 @@ def folder_list(folders: list[dict], parent_id: int | None = None):
         from database import get_folder
         folder = get_folder(parent_id)
         back_target = folder["parent_id"] if folder and folder.get("parent_id") else 0
-        buttons.append([InlineKeyboardButton("⬅️ Back", callback_data=f"f:{back_target}")])
+        buttons.append([
+            InlineKeyboardButton("⬅️ Back", callback_data=f"f:{back_target}"),
+            InlineKeyboardButton("🏠 Beranda", callback_data="home_nav"),
+        ])
+    else:
+        buttons.append([InlineKeyboardButton("🏠 Beranda", callback_data="home_nav")])
 
     return InlineKeyboardMarkup(buttons)
 
@@ -119,13 +126,14 @@ def folder_contents(folder_id: int, files: list[dict], subfolders: list[dict],
     row_actions.append(InlineKeyboardButton("✏️ Rename", callback_data=f"dr:{folder_id}"))
     buttons.append(row_actions)
 
-    # Row 4: Delete & Back
+    # Row 4: Delete, Back & Home
     from database import get_folder
     folder = get_folder(folder_id)
     back_target = folder["parent_id"] if folder and folder.get("parent_id") else 0
     buttons.append([
         InlineKeyboardButton("🗑 Delete", callback_data=f"dx:{folder_id}"),
         InlineKeyboardButton("⬅️ Back", callback_data=f"f:{back_target}"),
+        InlineKeyboardButton("🏠 Beranda", callback_data="home_nav"),
     ])
 
     return InlineKeyboardMarkup(buttons)
@@ -144,7 +152,8 @@ def file_actions(file_data: dict):
          InlineKeyboardButton("📁 Move", callback_data=f"fm:{file_id}")],
         [InlineKeyboardButton("✏️ Rename", callback_data=f"fr:{file_id}"),
          InlineKeyboardButton("🗑 Delete", callback_data=f"fx:{file_id}")],
-        [InlineKeyboardButton("⬅️ Back", callback_data=f"fb:{folder_id}")],
+        [InlineKeyboardButton("⬅️ Back", callback_data=f"fb:{folder_id}"),
+         InlineKeyboardButton("🏠 Beranda", callback_data="home_nav")],
     ]
     return InlineKeyboardMarkup(buttons)
 
@@ -255,5 +264,6 @@ def settings_menu(trash_count: int = 0):
         [InlineKeyboardButton("📊 Storage Info", callback_data="si")],
         [InlineKeyboardButton(trash_label, callback_data="tv")],
         [InlineKeyboardButton("📋 Sort: by Date ↓", callback_data="ss:cycle")],
+        [InlineKeyboardButton("🏠 Beranda", callback_data="home_nav")],
     ]
     return InlineKeyboardMarkup(buttons)
