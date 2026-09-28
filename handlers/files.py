@@ -2,7 +2,7 @@
 
 import asyncio
 
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 import database as db
@@ -95,23 +95,38 @@ async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 )
             return
 
-    # Quick upload: file sent outside upload mode
-    info["_msg_id"] = update.message.message_id
-    context.user_data["pending_file"] = info
-    folders = db.get_all_folders(user_id)
+    # Quick upload: file sent outside upload mode -> auto-save to "📥 File Masuk"
+    inbox = db.get_or_create_inbox_folder(user_id)
+    saved = db.save_file(user_id, inbox["id"], **info)
 
-    if not folders:
-        await update.message.reply_text(
-            "📁 Belum ada folder. Buat folder dulu lewat <b>My Files</b>.",
-            parse_mode="HTML", reply_markup=kb.main_menu(),
+    # Delete original file message from chat to keep it clean
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+
+    if saved:
+        emoji = file_emoji(info["file_type"])
+        size = format_size(info.get("file_size", 0))
+        text = (
+            f"{emoji} <b>{info['file_name']}</b> ({size})\n"
+            f"📁 Disimpan ke <b>📥 File Masuk</b> ✅"
         )
-        return
-
-    await update.message.reply_text(
-        f"📎 File diterima: <b>{info['file_name']}</b>\n\nPilih folder tujuan:",
-        parse_mode="HTML",
-        reply_markup=kb.folder_picker(folders, "qup:"),
-    )
+        buttons = [
+            [InlineKeyboardButton("📂 Buka File Masuk", callback_data=f"f:{inbox['id']}"),
+             InlineKeyboardButton("📁 Pindahkan", callback_data=f"fm:{saved['id']}")],
+        ]
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=text,
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(buttons),
+        )
+    else:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="❌ Gagal menyimpan file.",
+        )
 
 
 async def quick_upload_to_folder(update: Update, context: ContextTypes.DEFAULT_TYPE):

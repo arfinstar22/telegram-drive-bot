@@ -33,6 +33,7 @@ def _reset(context: ContextTypes.DEFAULT_TYPE):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     db.upsert_user(user.id, user.username, user.full_name)
+    db.get_or_create_inbox_folder(user.id)
     _reset(context)
 
     # Check for deep-link argument (e.g. /start sf_xxx or /start sd_xxx)

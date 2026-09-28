@@ -42,6 +42,25 @@ def create_folder(user_id: int, name: str, parent_id: int | None = None):
     return res.data[0] if res.data else None
 
 
+def get_or_create_inbox_folder(user_id: int) -> dict:
+    """Get or automatically create default '📥 File Masuk' root folder."""
+    upsert_user(user_id)
+    res = (db.table("folders")
+           .select("*")
+           .eq("user_id", user_id)
+           .is_("parent_id", "null")
+           .eq("name", "📥 File Masuk")
+           .execute())
+    if res.data:
+        return res.data[0]
+    new_folder = db.table("folders").insert({
+        "user_id": user_id,
+        "name": "📥 File Masuk",
+        "parent_id": None,
+    }).execute()
+    return new_folder.data[0]
+
+
 def get_folders(user_id: int, parent_id: int | None = None) -> list[dict]:
     q = db.table("folders").select("*").eq("user_id", user_id)
     if parent_id:
