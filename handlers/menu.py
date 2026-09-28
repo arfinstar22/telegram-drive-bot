@@ -209,6 +209,18 @@ async def _do_search(update: Update, context: ContextTypes.DEFAULT_TYPE, query: 
     results = db.search_files(user_id, query)
     _reset(context)
 
+    ai_used = False
+    if not results:
+        import ai_service
+        if ai_service.is_ai_enabled():
+            all_files = db.get_all_user_files(user_id, limit=60)
+            if all_files:
+                matching_ids = await ai_service.semantic_search(query, all_files)
+                if matching_ids:
+                    id_map = {f["id"]: f for f in all_files}
+                    results = [id_map[i] for i in matching_ids if i in id_map]
+                    ai_used = True
+
     if not results:
         await update.message.reply_text(f"🔍 Tidak ditemukan file untuk: <b>{query}</b>",
                                         parse_mode="HTML", reply_markup=kb.main_menu())
@@ -230,6 +242,7 @@ async def _do_search(update: Update, context: ContextTypes.DEFAULT_TYPE, query: 
             callback_data=f"fi:{f['id']}",
         )])
 
-    text = f"🔍 Hasil pencarian: <b>{query}</b>\n{len(results)} file ditemukan"
+    badge = " (🤖 Gemini 3.7 Smart Match)" if ai_used else ""
+    text = f"🔍 Hasil pencarian: <b>{query}</b>{badge}\n{len(results)} file ditemukan"
     await update.message.reply_text(text, parse_mode="HTML",
                                     reply_markup=InlineKeyboardMarkup(buttons))

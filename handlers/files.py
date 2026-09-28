@@ -1,13 +1,19 @@
 """File upload, preview, download, rename, move, delete, search."""
 
 import asyncio
+import base64
+import io
+import logging
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
+import ai_service
 import database as db
 import keyboards as kb
 from utils import extract_file_info, file_emoji, format_size
+
+log = logging.getLogger(__name__)
 
 
 # ── Upload flow ────────────────────────────────────────
@@ -75,6 +81,32 @@ async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     state = context.user_data.get("state", "idle")
     user_id = update.effective_user.id
+
+    # 🔄 Check duplicate
+    if info.get("file_unique_id"):
+        dup = db.find_duplicate_file(user_id, info["file_unique_id"])
+        if dup:
+            target_fid = context.user_data.get("upload_folder_id") if state == "uploading" else db.get_or_create_inbox_folder(user_id)["id"]
+            context.user_data["pending_dup"] = {"info": info, "folder_id": target_fid}
+            try:
+                await update.message.delete()
+            except Exception:
+                pass
+            dup_folder = dup.get("folders", {}).get("name") if dup.get("folders") else "Storage"
+            size = format_size(info.get("file_size", 0))
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=(
+                    f"⚠️ <b>Duplikat Terdeteksi!</b>\n\n"
+                    f"File ini persis sama dengan yang sudah ada:\n"
+                    f"📄 <b>{dup['file_name']}</b> ({size})\n"
+                    f"📁 Di folder: <b>{dup_folder}</b>\n\n"
+                    f"Tetap simpan sebagai salinan baru?"
+                ),
+                parse_mode="HTML",
+                reply_markup=kb.duplicate_warning_keyboard(),
+            )
+            return
 
     if state == "uploading":
         folder_id = context.user_data.get("upload_folder_id")
@@ -527,3 +559,163 @@ async def recent_files_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML",
         reply_markup=kb.recent_list(files),
     )
+
+
+# ── Duplicate Resolution ───────────────────────────────
+
+async def duplicate_force_save(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """dup_force — user chose to keep duplicate file."""
+    query = update.callback_query
+    await query.answer()
+    pending = context.user_data.pop("pending_dup", None)
+    if not pending:
+        await query.edit_message_text("❌ Data upload kadaluarsa.")
+        return
+
+    user_id = query.from_user.id
+    saved = db.save_file(user_id, pending["folder_id"], **pending["info"])
+    if saved:
+        emoji = file_emoji(pending["info"]["file_type"])
+        size = format_size(pending["info"].get("file_size", 0))
+        await query.edit_message_text(
+            f"✅ {emoji} <b>{pending['info']['file_name']}</b> ({size}) tetap disimpan sebagai salinan baru!",
+            parse_mode="HTML",
+        )
+    else:
+        await query.edit_message_text("❌ Gagal menyimpan file.")
+
+
+async def duplicate_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """dup_skip — user chose to skip duplicate file."""
+    query = update.callback_query
+    await query.answer("File duplikat dilewati")
+    context.user_data.pop("pending_dup", None)
+    await query.edit_message_text("❌ File duplikat diabaikan (tidak disimpan).")
+
+
+# ── AI Features (Gemini 3.7 Flash) ────────────────────
+
+async def ai_smart_rename(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """aisr:{file_id} — suggest a descriptive filename using Gemini 3.7 Flash."""
+    query = update.callback_query
+    file_id = int(query.data.split(":")[1])
+
+    if not ai_service.is_ai_enabled():
+        await query.answer("⚠️ Fitur AI belum aktif (GEMINI_API_KEY belum diisi).", show_alert=True)
+        return
+
+    f = db.get_file(file_id)
+    if not f:
+        await query.answer("File tidak ditemukan.", show_alert=True)
+        return
+
+    await query.answer("🤖 Gemini 3.7 Flash menganalisis...")
+    wait_msg = await query.message.reply_text("⏳ <i>Gemini 3.7 Flash sedang membuat saran nama file baru...</i>", parse_mode="HTML")
+
+    b64 = None
+    mime_type = f.get("mime_type")
+    # For photos or small files (< 15MB), grab content or thumbnail for visual context
+    if f.get("file_size", 0) <= 15 * 1024 * 1024 and f["file_type"] in ("photo", "document"):
+        try:
+            target_fid = f.get("thumbnail_file_id") or f["file_id"]
+            tg_file = await context.bot.get_file(target_fid)
+            bio = io.BytesIO()
+            await tg_file.download_to_memory(bio)
+            b64 = base64.b64encode(bio.getvalue()).decode("utf-8")
+            if not mime_type:
+                mime_type = "image/jpeg" if f["file_type"] == "photo" else "application/octet-stream"
+        except Exception as exc:
+            log.warning("Could not download file for rename context: %s", exc)
+
+    new_name = await ai_service.generate_smart_rename(f["file_name"], b64, mime_type)
+    try:
+        await wait_msg.delete()
+    except Exception:
+        pass
+
+    if not new_name:
+        await query.message.reply_text("❌ Gagal mendapatkan saran nama dari AI.")
+        return
+
+    context.user_data[f"ai_rename_{file_id}"] = new_name
+    await query.message.reply_text(
+        f"✨ <b>Saran Nama Baru dari Gemini 3.7 Flash:</b>\n\n"
+        f"Lama: <code>{f['file_name']}</code>\n"
+        f"Baru: <code>{new_name}</code>\n\n"
+        f"Terapkan nama ini?",
+        parse_mode="HTML",
+        reply_markup=kb.apply_rename_keyboard(file_id),
+    )
+
+
+async def ai_apply_rename(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """aisrok:{file_id} — apply AI suggested name to file."""
+    query = update.callback_query
+    await query.answer()
+    file_id = int(query.data.split(":")[1])
+    new_name = context.user_data.pop(f"ai_rename_{file_id}", None)
+
+    f = db.get_file(file_id)
+    if not f or not new_name:
+        await query.edit_message_text("❌ Usulan nama sudah kadaluarsa.")
+        return
+
+    db.rename_file(file_id, new_name)
+    await query.edit_message_text(
+        f"✅ Nama file berhasil diubah menjadi:\n<b>{new_name}</b>",
+        parse_mode="HTML",
+    )
+
+
+async def ai_summarize_ocr(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """aisum:{file_id} — OCR image or summarize document using Gemini 3.7 Flash."""
+    query = update.callback_query
+    file_id = int(query.data.split(":")[1])
+
+    if not ai_service.is_ai_enabled():
+        await query.answer("⚠️ Fitur AI belum aktif (GEMINI_API_KEY belum diisi).", show_alert=True)
+        return
+
+    f = db.get_file(file_id)
+    if not f:
+        await query.answer("File tidak ditemukan.", show_alert=True)
+        return
+
+    if f.get("file_size", 0) > 20 * 1024 * 1024:
+        await query.answer("Ukuran file > 20MB melebihi batas Telegram Bot API.", show_alert=True)
+        return
+
+    await query.answer("🤖 Gemini 3.7 Flash membaca isi file...")
+    wait_msg = await query.message.reply_text("⏳ <i>Sedang membaca dan menganalisis file dengan Gemini 3.7 Flash...</i>", parse_mode="HTML")
+
+    try:
+        tg_file = await context.bot.get_file(f["file_id"])
+        bio = io.BytesIO()
+        await tg_file.download_to_memory(bio)
+        b64 = base64.b64encode(bio.getvalue()).decode("utf-8")
+        mime_type = f.get("mime_type") or ("image/jpeg" if f["file_type"] == "photo" else "application/pdf")
+
+        summary = await ai_service.summarize_or_ocr(b64, mime_type, f["file_name"])
+    except Exception as exc:
+        log.error("Failed to run summarize/OCR: %s", exc)
+        summary = None
+
+    try:
+        await wait_msg.delete()
+    except Exception:
+        pass
+
+    if not summary:
+        await query.message.reply_text("❌ Gagal membaca atau meringkas file ini.")
+        return
+
+    header = f"📝 <b>Hasil Analisis Gemini 3.7 Flash:</b>\n📄 <i>{f['file_name']}</i>\n━━━━━━━━━━━━━━━━━━━\n\n"
+    full_text = header + summary
+    if len(full_text) > 4000:
+        full_text = full_text[:3990] + "..."
+
+    try:
+        await query.message.reply_text(full_text, parse_mode="Markdown")
+    except Exception:
+        await query.message.reply_text(full_text)
+

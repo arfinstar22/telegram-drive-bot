@@ -66,11 +66,20 @@ def main():
     app.add_handler(CallbackQueryHandler(files.public_save_to_drive, pattern=r"^psave:\d+$"))
     app.add_handler(CallbackQueryHandler(files.public_save_confirm, pattern=r"^psaveto:\d+:\d+$"))
 
+    # ── AI & Duplicate callbacks ───────────────────────
+    app.add_handler(CallbackQueryHandler(files.ai_smart_rename, pattern=r"^aisr:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.ai_apply_rename, pattern=r"^aisrok:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.ai_summarize_ocr, pattern=r"^aisum:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.duplicate_force_save, pattern=r"^dup_force$"))
+    app.add_handler(CallbackQueryHandler(files.duplicate_skip, pattern=r"^dup_skip$"))
+
     # ── Navigation callbacks ───────────────────────────
     app.add_handler(CallbackQueryHandler(menu.go_home, pattern=r"^home_nav$"))
 
     # ── Settings & Trash callbacks ─────────────────────
     app.add_handler(CallbackQueryHandler(settings.storage_info, pattern=r"^si$"))
+    app.add_handler(CallbackQueryHandler(settings.storage_health, pattern=r"^sh:menu$"))
+    app.add_handler(CallbackQueryHandler(settings.clean_duplicates, pattern=r"^sh:clean_dup$"))
     app.add_handler(CallbackQueryHandler(settings.sort_cycle, pattern=r"^ss:"))
     app.add_handler(CallbackQueryHandler(settings.settings_back, pattern=r"^sb$"))
     app.add_handler(CallbackQueryHandler(settings.trash_view, pattern=r"^tv$"))

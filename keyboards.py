@@ -148,6 +148,8 @@ def file_actions(file_data: dict):
     buttons = [
         [InlineKeyboardButton("📥 Download", callback_data=f"fdl:{file_id}"),
          InlineKeyboardButton(star_label, callback_data=f"fst:{file_id}")],
+        [InlineKeyboardButton("✨ Smart Rename", callback_data=f"aisr:{file_id}"),
+         InlineKeyboardButton("📝 Ringkas/OCR", callback_data=f"aisum:{file_id}")],
         [InlineKeyboardButton("🔗 Share Link", callback_data=f"fsh:{file_id}"),
          InlineKeyboardButton("📁 Move", callback_data=f"fm:{file_id}")],
         [InlineKeyboardButton("✏️ Rename", callback_data=f"fr:{file_id}"),
@@ -261,9 +263,52 @@ def confirm_empty_trash():
 def settings_menu(trash_count: int = 0):
     trash_label = f"🗑 Trash ({trash_count})" if trash_count else "🗑 Trash"
     buttons = [
-        [InlineKeyboardButton("📊 Storage Info", callback_data="si")],
+        [InlineKeyboardButton("📊 Storage Info", callback_data="si"),
+         InlineKeyboardButton("🩺 Storage Health", callback_data="sh:menu")],
         [InlineKeyboardButton(trash_label, callback_data="tv")],
         [InlineKeyboardButton("📋 Sort: by Date ↓", callback_data="ss:cycle")],
         [InlineKeyboardButton("🏠 Beranda", callback_data="home_nav")],
     ]
     return InlineKeyboardMarkup(buttons)
+
+
+def storage_health_view(health: dict):
+    buttons = []
+    for f in health.get("largest_files", [])[:3]:
+        emoji = file_emoji(f["file_type"])
+        size = format_size(f.get("file_size", 0))
+        name = truncate(f["file_name"], 16)
+        buttons.append([InlineKeyboardButton(f"{emoji} {name} ({size})", callback_data=f"fi:{f['id']}")])
+
+    if health.get("total_duplicates", 0) > 0:
+        buttons.append([InlineKeyboardButton(
+            f"🧹 Bersihkan {health['total_duplicates']} Duplikat ({format_size(health['dup_wasted_size'])})",
+            callback_data="sh:clean_dup"
+        )])
+
+    if health.get("trash_count", 0) > 0:
+        buttons.append([InlineKeyboardButton(
+            f"🗑 Kosongkan Trash ({format_size(health['trash_size'])})",
+            callback_data="te"
+        )])
+
+    buttons.append([
+        InlineKeyboardButton("⬅️ Back", callback_data="sb"),
+        InlineKeyboardButton("🏠 Beranda", callback_data="home_nav"),
+    ])
+    return InlineKeyboardMarkup(buttons)
+
+
+def duplicate_warning_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("⚠️ Tetap Simpan", callback_data="dup_force"),
+         InlineKeyboardButton("❌ Lewati (Jangan Simpan)", callback_data="dup_skip")],
+    ])
+
+
+def apply_rename_keyboard(file_id: int):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Terapkan Nama Ini", callback_data=f"aisrok:{file_id}")],
+        [InlineKeyboardButton("✏️ Ketik Manual", callback_data=f"fr:{file_id}")],
+        [InlineKeyboardButton("⬅️ Batal", callback_data=f"fi:{file_id}")],
+    ])

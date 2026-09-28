@@ -345,3 +345,99 @@ def copy_file_to_user_folder(source_file: dict, target_user_id: int, target_fold
     }
     res = db.table("files").insert(data).execute()
     return res.data[0] if res.data else None
+
+
+# ── Smart Features (Duplicates & Health) ───────────────
+
+def find_duplicate_file(user_id: int, file_unique_id: str) -> dict | None:
+    """Find active file with the same Telegram file_unique_id."""
+    res = (db.table("files")
+           .select("*, folders(name)")
+           .eq("user_id", user_id)
+           .eq("file_unique_id", file_unique_id)
+           .eq("is_trashed", False)
+           .limit(1)
+           .execute())
+    return res.data[0] if res.data else None
+
+
+def get_all_user_files(user_id: int, limit: int = 100) -> list[dict]:
+    """Retrieve user files for semantic search and AI index."""
+    return (db.table("files")
+            .select("id, file_name, file_type, file_size, created_at, folders(name)")
+            .eq("user_id", user_id)
+            .eq("is_trashed", False)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute().data)
+
+
+def get_storage_health(user_id: int) -> dict:
+    """Calculate storage diagnostics: largest files, duplicates, and trash."""
+    default = {
+        "largest_files": [],
+        "duplicate_groups": [],
+        "total_duplicates": 0,
+        "dup_wasted_size": 0,
+        "trash_count": 0,
+        "trash_size": 0,
+    }
+    try:
+        # Top 5 largest files
+        largest = (db.table("files")
+                   .select("*, folders(name)")
+                   .eq("user_id", user_id)
+                   .eq("is_trashed", False)
+                   .order("file_size", desc=True)
+                   .limit(5)
+                   .execute().data)
+
+        # Find duplicates
+        all_files = (db.table("files")
+                     .select("id, file_name, file_size, file_unique_id, folder_id, folders(name)")
+                     .eq("user_id", user_id)
+                     .eq("is_trashed", False)
+                     .execute().data)
+
+        seen: dict[str, list[dict]] = {}
+        for f in all_files:
+            uid = f.get("file_unique_id")
+            if uid:
+                seen.setdefault(uid, []).append(f)
+
+        dup_groups = [flist for flist in seen.values() if len(flist) > 1]
+        extra_dups = sum(len(d) - 1 for d in dup_groups)
+        dup_wasted_size = sum(sum(item.get("file_size", 0) for item in group[1:]) for group in dup_groups)
+
+        # Trash stats
+        trash_items = (db.table("files")
+                       .select("file_size")
+                       .eq("user_id", user_id)
+                       .eq("is_trashed", True)
+                       .execute().data)
+        trash_size = sum(f.get("file_size", 0) for f in trash_items)
+
+        return {
+            "largest_files": largest,
+            "duplicate_groups": dup_groups,
+            "total_duplicates": extra_dups,
+            "dup_wasted_size": dup_wasted_size,
+            "trash_count": len(trash_items),
+            "trash_size": trash_size,
+        }
+    except Exception as exc:
+        log.error("Failed to fetch storage health: %s", exc)
+        return default
+
+
+
+def clean_duplicate_files(user_id: int) -> int:
+    """Move all redundant duplicate files to trash, keeping earliest copy."""
+    health = get_storage_health(user_id)
+    trashed_count = 0
+    for group in health["duplicate_groups"]:
+        # Keep group[0], trash the rest
+        for extra in group[1:]:
+            trash_file(extra["id"])
+            trashed_count += 1
+    return trashed_count

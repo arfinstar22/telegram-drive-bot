@@ -175,3 +175,47 @@ async def trash_empty_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer("Trash dikosongkan ✅")
     await query.edit_message_text("🗑 <b>Trash</b>\n\nKosong!", parse_mode="HTML",
                                   reply_markup=kb.trash_list([]))
+
+
+# ── Storage Health & Cleaner ───────────────────────────
+
+async def storage_health(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """sh:menu — show storage health, duplicates, largest files."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    health = db.get_storage_health(user_id)
+
+    largest_text = ""
+    for idx, f in enumerate(health.get("largest_files", []), 1):
+        emoji = file_emoji(f["file_type"])
+        size = format_size(f.get("file_size", 0))
+        folder_name = f.get("folders", {}).get("name") if f.get("folders") else "Storage"
+        largest_text += f"  {idx}. {emoji} <b>{f['file_name']}</b> ({size}) — <i>{folder_name}</i>\n"
+    if not largest_text:
+        largest_text = "  <i>Belum ada file.</i>\n"
+
+    dup_count = health["total_duplicates"]
+    dup_size = format_size(health["dup_wasted_size"])
+    trash_count = health["trash_count"]
+    trash_size = format_size(health["trash_size"])
+
+    text = (
+        f"🩺 <b>Storage Health & Cleaner</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"🔄 <b>Duplikat Terdeteksi:</b> {dup_count} file ({dup_size})\n"
+        f"🗑 <b>Trash Sampah:</b> {trash_count} file ({trash_size})\n\n"
+        f"📌 <b>File Terbesar Kamu:</b>\n{largest_text}\n"
+        f"Pilih tindakan di bawah untuk membersihkan ruang penyimpanan:"
+    )
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb.storage_health_view(health))
+
+
+async def clean_duplicates(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """sh:clean_dup — clean redundant duplicate files."""
+    query = update.callback_query
+    user_id = query.from_user.id
+    cleaned = db.clean_duplicate_files(user_id)
+    await query.answer(f"🧹 Berhasil memindahkan {cleaned} file duplikat ke Trash!", show_alert=True)
+    await storage_health(update, context)
+

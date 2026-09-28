@@ -15,3 +15,7 @@ services:
         sync: false
       - key: PORT
         value: "10000"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: "gemini-3.7-flash"
