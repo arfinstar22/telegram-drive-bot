@@ -26,6 +26,8 @@ def main():
     # ── Reply Keyboard buttons ─────────────────────────
     app.add_handler(MessageHandler(filters.Regex(r"^📁 My Files$"), folders.my_files))
     app.add_handler(MessageHandler(filters.Regex(r"^📤 Upload$"), files.upload_menu))
+    app.add_handler(MessageHandler(filters.Regex(r"^⭐ Starred$"), menu.starred_menu))
+    app.add_handler(MessageHandler(filters.Regex(r"^🕒 Recent$"), files.recent_files_menu))
     app.add_handler(MessageHandler(filters.Regex(r"^🔍 Search$"), files.search_prompt))
     app.add_handler(MessageHandler(filters.Regex(r"^⚙️ Settings$"), settings.settings_menu))
     app.add_handler(MessageHandler(filters.Regex(r"^✅ Done$"), files.done_uploading))
@@ -39,6 +41,10 @@ def main():
     app.add_handler(CallbackQueryHandler(folders.delete_folder_prompt, pattern=r"^dx:\d+$"))
     app.add_handler(CallbackQueryHandler(folders.confirm_delete_folder, pattern=r"^dxc:"))
     app.add_handler(CallbackQueryHandler(folders.file_page, pattern=r"^fp:"))
+    app.add_handler(CallbackQueryHandler(folders.toggle_star_folder, pattern=r"^dst:\d+$"))
+    app.add_handler(CallbackQueryHandler(folders.set_folder_filter, pattern=r"^ffilt:\d+:\w+$"))
+    app.add_handler(CallbackQueryHandler(folders.share_folder_prompt, pattern=r"^dsh:\d+$"))
+    app.add_handler(CallbackQueryHandler(folders.revoke_folder_share, pattern=r"^dsh_rev:\d+$"))
 
     # ── File callbacks ─────────────────────────────────
     app.add_handler(CallbackQueryHandler(files.preview_file, pattern=r"^fi:"))
@@ -52,6 +58,16 @@ def main():
     app.add_handler(CallbackQueryHandler(files.back_to_folder, pattern=r"^fb:"))
     app.add_handler(CallbackQueryHandler(files.quick_upload_to_folder, pattern=r"^qup:"))
     app.add_handler(CallbackQueryHandler(files.cancel_pick, pattern=r"^cancel_pick$"))
+    app.add_handler(CallbackQueryHandler(files.toggle_star_file, pattern=r"^fst:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.share_file_prompt, pattern=r"^fsh:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.revoke_file_share, pattern=r"^fsh_rev:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.batch_download_folder, pattern=r"^dlall:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.public_download_file, pattern=r"^pdl:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.public_save_to_drive, pattern=r"^psave:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.public_save_confirm, pattern=r"^psaveto:\d+:\d+$"))
+
+    # ── Navigation callbacks ───────────────────────────
+    app.add_handler(CallbackQueryHandler(menu.go_home, pattern=r"^home_nav$"))
 
     # ── Settings & Trash callbacks ─────────────────────
     app.add_handler(CallbackQueryHandler(settings.storage_info, pattern=r"^si$"))

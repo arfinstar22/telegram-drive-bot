@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import secrets
 
 from supabase import create_client, Client
 
@@ -94,7 +95,7 @@ def save_file(user_id: int, folder_id: int, **file_data) -> dict | None:
 
 
 def get_files(folder_id: int, page: int = 1, per_page: int = FILES_PER_PAGE,
-              sort: str = "date_desc") -> tuple[list[dict], int, int]:
+              sort: str = "date_desc", file_type: str | None = None) -> tuple[list[dict], int, int]:
     sort_map = {
         "date_desc": ("created_at", True),
         "date_asc":  ("created_at", False),
@@ -106,11 +107,15 @@ def get_files(folder_id: int, page: int = 1, per_page: int = FILES_PER_PAGE,
     col, desc = sort_map.get(sort, sort_map["date_desc"])
     offset = (page - 1) * per_page
 
-    res = (db.table("files")
-           .select("*", count="exact")
-           .eq("folder_id", folder_id)
-           .eq("is_trashed", False)
-           .order(col, desc=desc)
+    q = (db.table("files")
+         .select("*", count="exact")
+         .eq("folder_id", folder_id)
+         .eq("is_trashed", False))
+
+    if file_type and file_type != "all":
+        q = q.eq("file_type", file_type)
+
+    res = (q.order(col, desc=desc)
            .range(offset, offset + per_page - 1)
            .execute())
 
@@ -198,3 +203,126 @@ def get_storage_info(user_id: int) -> dict:
         "trash_count": trash_res.count or 0,
         "by_type": by_type,
     }
+
+
+# ── Starred (Favorites) ────────────────────────────────
+
+def toggle_star_file(file_id: int) -> bool:
+    f = get_file(file_id)
+    if not f:
+        return False
+    new_state = not bool(f.get("is_starred"))
+    db.table("files").update({"is_starred": new_state, "updated_at": _now()}).eq("id", file_id).execute()
+    return new_state
+
+
+def toggle_star_folder(folder_id: int) -> bool:
+    folder = get_folder(folder_id)
+    if not folder:
+        return False
+    new_state = not bool(folder.get("is_starred"))
+    db.table("folders").update({"is_starred": new_state, "updated_at": _now()}).eq("id", folder_id).execute()
+    return new_state
+
+
+def get_starred_folders(user_id: int) -> list[dict]:
+    return (db.table("folders")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("is_starred", True)
+            .order("name")
+            .execute().data)
+
+
+def get_starred_files(user_id: int) -> list[dict]:
+    return (db.table("files")
+            .select("*, folders(name)")
+            .eq("user_id", user_id)
+            .eq("is_trashed", False)
+            .eq("is_starred", True)
+            .order("created_at", desc=True)
+            .limit(50)
+            .execute().data)
+
+
+# ── Recent Files ───────────────────────────────────────
+
+def get_recent_files(user_id: int, limit: int = 15) -> list[dict]:
+    return (db.table("files")
+            .select("*, folders(name)")
+            .eq("user_id", user_id)
+            .eq("is_trashed", False)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute().data)
+
+
+# ── Batch Download ─────────────────────────────────────
+
+def get_all_files_in_folder(folder_id: int) -> list[dict]:
+    return (db.table("files")
+            .select("*")
+            .eq("folder_id", folder_id)
+            .eq("is_trashed", False)
+            .order("created_at", desc=False)
+            .execute().data)
+
+
+# ── Share Links ────────────────────────────────────────
+
+def get_or_create_file_share_token(file_id: int) -> str | None:
+    f = get_file(file_id)
+    if not f:
+        return None
+    token = f.get("share_token")
+    if token:
+        return token
+    token = secrets.token_urlsafe(8)
+    db.table("files").update({"share_token": token, "updated_at": _now()}).eq("id", file_id).execute()
+    return token
+
+
+def revoke_file_share_token(file_id: int):
+    return db.table("files").update({"share_token": None, "updated_at": _now()}).eq("id", file_id).execute()
+
+
+def get_file_by_share_token(token: str) -> dict | None:
+    res = db.table("files").select("*, folders(name)").eq("share_token", token).eq("is_trashed", False).execute()
+    return res.data[0] if res.data else None
+
+
+def get_or_create_folder_share_token(folder_id: int) -> str | None:
+    folder = get_folder(folder_id)
+    if not folder:
+        return None
+    token = folder.get("share_token")
+    if token:
+        return token
+    token = secrets.token_urlsafe(8)
+    db.table("folders").update({"share_token": token, "updated_at": _now()}).eq("id", folder_id).execute()
+    return token
+
+
+def revoke_folder_share_token(folder_id: int):
+    return db.table("folders").update({"share_token": None, "updated_at": _now()}).eq("id", folder_id).execute()
+
+
+def get_folder_by_share_token(token: str) -> dict | None:
+    res = db.table("folders").select("*").eq("share_token", token).execute()
+    return res.data[0] if res.data else None
+
+
+def copy_file_to_user_folder(source_file: dict, target_user_id: int, target_folder_id: int) -> dict | None:
+    data = {
+        "user_id": target_user_id,
+        "folder_id": target_folder_id,
+        "file_name": source_file["file_name"],
+        "file_id": source_file["file_id"],
+        "file_unique_id": source_file["file_unique_id"],
+        "file_type": source_file["file_type"],
+        "file_size": source_file.get("file_size", 0),
+        "mime_type": source_file.get("mime_type"),
+        "thumbnail_file_id": source_file.get("thumbnail_file_id"),
+    }
+    res = db.table("files").insert(data).execute()
+    return res.data[0] if res.data else None

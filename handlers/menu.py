@@ -1,6 +1,6 @@
 """Start command, main menu, text input router, cancel/home."""
 
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 import database as db
@@ -15,6 +15,8 @@ WELCOME = (
     "━━━━━━━━━━━━━━━━━━━\n"
     "📁 <b>My Files</b> — Folder & file kamu\n"
     "📤 <b>Upload</b> — Upload file baru\n"
+    "⭐ <b>Starred</b> — File & folder favorit\n"
+    "🕒 <b>Recent</b> — File terakhir diunggah\n"
     "🔍 <b>Search</b> — Cari file\n"
     "⚙️ <b>Settings</b> — Info & pengaturan\n"
     "━━━━━━━━━━━━━━━━━━━\n"
@@ -32,7 +34,90 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     db.upsert_user(user.id, user.username, user.full_name)
     _reset(context)
+
+    # Check for deep-link argument (e.g. /start sf_xxx or /start sd_xxx)
+    if context.args:
+        arg = context.args[0]
+        if arg.startswith("sf_"):
+            token = arg[3:]
+            f = db.get_file_by_share_token(token)
+            if not f:
+                await update.message.reply_text(
+                    "❌ Link file ini sudah tidak valid atau telah dinonaktifkan.",
+                    reply_markup=kb.main_menu(),
+                )
+                return
+
+            from utils import file_emoji, format_size
+            emoji = file_emoji(f["file_type"])
+            size = format_size(f.get("file_size", 0))
+            is_own_file = (f["user_id"] == user.id)
+
+            await update.message.reply_text(
+                f"🔗 <b>File Bersama</b>\n\n"
+                f"{emoji} <b>{f['file_name']}</b> ({size})\n\n"
+                f"File ini dibagikan kepada kamu:",
+                parse_mode="HTML",
+                reply_markup=kb.public_shared_file(f["id"], can_save=not is_own_file),
+            )
+            return
+
+        elif arg.startswith("sd_"):
+            token = arg[3:]
+            folder = db.get_folder_by_share_token(token)
+            if not folder:
+                await update.message.reply_text(
+                    "❌ Link folder ini sudah tidak valid atau telah dinonaktifkan.",
+                    reply_markup=kb.main_menu(),
+                )
+                return
+
+            files = db.get_all_files_in_folder(folder["id"])
+            from utils import file_emoji, format_size, truncate
+            buttons = []
+            for f in files[:20]:
+                emoji = file_emoji(f["file_type"])
+                size = format_size(f.get("file_size", 0))
+                name = truncate(f["file_name"], 20)
+                buttons.append([InlineKeyboardButton(f"{emoji} {name} — {size}", callback_data=f"pdl:{f['id']}")])
+            buttons.append([InlineKeyboardButton("🏠 Menu Utama", callback_data="home_nav")])
+            from telegram import InlineKeyboardMarkup
+            markup = InlineKeyboardMarkup(buttons)
+
+            await update.message.reply_text(
+                f"🔗 <b>Folder Bersama</b>: 📁 <b>{folder['name']}</b>\n\n"
+                f"Total {len(files)} file. Klik file di bawah untuk langsung mengunduh:",
+                parse_mode="HTML",
+                reply_markup=markup,
+            )
+            return
+
     await update.message.reply_text(WELCOME, parse_mode="HTML", reply_markup=kb.main_menu())
+
+
+async def starred_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Reply Keyboard: ⭐ Starred — show favorite folders & files."""
+    user_id = update.effective_user.id
+    _reset(context)
+    folders = db.get_starred_folders(user_id)
+    files = db.get_starred_files(user_id)
+
+    if not folders and not files:
+        await update.message.reply_text(
+            "⭐ <b>Starred (Favorit)</b>\n\n"
+            "Belum ada folder atau file yang kamu beri bintang.\n"
+            "Buka folder atau file, lalu klik tombol <b>⭐ Star</b> untuk menandainya!",
+            parse_mode="HTML", reply_markup=kb.main_menu(),
+        )
+        return
+
+    total = len(folders) + len(files)
+    await update.message.reply_text(
+        f"⭐ <b>Starred Items</b> ({total} favorit):\n\n"
+        f"Akses cepat ke folder dan file favorit kamu:",
+        parse_mode="HTML",
+        reply_markup=kb.starred_list(folders, files),
+    )
 
 
 async def go_home(update: Update, context: ContextTypes.DEFAULT_TYPE):

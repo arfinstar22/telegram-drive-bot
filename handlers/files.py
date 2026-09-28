@@ -1,5 +1,7 @@
 """File upload, preview, download, rename, move, delete, search."""
 
+import asyncio
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -312,3 +314,181 @@ async def search_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["state"] = "searching"
     await update.message.reply_text("🔍 Ketik nama file yang dicari:",
                                     reply_markup=kb.cancel_only())
+
+
+# ── Star File ──────────────────────────────────────────
+
+async def toggle_star_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """fst:{file_id} — toggle star on file."""
+    query = update.callback_query
+    file_id = int(query.data.split(":")[1])
+
+    is_starred = db.toggle_star_file(file_id)
+    msg = "Ditambahkan ke Favorit ⭐" if is_starred else "Dihapus dari Favorit"
+    await query.answer(msg)
+
+    f = db.get_file(file_id)
+    if f:
+        await query.edit_message_reply_markup(reply_markup=kb.file_actions(f))
+
+
+# ── Share File ─────────────────────────────────────────
+
+async def share_file_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """fsh:{file_id} — generate public share link for file."""
+    query = update.callback_query
+    await query.answer()
+    file_id = int(query.data.split(":")[1])
+
+    f = db.get_file(file_id)
+    if not f:
+        await query.answer("File tidak ditemukan", show_alert=True)
+        return
+
+    token = db.get_or_create_file_share_token(file_id)
+    bot_me = await context.bot.get_me()
+    share_link = f"https://t.me/{bot_me.username}?start=sf_{token}"
+
+    emoji = file_emoji(f["file_type"])
+    size = format_size(f.get("file_size", 0))
+
+    text = (
+        f"🔗 <b>Public Share Link</b>\n\n"
+        f"File: {emoji} <b>{f['file_name']}</b> ({size})\n\n"
+        f"Siapa saja yang memiliki link ini dapat mengunduh file ini langsung:\n\n"
+        f"<code>{share_link}</code>\n\n"
+        f"<i>Klik link di atas untuk menyalin.</i>"
+    )
+    await query.message.reply_text(text, parse_mode="HTML", reply_markup=kb.share_file_view(file_id))
+
+
+async def revoke_file_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """fsh_rev:{file_id} — revoke share link."""
+    query = update.callback_query
+    file_id = int(query.data.split(":")[1])
+    db.revoke_file_share_token(file_id)
+    await query.answer("Link dibatalkan ✅")
+    await query.edit_message_text("❌ Link publik untuk file ini telah dinonaktifkan.")
+
+
+# ── Batch Download ─────────────────────────────────────
+
+async def batch_download_folder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """dlall:{folder_id} — download all files in a folder sequentially."""
+    query = update.callback_query
+    folder_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
+
+    files = db.get_all_files_in_folder(folder_id)
+    if not files:
+        await query.answer("Folder ini belum memiliki file.", show_alert=True)
+        return
+
+    total = len(files)
+    await query.answer(f"Mengunduh {total} file...")
+    status_msg = await query.message.reply_text(f"📦 Mengirim {total} file... (0/{total})")
+
+    success_count = 0
+    for idx, f in enumerate(files, 1):
+        try:
+            await context.bot.send_document(
+                chat_id=user_id,
+                document=f["file_id"],
+                caption=f"📄 {f['file_name']}",
+            )
+            success_count += 1
+            if idx % 3 == 0 or idx == total:
+                await status_msg.edit_text(f"📦 Mengirim file... ({idx}/{total})")
+        except Exception:
+            pass
+        await asyncio.sleep(0.4)
+
+    await status_msg.edit_text(f"✅ Selesai! {success_count}/{total} file berhasil dikirim.")
+
+
+# ── Public Shared File Actions ─────────────────────────
+
+async def public_download_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """pdl:{file_id} — guest downloads a shared file."""
+    query = update.callback_query
+    await query.answer()
+    file_id = int(query.data.split(":")[1])
+
+    f = db.get_file(file_id)
+    if not f:
+        await query.answer("File tidak ditemukan atau telah dihapus.", show_alert=True)
+        return
+
+    await query.message.reply_document(f["file_id"], caption=f"📥 {f['file_name']}")
+
+
+async def public_save_to_drive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """psave:{file_id} — guest saves shared file to their own drive."""
+    query = update.callback_query
+    await query.answer()
+    file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
+
+    folders = db.get_all_folders(user_id)
+    if not folders:
+        await query.message.reply_text(
+            "📁 Kamu belum punya folder. Buat folder dulu lewat menu <b>📁 My Files</b>.",
+            parse_mode="HTML",
+        )
+        return
+
+    # Show folder picker
+    await query.message.reply_text(
+        "Pilih folder tujuan untuk menyimpan file ini:",
+        reply_markup=kb.folder_picker(folders, f"psaveto:{file_id}:"),
+    )
+
+
+async def public_save_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """psaveto:{file_id}:{folder_id} — execute copy file."""
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split(":")
+    file_id = int(parts[1])
+    folder_id = int(parts[2])
+    user_id = query.from_user.id
+
+    source_file = db.get_file(file_id)
+    if not source_file:
+        await query.edit_message_text("❌ File sumber tidak ditemukan.")
+        return
+
+    folder = db.get_folder(folder_id)
+    folder_name = folder["name"] if folder else "folder"
+
+    saved = db.copy_file_to_user_folder(source_file, user_id, folder_id)
+    if saved:
+        emoji = file_emoji(source_file["file_type"])
+        await query.edit_message_text(
+            f"✅ {emoji} <b>{source_file['file_name']}</b> berhasil disimpan ke folder <b>{folder_name}</b>!",
+            parse_mode="HTML",
+        )
+    else:
+        await query.edit_message_text("❌ Gagal menyimpan file.")
+
+
+# ── Recent Files Menu ──────────────────────────────────
+
+async def recent_files_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Reply Keyboard: 🕒 Recent — show last 15 uploaded files."""
+    user_id = update.effective_user.id
+    files = db.get_recent_files(user_id, limit=15)
+
+    if not files:
+        await update.message.reply_text(
+            "🕒 <b>Recent Files</b>\n\nBelum ada file yang diunggah.",
+            parse_mode="HTML", reply_markup=kb.main_menu(),
+        )
+        return
+
+    await update.message.reply_text(
+        f"🕒 <b>Recent Files</b> (15 file terakhir):\n\n"
+        f"Pilih file untuk melihat preview atau mengunduh:",
+        parse_mode="HTML",
+        reply_markup=kb.recent_list(files),
+    )

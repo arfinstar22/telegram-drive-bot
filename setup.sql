@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS folders (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     parent_id BIGINT REFERENCES folders(id) ON DELETE CASCADE,
+    is_starred BOOLEAN DEFAULT FALSE,
+    share_token TEXT UNIQUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -33,6 +35,8 @@ CREATE TABLE IF NOT EXISTS files (
     thumbnail_file_id TEXT,
     is_trashed BOOLEAN DEFAULT FALSE,
     trashed_at TIMESTAMPTZ,
+    is_starred BOOLEAN DEFAULT FALSE,
+    share_token TEXT UNIQUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -48,3 +52,6 @@ CREATE INDEX IF NOT EXISTS idx_folders_parent ON folders(parent_id);
 CREATE INDEX IF NOT EXISTS idx_files_folder ON files(folder_id);
 CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id);
 CREATE INDEX IF NOT EXISTS idx_files_trashed ON files(is_trashed);
+CREATE INDEX IF NOT EXISTS idx_files_starred ON files(user_id, is_starred);
+CREATE INDEX IF NOT EXISTS idx_files_share ON files(share_token);
+CREATE INDEX IF NOT EXISTS idx_folders_share ON folders(share_token);

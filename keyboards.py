@@ -8,6 +8,7 @@ from utils import file_emoji, format_size, truncate
 def main_menu():
     return ReplyKeyboardMarkup(
         [["📁 My Files", "📤 Upload"],
+         ["⭐ Starred", "🕒 Recent"],
          ["🔍 Search", "⚙️ Settings"]],
         resize_keyboard=True,
     )
@@ -32,8 +33,9 @@ def cancel_only():
 def folder_list(folders: list[dict], parent_id: int | None = None):
     buttons = []
     for folder in folders:
+        star_icon = "★ " if folder.get("is_starred") else ""
         buttons.append([InlineKeyboardButton(
-            f"📁 {folder['name']}",
+            f"📁 {star_icon}{folder['name']}",
             callback_data=f"f:{folder['id']}",
         )])
 
@@ -50,21 +52,41 @@ def folder_list(folders: list[dict], parent_id: int | None = None):
 
 
 def folder_contents(folder_id: int, files: list[dict], subfolders: list[dict],
-                    page: int, total_pages: int):
+                    page: int, total_pages: int, is_starred: bool = False,
+                    active_filter: str = "all", has_any_files: bool = True):
     buttons = []
 
+    # Subfolders
     for sf in subfolders:
+        star_icon = "★ " if sf.get("is_starred") else ""
         buttons.append([InlineKeyboardButton(
-            f"📁 {sf['name']}",
+            f"📁 {star_icon}{sf['name']}",
             callback_data=f"f:{sf['id']}",
         )])
 
+    # Filter bar if folder has any files
+    if has_any_files:
+        filter_options = [
+            ("all", "Semua"),
+            ("photo", "🖼️"),
+            ("video", "🎥"),
+            ("document", "📄"),
+            ("audio", "🎵"),
+        ]
+        frow = []
+        for key, label in filter_options:
+            display = f"•{label}•" if active_filter == key else label
+            frow.append(InlineKeyboardButton(display, callback_data=f"ffilt:{folder_id}:{key}"))
+        buttons.append(frow)
+
+    # Files
     for f in files:
         emoji = file_emoji(f["file_type"])
+        star_icon = "★ " if f.get("is_starred") else ""
         size = format_size(f.get("file_size", 0))
-        name = truncate(f["file_name"], 22)
+        name = truncate(f["file_name"], 20)
         buttons.append([InlineKeyboardButton(
-            f"{emoji} {name} — {size}",
+            f"{star_icon}{emoji} {name} — {size}",
             callback_data=f"fi:{f['id']}",
         )])
 
@@ -77,19 +99,34 @@ def folder_contents(folder_id: int, files: list[dict], subfolders: list[dict],
             nav.append(InlineKeyboardButton("▶️", callback_data=f"fp:{folder_id}:{page + 1}"))
         buttons.append(nav)
 
+    # Row 1: Upload & Subfolder
     buttons.append([
         InlineKeyboardButton("📤 Upload", callback_data=f"up:{folder_id}"),
         InlineKeyboardButton("➕ Subfolder", callback_data=f"cf:{folder_id}"),
     ])
+
+    # Row 2: Star Folder & Share Folder
+    star_btn_text = "★ Starred" if is_starred else "⭐ Star Folder"
     buttons.append([
-        InlineKeyboardButton("✏️ Rename", callback_data=f"dr:{folder_id}"),
-        InlineKeyboardButton("🗑 Delete", callback_data=f"dx:{folder_id}"),
+        InlineKeyboardButton(star_btn_text, callback_data=f"dst:{folder_id}"),
+        InlineKeyboardButton("🔗 Share Folder", callback_data=f"dsh:{folder_id}"),
     ])
 
+    # Row 3: Batch Download & Rename
+    row_actions = []
+    if has_any_files:
+        row_actions.append(InlineKeyboardButton("📦 Download All", callback_data=f"dlall:{folder_id}"))
+    row_actions.append(InlineKeyboardButton("✏️ Rename", callback_data=f"dr:{folder_id}"))
+    buttons.append(row_actions)
+
+    # Row 4: Delete & Back
     from database import get_folder
     folder = get_folder(folder_id)
     back_target = folder["parent_id"] if folder and folder.get("parent_id") else 0
-    buttons.append([InlineKeyboardButton("⬅️ Back", callback_data=f"f:{back_target}")])
+    buttons.append([
+        InlineKeyboardButton("🗑 Delete", callback_data=f"dx:{folder_id}"),
+        InlineKeyboardButton("⬅️ Back", callback_data=f"f:{back_target}"),
+    ])
 
     return InlineKeyboardMarkup(buttons)
 
@@ -97,13 +134,69 @@ def folder_contents(folder_id: int, files: list[dict], subfolders: list[dict],
 def file_actions(file_data: dict):
     file_id = file_data["id"]
     folder_id = file_data["folder_id"]
+    is_starred = file_data.get("is_starred", False)
+    star_label = "★ Starred" if is_starred else "⭐ Star"
+
     buttons = [
         [InlineKeyboardButton("📥 Download", callback_data=f"fdl:{file_id}"),
+         InlineKeyboardButton(star_label, callback_data=f"fst:{file_id}")],
+        [InlineKeyboardButton("🔗 Share Link", callback_data=f"fsh:{file_id}"),
          InlineKeyboardButton("📁 Move", callback_data=f"fm:{file_id}")],
         [InlineKeyboardButton("✏️ Rename", callback_data=f"fr:{file_id}"),
          InlineKeyboardButton("🗑 Delete", callback_data=f"fx:{file_id}")],
         [InlineKeyboardButton("⬅️ Back", callback_data=f"fb:{folder_id}")],
     ]
+    return InlineKeyboardMarkup(buttons)
+
+
+def starred_list(folders: list[dict], files: list[dict]):
+    buttons = []
+    for folder in folders:
+        buttons.append([InlineKeyboardButton(f"📁 ★ {folder['name']}", callback_data=f"f:{folder['id']}")])
+    for f in files:
+        emoji = file_emoji(f["file_type"])
+        size = format_size(f.get("file_size", 0))
+        name = truncate(f["file_name"], 20)
+        buttons.append([InlineKeyboardButton(f"★ {emoji} {name} — {size}", callback_data=f"fi:{f['id']}")])
+    buttons.append([InlineKeyboardButton("🏠 Menu Utama", callback_data="home_nav")])
+    return InlineKeyboardMarkup(buttons)
+
+
+def recent_list(files: list[dict]):
+    buttons = []
+    for f in files:
+        emoji = file_emoji(f["file_type"])
+        size = format_size(f.get("file_size", 0))
+        name = truncate(f["file_name"], 18)
+        folder_info = f" ({truncate(f['folders']['name'], 10)})" if f.get("folders") and f["folders"].get("name") else ""
+        buttons.append([InlineKeyboardButton(
+            f"{emoji} {name}{folder_info} — {size}",
+            callback_data=f"fi:{f['id']}",
+        )])
+    buttons.append([InlineKeyboardButton("🏠 Menu Utama", callback_data="home_nav")])
+    return InlineKeyboardMarkup(buttons)
+
+
+def share_file_view(file_id: int):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ Revoke Link", callback_data=f"fsh_rev:{file_id}")],
+        [InlineKeyboardButton("⬅️ Back to File", callback_data=f"fi:{file_id}")],
+    ])
+
+
+def share_folder_view(folder_id: int):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ Revoke Link", callback_data=f"dsh_rev:{folder_id}")],
+        [InlineKeyboardButton("⬅️ Back to Folder", callback_data=f"f:{folder_id}")],
+    ])
+
+
+def public_shared_file(file_id: int, can_save: bool = True):
+    buttons = [
+        [InlineKeyboardButton("📥 Download File", callback_data=f"pdl:{file_id}")],
+    ]
+    if can_save:
+        buttons.append([InlineKeyboardButton("💾 Simpan ke Drive Saya", callback_data=f"psave:{file_id}")])
     return InlineKeyboardMarkup(buttons)
 
 
