@@ -163,34 +163,23 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--text-muted);
+      gap: 8px;
       margin-bottom: 10px;
-    }
-
-    .storage-title-wrap {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .storage-title {
-      color: var(--text-muted);
-      font-weight: 600;
     }
 
     .unlimited-badge {
       background: rgba(16, 185, 129, 0.15);
       border: 1px solid rgba(16, 185, 129, 0.35);
       color: #34d399;
-      font-size: 0.65rem;
+      font-size: 0.72rem;
       font-weight: 700;
-      padding: 2px 7px;
+      padding: 3px 9px;
       border-radius: 20px;
       display: inline-flex;
       align-items: center;
-      gap: 3px;
+      gap: 4px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .storage-used {
@@ -198,6 +187,8 @@
       font-weight: 700;
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.82rem;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .btn-clean-dup {
@@ -1755,13 +1746,10 @@
     <!-- Storage Diagnostics Card -->
     <div class="storage-bar-card" onclick="openStorageStatsModal()" title="Klik untuk lihat Statistik & Rincian Storage">
       <div class="storage-header">
-        <div class="storage-title-wrap">
-          <span class="storage-title">Penggunaan Kapasitas</span>
-          <span class="unlimited-badge">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 12c-2-2.5-4-4-6.5-4A5.5 5.5 0 0 0 0 13.5 5.5 5.5 0 0 0 5.5 19c2.5 0 4.5-1.5 6.5-4 2 2.5 4 4 6.5 4a5.5 5.5 0 0 0 5.5-5.5 5.5 5.5 0 0 0-5.5-5.5c-2.5 0-4.5 1.5-6.5 4z"/></svg>
-            Unlimited
-          </span>
-        </div>
+        <span class="unlimited-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 12c-2-2.5-4-4-6.5-4A5.5 5.5 0 0 0 0 13.5 5.5 5.5 0 0 0 5.5 19c2.5 0 4.5-1.5 6.5-4 2 2.5 4 4 6.5 4a5.5 5.5 0 0 0 5.5-5.5 5.5 5.5 0 0 0-5.5-5.5c-2.5 0-4.5 1.5-6.5 4z"/></svg>
+          Unlimited
+        </span>
         <div style="display: flex; align-items: center; gap: 8px;">
           <span class="storage-used" id="storageSummary">0 MB • 0 File</span>
           <button class="btn-clean-dup" onclick="event.stopPropagation(); openDuplicatesModal();" title="Pindai & Bersihkan Berkas Duplikat">
