@@ -417,11 +417,10 @@ def single_upload_keyboard(folder_id: int, file_id: int):
 
 
 def batch_upload_keyboard(folder_id: int, batch_id: str | None = None, can_smart_sort: bool = False):
-    buttons = [
-        [InlineKeyboardButton("📂 Buka Folder", callback_data=f"f:{folder_id}")],
-    ]
+    buttons = []
     if can_smart_sort and batch_id:
         buttons.append([InlineKeyboardButton("🗂 Rapikan Otomatis (Smart Sort)", callback_data=f"bsm:{batch_id}")])
+    buttons.append([InlineKeyboardButton("📂 Buka Folder", callback_data=f"f:{folder_id}")])
     buttons.append([InlineKeyboardButton("🗑 Bersihkan Notif", callback_data="msg_del")])
     return InlineKeyboardMarkup(buttons)
 

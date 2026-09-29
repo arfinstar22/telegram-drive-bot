@@ -153,14 +153,13 @@ async def _flush_upload_batch(user_id: int, context: ContextTypes.DEFAULT_TYPE):
             f"✅ <b>{count} file</b> berhasil disimpan!\n"
             f"💾 Total: <b>{format_size(total_size)}</b>\n"
             f"📁 Folder: <b>{folder_name}</b>{dup_info}\n\n"
-            f"📋 <b>Rincian File:</b>\n{preview_lines}\n"
-            f"<i>⏱ Pesan ini otomatis bersih dalam 7 detik...</i>"
+            f"📋 <b>Rincian File:</b>\n{preview_lines}"
         )
 
         batch_id = secrets.token_hex(4)
         context.user_data[f"batch_files_{batch_id}"] = [f["id"] for f in files]
-        keyboard = kb.batch_upload_keyboard(folder_id, batch_id, can_smart_sort=is_inbox)
-        delay = 7.0
+        keyboard = kb.batch_upload_keyboard(folder_id, batch_id, can_smart_sort=True)
+        delay = None
 
     if msg_id:
         try:
@@ -171,7 +170,8 @@ async def _flush_upload_batch(user_id: int, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML",
                 reply_markup=keyboard,
             )
-            schedule_auto_delete(context.bot, chat_id, msg_id, delay=delay)
+            if delay:
+                schedule_auto_delete(context.bot, chat_id, msg_id, delay=delay)
             return
         except Exception:
             pass
@@ -183,7 +183,8 @@ async def _flush_upload_batch(user_id: int, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML",
             reply_markup=keyboard,
         )
-        schedule_auto_delete(context.bot, chat_id, sent.message_id, delay=delay)
+        if delay:
+            schedule_auto_delete(context.bot, chat_id, sent.message_id, delay=delay)
     except Exception as exc:
         log.warning("Could not send final upload batch summary: %s", exc)
 
@@ -363,12 +364,10 @@ async def batch_smart_sort(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"Berhasil merapikan <b>{moved_count} file</b> ke dalam folder:\n"
         f"{summary_lines}\n"
-        f"Semua file telah tertata rapi sesuai kategori dan tahunnya!\n\n"
-        f"<i>⏱ Pesan ini otomatis bersih dalam 6 detik...</i>",
+        f"Semua file telah tertata rapi sesuai kategori dan tahunnya!",
         parse_mode="HTML",
         reply_markup=btn,
     )
-    schedule_auto_delete(context.bot, query.message.chat_id, query.message.message_id, delay=6.0)
 
 
 async def delete_notification_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
