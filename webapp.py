@@ -292,6 +292,226 @@ class ApiBatchMoveHandler(BaseApiHandler):
             self.write(json.dumps({"error": str(e)}))
 
 
+class ApiCreateFolderHandler(BaseApiHandler):
+    """Create new folder in drive."""
+    async def post(self):
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            name = (data.get("name") or "").strip()
+            parent_id = data.get("parent_id")
+            user_id = data.get("user_id")
+            if not name or not user_id:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Nama folder dan user_id wajib diisi"}))
+                return
+
+            folder = db.get_or_create_folder(int(user_id), name, int(parent_id) if parent_id else None)
+            self.write(json.dumps({"ok": True, "folder": folder}))
+        except Exception as e:
+            log.exception("Error create folder: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
+class ApiRenameHandler(BaseApiHandler):
+    """Rename file or folder."""
+    async def post(self):
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            item_type = data.get("type", "file")
+            item_id = data.get("id")
+            new_name = (data.get("new_name") or "").strip()
+            user_id = data.get("user_id")
+
+            if not item_id or not new_name or not user_id:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Missing parameters"}))
+                return
+
+            if item_type == "folder":
+                db.rename_folder(int(item_id), new_name)
+            else:
+                db.rename_file(int(item_id), new_name)
+
+            self.write(json.dumps({"ok": True}))
+        except Exception as e:
+            log.exception("Error rename: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
+class ApiBatchDeleteHandler(BaseApiHandler):
+    """Trash/delete files and folders."""
+    async def post(self):
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            file_ids = data.get("file_ids", [])
+            folder_ids = data.get("folder_ids", [])
+            user_id = data.get("user_id")
+
+            del_files = 0
+            for fid in file_ids:
+                try:
+                    db.trash_file(int(fid))
+                    del_files += 1
+                except Exception as ex:
+                    log.warning("Failed trashing file %s: %s", fid, ex)
+
+            del_folders = 0
+            for fld_id in folder_ids:
+                try:
+                    db.delete_folder(int(fld_id))
+                    del_folders += 1
+                except Exception as ex:
+                    log.warning("Failed deleting folder %s: %s", fld_id, ex)
+
+            self.write(json.dumps({"ok": True, "deleted_files": del_files, "deleted_folders": del_folders}))
+        except Exception as e:
+            log.exception("Error batch delete: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
+class ApiBatchStarHandler(BaseApiHandler):
+    """Batch star/unstar files."""
+    async def post(self):
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            file_ids = data.get("file_ids", [])
+            is_starred = bool(data.get("is_starred", True))
+
+            for fid in file_ids:
+                try:
+                    db.db.table("files").update({"is_starred": is_starred, "updated_at": db._now()}).eq("id", int(fid)).execute()
+                except Exception as ex:
+                    log.warning("Failed starring file %s: %s", fid, ex)
+
+            self.write(json.dumps({"ok": True}))
+        except Exception as e:
+            log.exception("Error batch star: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
+class ApiUploadHandler(BaseApiHandler):
+    """Direct file upload from WebApp."""
+    async def post(self):
+        try:
+            user_id_raw = self.get_argument("user_id", None)
+            folder_id_raw = self.get_argument("folder_id", None)
+            if not user_id_raw or not user_id_raw.isdigit():
+                self.set_status(400)
+                self.write(json.dumps({"error": "Invalid user_id"}))
+                return
+
+            user_id = int(user_id_raw)
+            if folder_id_raw and folder_id_raw.isdigit() and int(folder_id_raw) > 0:
+                folder_id = int(folder_id_raw)
+            else:
+                inbox = db.get_or_create_inbox_folder(user_id)
+                folder_id = inbox["id"]
+
+            uploaded_files = self.request.files.get("files", [])
+            if not uploaded_files:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Tidak ada file yang diunggah"}))
+                return
+
+            bot = Bot(BOT_TOKEN)
+            f_obj = db.get_folder(folder_id)
+            folder_name = f_obj["name"] if f_obj else "Folder"
+
+            saved_count = 0
+            for fileinfo in uploaded_files:
+                filename = fileinfo["filename"]
+                body = fileinfo["body"]
+                content_type = fileinfo.get("content_type", "application/octet-stream")
+                size = len(body)
+
+                lower_name = filename.lower()
+                if any(lower_name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
+                    ftype = "photo"
+                    msg = await bot.send_photo(chat_id=user_id, photo=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
+                    fid = msg.photo[-1].file_id
+                    fuid = msg.photo[-1].file_unique_id
+                elif any(lower_name.endswith(ext) for ext in [".mp4", ".mov", ".mkv", ".webm"]):
+                    ftype = "video"
+                    msg = await bot.send_video(chat_id=user_id, video=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
+                    fid = msg.video.file_id
+                    fuid = msg.video.file_unique_id
+                elif any(lower_name.endswith(ext) for ext in [".mp3", ".wav", ".flac", ".m4a"]):
+                    ftype = "audio"
+                    msg = await bot.send_audio(chat_id=user_id, audio=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
+                    fid = msg.audio.file_id
+                    fuid = msg.audio.file_unique_id
+                else:
+                    ftype = "document"
+                    from io import BytesIO
+                    bio = BytesIO(body)
+                    bio.name = filename
+                    msg = await bot.send_document(chat_id=user_id, document=bio, filename=filename, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
+                    fid = msg.document.file_id
+                    fuid = msg.document.file_unique_id
+
+                db.save_file(
+                    user_id=user_id,
+                    folder_id=folder_id,
+                    file_id=fid,
+                    file_unique_id=fuid,
+                    file_name=filename,
+                    file_size=size,
+                    file_type=ftype,
+                    mime_type=content_type,
+                )
+                saved_count += 1
+
+            self.write(json.dumps({"ok": True, "count": saved_count}))
+        except Exception as e:
+            log.exception("Error in ApiUploadHandler: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
+class ApiFileContentHandler(BaseApiHandler):
+    """Fetches text content for text/code preview."""
+    async def get(self):
+        file_id_raw = self.get_argument("file_id", None)
+        if not file_id_raw or not file_id_raw.isdigit():
+            self.set_status(400)
+            self.write(json.dumps({"error": "Invalid file_id"}))
+            return
+
+        f = db.get_file(int(file_id_raw))
+        if not f:
+            self.set_status(404)
+            self.write(json.dumps({"error": "File not found"}))
+            return
+
+        if f.get("file_size", 0) > 2 * 1024 * 1024:
+            self.set_status(400)
+            self.write(json.dumps({"error": "File terlalu besar untuk preview teks (> 2MB)"}))
+            return
+
+        try:
+            bot = Bot(BOT_TOKEN)
+            tg_file = await bot.get_file(f["file_id"])
+            if not tg_file or not tg_file.file_path:
+                self.set_status(500)
+                self.write(json.dumps({"error": "Could not get file path"}))
+                return
+
+            import urllib.request
+            req = urllib.request.Request(tg_file.file_path, headers={"User-Agent": "DarfinStorage"})
+            with urllib.request.urlopen(req) as response:
+                content = response.read().decode("utf-8", errors="replace")
+
+            self.write(json.dumps({"ok": True, "content": content[:80000]}))
+        except Exception as e:
+            log.exception("Error fetching file content: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
 def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
     """Compile all WebApp + Telegram Webhook routes."""
     import telegram.ext._utils.webhookhandler as wh
@@ -305,6 +525,12 @@ def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
         (r"/api/send_to_chat/?", ApiSendToChatHandler),
         (r"/api/all_folders/?", ApiAllFoldersHandler),
         (r"/api/batch_move/?", ApiBatchMoveHandler),
+        (r"/api/create_folder/?", ApiCreateFolderHandler),
+        (r"/api/rename/?", ApiRenameHandler),
+        (r"/api/batch_delete/?", ApiBatchDeleteHandler),
+        (r"/api/batch_star/?", ApiBatchStarHandler),
+        (r"/api/upload/?", ApiUploadHandler),
+        (r"/api/file_content/?", ApiFileContentHandler),
     ]
 
 
@@ -342,6 +568,12 @@ def start_standalone_webapp_server(port: int = 10000):
         (r"/api/send_to_chat/?", ApiSendToChatHandler),
         (r"/api/all_folders/?", ApiAllFoldersHandler),
         (r"/api/batch_move/?", ApiBatchMoveHandler),
+        (r"/api/create_folder/?", ApiCreateFolderHandler),
+        (r"/api/rename/?", ApiRenameHandler),
+        (r"/api/batch_delete/?", ApiBatchDeleteHandler),
+        (r"/api/batch_star/?", ApiBatchStarHandler),
+        (r"/api/upload/?", ApiUploadHandler),
+        (r"/api/file_content/?", ApiFileContentHandler),
     ]
     app = tornado.web.Application(routes)
     try:

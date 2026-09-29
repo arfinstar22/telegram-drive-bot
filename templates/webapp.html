@@ -1017,6 +1017,233 @@
       font-size: 3rem;
       margin-bottom: 12px;
     }
+
+    /* Upload FAB Button */
+    .upload-fab {
+      position: fixed;
+      right: 20px;
+      bottom: calc(24px + var(--safe-bottom));
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      color: #030712;
+      border: none;
+      box-shadow: 0 6px 20px rgba(56, 189, 248, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 95;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+    }
+
+    .upload-fab:active {
+      transform: scale(0.9);
+    }
+
+    /* Upload Progress Toast Card */
+    .upload-progress-card {
+      position: fixed;
+      bottom: calc(85px + var(--safe-bottom));
+      left: 50%;
+      transform: translateX(-50%) translateY(120px);
+      width: calc(100% - 32px);
+      max-width: 480px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid var(--accent);
+      backdrop-filter: blur(20px);
+      border-radius: 14px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.7), 0 0 20px rgba(56, 189, 248, 0.25);
+      z-index: 150;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .upload-progress-card.active {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .upc-spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid rgba(56, 189, 248, 0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .upc-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .upc-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #fff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .upc-sub {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* Sort Select */
+    .sort-select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 5px 8px;
+      border-radius: 8px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .sort-select:focus {
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* New Folder Button */
+    .btn-new-folder {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px dashed rgba(56, 189, 248, 0.4);
+      color: var(--accent);
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+
+    .btn-new-folder:active {
+      transform: scale(0.96);
+      background: rgba(56, 189, 248, 0.2);
+    }
+
+    /* Danger Button */
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--rose);
+      border: 1px solid rgba(244, 63, 94, 0.35);
+    }
+
+    .btn-danger:hover, .btn-danger:active {
+      background: rgba(244, 63, 94, 0.25);
+    }
+
+    /* Batch Selection Extra Buttons */
+    .btn-sel-star {
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      color: var(--gold);
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .btn-sel-star:active {
+      transform: scale(0.96);
+    }
+
+    .btn-sel-delete {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: var(--rose);
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .btn-sel-delete:active {
+      transform: scale(0.96);
+    }
+
+    /* Media Previews */
+    .media-preview-container {
+      margin-bottom: 16px;
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
+    }
+
+    .preview-video-large {
+      padding: 24px 16px;
+      text-align: center;
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.1), rgba(0, 0, 0, 0.5));
+    }
+
+    .code-preview-box {
+      max-height: 220px;
+      overflow-y: auto;
+      background: #050811;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 10px;
+      padding: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: #93C5FD;
+      white-space: pre-wrap;
+      word-break: break-all;
+      user-select: text;
+    }
+
+    /* Prompt Input */
+    .prompt-input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      color: #fff;
+      outline: none;
+      margin: 14px 0 18px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .prompt-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
   </style>
 </head>
 <body>
@@ -1084,8 +1311,14 @@
     <!-- Folders Section -->
     <div id="foldersSection">
       <div class="section-title">
-        <span>Folder</span>
-        <span id="folderCountLabel"></span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Folder</span>
+          <span id="folderCountLabel"></span>
+        </div>
+        <button class="btn-new-folder" onclick="openCreateFolderModal()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Folder Baru
+        </button>
       </div>
       <div class="folders-grid" id="foldersContainer">
         <!-- Rendered dynamically -->
@@ -1101,13 +1334,23 @@
           <span id="selectModeBtnText">Pilih</span>
         </button>
       </div>
-      <div class="view-toggle">
-        <button class="view-btn active" id="btnViewGrid" onclick="setViewMode('grid')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
-        </button>
-        <button class="view-btn" id="btnViewList" onclick="setViewMode('list')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
-        </button>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <select class="sort-select" id="sortOrderSelect" onchange="changeSortOrder(this.value)">
+          <option value="date_desc">Terbaru</option>
+          <option value="date_asc">Terlama</option>
+          <option value="name_asc">A-Z</option>
+          <option value="name_desc">Z-A</option>
+          <option value="size_desc">Terbesar</option>
+          <option value="size_asc">Terkecil</option>
+        </select>
+        <div class="view-toggle">
+          <button class="view-btn active" id="btnViewGrid" onclick="setViewMode('grid')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+          </button>
+          <button class="view-btn" id="btnViewList" onclick="setViewMode('list')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1141,7 +1384,7 @@
   <div class="modal-overlay" id="fileModal" onclick="closeModal(event)">
     <div class="modal-sheet" onclick="event.stopPropagation()">
       <div class="sheet-handle"></div>
-      <div id="modalPreviewMedia" style="margin-bottom: 16px; border-radius: 12px; overflow: hidden; max-height: 240px; display: none;"></div>
+      <div id="modalPreviewMedia" class="media-preview-container" style="display: none;"></div>
       <h3 class="sheet-title" id="modalFileName">Nama File</h3>
       <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 12px;" id="modalFileMeta">Ukuran • Tanggal</p>
       
@@ -1173,6 +1416,16 @@
             Salin Link
           </button>
         </div>
+        <div class="sheet-action-row" style="grid-template-columns: 1fr 1fr;">
+          <button class="btn btn-secondary" onclick="openRenameModal(activeModalFile)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            Ubah Nama
+          </button>
+          <button class="btn btn-danger" onclick="openDeleteConfirmModal([activeModalFile.id])">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Hapus
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1184,9 +1437,15 @@
       <button class="btn-sel-text" id="btnSelectAll" onclick="selectAllFiles()">Pilih Semua</button>
     </div>
     <div class="sel-actions">
+      <button class="btn-sel-star" id="btnSelStar" onclick="batchStarSelected()" title="Bintang">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      </button>
       <button class="btn-sel-move" id="btnSelMove" onclick="openMoveModal()">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><polyline points="12 11 12 17 9 14"/><line x1="12" y1="17" x2="15" y2="14"/></svg>
-        Pindahkan
+        Pindah
+      </button>
+      <button class="btn-sel-delete" id="btnSelDelete" onclick="openDeleteConfirmModal(Array.from(selectedFileIds))" title="Hapus">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       </button>
       <button class="btn-sel-close" onclick="exitSelectMode()" title="Batal">✕</button>
     </div>
@@ -1218,6 +1477,55 @@
     </div>
   </div>
 
+  <!-- Generic Prompt Modal (Folder Creation & Renaming) -->
+  <div class="modal-overlay" id="genericPromptModal" onclick="closePromptModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <h3 class="sheet-title" id="promptModalTitle">Judul</h3>
+      <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 8px;" id="promptModalSub">Keterangan</p>
+      <input type="text" class="prompt-input" id="promptModalInput" placeholder="Masukkan nama..." autocomplete="off">
+      <div class="sheet-actions" style="margin-top: 6px;">
+        <div class="sheet-action-row">
+          <button class="btn btn-secondary" onclick="closePromptModal()">Batal</button>
+          <button class="btn btn-primary" id="btnConfirmPrompt" onclick="confirmPromptModal()">Simpan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generic Confirm Modal (Deletion) -->
+  <div class="modal-overlay" id="genericConfirmModal" onclick="closeConfirmModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <h3 class="sheet-title" id="confirmModalTitle">Hapus Berkas?</h3>
+      <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 16px; line-height: 1.5;" id="confirmModalMsg">Berkas yang dihapus tidak dapat dipulihkan.</p>
+      <div class="sheet-actions" style="margin-top: 6px;">
+        <div class="sheet-action-row">
+          <button class="btn btn-secondary" onclick="closeConfirmModal()">Batal</button>
+          <button class="btn btn-danger" id="btnExecuteConfirm" onclick="executeConfirmModal()">Hapus Permanen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload FAB & Hidden Input -->
+  <button class="upload-fab" id="uploadFab" onclick="triggerWebUpload()" title="Unggah Berkas">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  </button>
+  <input type="file" id="webFileInput" multiple style="display: none;" onchange="handleWebUpload(event)">
+
+  <!-- Upload Progress Floating Card -->
+  <div class="upload-progress-card" id="uploadProgressCard">
+    <div class="upc-spinner"></div>
+    <div class="upc-info">
+      <div class="upc-title" id="upcTitle">Mengunggah berkas...</div>
+      <div class="upc-sub" id="upcSub">Mohon tunggu sebentar</div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div class="toast-container" id="toastNotification"></div>
 
@@ -1240,6 +1548,7 @@
 
     let currentFolderId = null;
     let currentCategory = 'all';
+    let currentSortOrder = 'date_desc';
     let currentViewMode = 'grid';
     let driveData = { folders: [], files: [] };
     let activeModalFile = null;
@@ -1248,6 +1557,8 @@
     let targetMoveFolderId = null;
     let pendingMoveFileIds = [];
     let longPressTimer = null;
+    let promptCallback = null;
+    let confirmCallback = null;
 
     const audioEl = document.getElementById('globalAudioPlayer');
 
@@ -1311,11 +1622,16 @@
     function renderFolders(folders) {
       const container = document.getElementById('foldersContainer');
       const section = document.getElementById('foldersSection');
+      section.style.display = 'block';
       if (!folders || folders.length === 0) {
-        section.style.display = 'none';
+        document.getElementById('folderCountLabel').innerText = '0 folder';
+        container.innerHTML = `
+          <div style="grid-column: 1/-1; font-size: 0.76rem; color: var(--text-muted); padding: 8px 4px;">
+            Belum ada sub-folder di sini. Klik <strong>+ Folder Baru</strong> di atas untuk membuat.
+          </div>
+        `;
         return;
       }
-      section.style.display = 'block';
       document.getElementById('folderCountLabel').innerText = `${folders.length} folder`;
 
       container.innerHTML = folders.map(f => `
@@ -1455,8 +1771,14 @@
       }
     });
 
+    function changeSortOrder(val) {
+      triggerHaptic();
+      currentSortOrder = val;
+      applyFilter();
+    }
+
     function getFilteredFiles(query = document.getElementById('searchInput')?.value?.toLowerCase()?.trim() || '') {
-      let filtered = driveData.files || [];
+      let filtered = (driveData.files || []).slice();
       if (currentCategory !== 'all') {
         if (currentCategory === 'starred') {
           filtered = filtered.filter(f => f.is_starred);
@@ -1467,12 +1789,30 @@
 
       if (query) {
         filtered = filtered.filter(f => {
-          const matchName = f.file_name.toLowerCase().includes(query);
-          const matchTags = (f.tags || []).some(t => t.toLowerCase().includes(query.replace('#', '')));
+          const matchName = (f.file_name || '').toLowerCase().includes(query);
+          const matchTags = (f.tags || []).some(t => (t || '').toLowerCase().includes(query.replace('#', '')));
           const matchNote = (f.note || '').toLowerCase().includes(query);
           return matchName || matchTags || matchNote;
         });
       }
+
+      filtered.sort((a, b) => {
+        if (currentSortOrder === 'date_desc') {
+          return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+        } else if (currentSortOrder === 'date_asc') {
+          return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+        } else if (currentSortOrder === 'name_asc') {
+          return (a.file_name || '').localeCompare(b.file_name || '');
+        } else if (currentSortOrder === 'name_desc') {
+          return (b.file_name || '').localeCompare(a.file_name || '');
+        } else if (currentSortOrder === 'size_desc') {
+          return (b.file_size || 0) - (a.file_size || 0);
+        } else if (currentSortOrder === 'size_asc') {
+          return (a.file_size || 0) - (b.file_size || 0);
+        }
+        return 0;
+      });
+
       return filtered;
     }
 
@@ -1530,11 +1870,79 @@
       previewEl.style.display = 'none';
       previewEl.innerHTML = '';
 
+      const fname = (f.file_name || '').toLowerCase();
+      const dlUrl = `/api/download?file_id=${f.id}&user_id=${userId}`;
+
+      if (f.file_type === 'photo') {
+        previewEl.style.display = 'block';
+        previewEl.innerHTML = `<img src="${f.stream_url || dlUrl}" style="width: 100%; max-height: 250px; object-fit: contain; background: #000; border-radius: 8px; display: block;" alt="${escapeHtml(f.file_name)}">`;
+      } else if (f.file_type === 'video') {
+        previewEl.style.display = 'block';
+        const sizeBytes = f.file_size || 0;
+        const isOver20MB = sizeBytes > 20 * 1024 * 1024;
+        if (!isOver20MB) {
+          previewEl.innerHTML = `
+            <video controls playsinline preload="metadata" style="width: 100%; max-height: 250px; border-radius: 8px; background: #000; display: block;" src="${dlUrl}"></video>
+          `;
+        } else {
+          previewEl.innerHTML = `
+            <div class="preview-video-large">
+              <div style="font-size: 2.2rem; margin-bottom: 6px;">🎬</div>
+              <div style="font-weight: 700; color: #fff; font-size: 0.95rem;">Video Berukuran Besar (${f.file_size_formatted})</div>
+              <div style="font-size: 0.74rem; color: var(--text-muted); margin: 6px auto 14px; max-width: 380px; line-height: 1.4;">
+                File di atas 20MB dapat ditonton langsung streaming di pemutar video Telegram tanpa limit unduhan bot.
+              </div>
+              <button class="btn btn-primary" style="margin: 0 auto; padding: 8px 16px; font-size: 0.8rem;" onclick="sendFileToChat()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Buka & Tonton di Telegram
+              </button>
+            </div>
+          `;
+        }
+      } else if (fname.endsWith('.pdf')) {
+        previewEl.style.display = 'block';
+        previewEl.innerHTML = `
+          <div style="padding: 14px; text-align: center; background: rgba(56, 189, 248, 0.05); border-radius: 8px;">
+            <div style="font-size: 2rem; margin-bottom: 4px;">📑</div>
+            <div style="font-size: 0.82rem; font-weight: 600; color: #fff; margin-bottom: 8px;">Dokumen PDF</div>
+            <a href="${dlUrl}" target="_blank" class="btn btn-secondary" style="display: inline-flex; padding: 6px 14px; font-size: 0.75rem; text-decoration: none;">
+              🔍 Buka / Pratinjau PDF
+            </a>
+          </div>
+        `;
+      } else if (fname.endsWith('.txt') || fname.endsWith('.py') || fname.endsWith('.json') || fname.endsWith('.csv') || fname.endsWith('.md') || fname.endsWith('.log') || fname.endsWith('.js') || fname.endsWith('.html') || fname.endsWith('.css')) {
+        if ((f.file_size || 0) <= 2 * 1024 * 1024) {
+          previewEl.style.display = 'block';
+          previewEl.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span style="font-size: 0.72rem; color: var(--accent); font-weight: 700;">📝 Pratinjau Kode / Teks</span>
+            </div>
+            <div class="code-preview-box" id="codeBoxContent">Memuat teks...</div>
+          `;
+          fetch(`/api/file_content?file_id=${f.id}`)
+            .then(r => r.json())
+            .then(data => {
+              const box = document.getElementById('codeBoxContent');
+              if (box) {
+                if (data.ok) {
+                  box.innerText = data.content || '(File kosong)';
+                } else {
+                  box.innerText = 'Gagal memuat pratinjau teks: ' + (data.error || 'Error');
+                }
+              }
+            })
+            .catch(err => {
+              const box = document.getElementById('codeBoxContent');
+              if (box) box.innerText = 'Gagal memuat teks: ' + err;
+            });
+        }
+      }
+
       // Direct download link
       const dlBtn = document.getElementById('modalDownloadBtn');
       dlBtn.onclick = () => {
         triggerHaptic();
-        window.open(`/api/download?file_id=${f.id}&user_id=${userId}`, '_blank');
+        window.open(dlUrl, '_blank');
       };
 
       if (f.file_type === 'audio') {
@@ -1671,6 +2079,8 @@
       const bar = document.getElementById('selectionBar');
       const countPill = document.getElementById('selCountPill');
       const moveBtn = document.getElementById('btnSelMove');
+      const starBtn = document.getElementById('btnSelStar');
+      const delBtn = document.getElementById('btnSelDelete');
       const selectAllBtn = document.getElementById('btnSelectAll');
       const visibleFiles = getFilteredFiles();
       const count = selectedFileIds.size;
@@ -1683,14 +2093,16 @@
       if (count > 0) {
         bar.classList.add('active');
         countPill.innerText = `${count} Dipilih`;
-        moveBtn.disabled = false;
-        moveBtn.style.opacity = '1';
+        if (moveBtn) { moveBtn.disabled = false; moveBtn.style.opacity = '1'; }
+        if (starBtn) { starBtn.disabled = false; starBtn.style.opacity = '1'; }
+        if (delBtn) { delBtn.disabled = false; delBtn.style.opacity = '1'; }
       } else {
         if (isSelectMode) {
           bar.classList.add('active');
           countPill.innerText = `Pilih berkas...`;
-          moveBtn.disabled = true;
-          moveBtn.style.opacity = '0.5';
+          if (moveBtn) { moveBtn.disabled = true; moveBtn.style.opacity = '0.5'; }
+          if (starBtn) { starBtn.disabled = true; starBtn.style.opacity = '0.5'; }
+          if (delBtn) { delBtn.disabled = true; delBtn.style.opacity = '0.5'; }
         } else {
           bar.classList.remove('active');
         }
@@ -1834,6 +2246,247 @@
           tg.showPopup({ message: 'Tautan file berhasil disalin ke clipboard!' });
         } else {
           alert('Tautan disalin ke clipboard!');
+        }
+      });
+    }
+
+    // Direct Web Upload Logic
+    function triggerWebUpload() {
+      triggerHaptic();
+      const input = document.getElementById('webFileInput');
+      if (input) input.click();
+    }
+
+    async function handleWebUpload(event) {
+      const files = event.target.files;
+      if (!files || !files.length) return;
+      triggerHaptic();
+
+      const card = document.getElementById('uploadProgressCard');
+      const title = document.getElementById('upcTitle');
+      const sub = document.getElementById('upcSub');
+      title.innerText = `Mengunggah ${files.length} berkas...`;
+      sub.innerText = 'Menyimpan ke cloud bot Telegram...';
+      card.classList.add('active');
+
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+      }
+
+      try {
+        let uploadUrl = `/api/upload?user_id=${userId}`;
+        if (currentFolderId) {
+          uploadUrl += `&folder_id=${currentFolderId}`;
+        }
+        const res = await fetch(uploadUrl, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`✅ Berhasil mengunggah ${data.count} berkas!`);
+          await loadDriveData();
+        } else {
+          alert('Gagal mengunggah: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Gagal mengunggah: ' + err);
+      } finally {
+        card.classList.remove('active');
+        event.target.value = '';
+      }
+    }
+
+    // Batch Star Action
+    async function batchStarSelected() {
+      const fileIds = Array.from(selectedFileIds);
+      if (!fileIds.length) return;
+      triggerHaptic();
+
+      try {
+        const res = await fetch('/api/batch_star', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file_ids: fileIds,
+            is_starred: true,
+            user_id: userId
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`⭐ ${fileIds.length} berkas ditambahkan ke favorit!`);
+          (driveData.files || []).forEach(f => {
+            if (selectedFileIds.has(f.id)) {
+              f.is_starred = true;
+            }
+          });
+          exitSelectMode();
+          applyFilter();
+        } else {
+          alert('Gagal menambahkan bintang: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Gagal membintangi berkas: ' + err);
+      }
+    }
+
+    // Generic Prompt Modal Logic (Folder Creation & Renaming)
+    function openPromptModal({ title, sub, placeholder, defaultValue, onConfirm }) {
+      triggerHaptic();
+      document.getElementById('promptModalTitle').innerText = title;
+      document.getElementById('promptModalSub').innerText = sub;
+      const inp = document.getElementById('promptModalInput');
+      inp.placeholder = placeholder || '';
+      inp.value = defaultValue || '';
+      promptCallback = onConfirm;
+      document.getElementById('genericPromptModal').classList.add('active');
+      setTimeout(() => { inp.focus(); inp.select(); }, 150);
+    }
+
+    function closePromptModal(e) {
+      if (!e || e.target?.id === 'genericPromptModal' || e.target?.classList?.contains('sheet-handle') || !e.target) {
+        document.getElementById('genericPromptModal').classList.remove('active');
+        promptCallback = null;
+      }
+    }
+
+    async function confirmPromptModal() {
+      const val = document.getElementById('promptModalInput').value.trim();
+      if (!val) {
+        alert('Nama tidak boleh kosong');
+        return;
+      }
+      triggerHaptic();
+      const cb = promptCallback;
+      document.getElementById('genericPromptModal').classList.remove('active');
+      promptCallback = null;
+      if (cb) {
+        await cb(val);
+      }
+    }
+
+    function openCreateFolderModal() {
+      openPromptModal({
+        title: '📁 Buat Folder Baru',
+        sub: 'Masukkan nama folder yang akan dibuat:',
+        placeholder: 'Nama folder...',
+        defaultValue: '',
+        onConfirm: async (folderName) => {
+          try {
+            const res = await fetch('/api/create_folder', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: folderName,
+                user_id: userId,
+                parent_id: currentFolderId
+              })
+            });
+            const data = await res.json();
+            if (data.ok) {
+              showToast(`✅ Folder "${folderName}" berhasil dibuat!`);
+              await loadDriveData();
+            } else {
+              alert('Gagal membuat folder: ' + (data.error || 'Unknown error'));
+            }
+          } catch (err) {
+            alert('Gagal membuat folder: ' + err);
+          }
+        }
+      });
+    }
+
+    function openRenameModal(f) {
+      if (!f) return;
+      openPromptModal({
+        title: '✏️ Ubah Nama Berkas',
+        sub: 'Ketik nama berkas baru:',
+        placeholder: 'Nama berkas...',
+        defaultValue: f.file_name,
+        onConfirm: async (newName) => {
+          try {
+            const res = await fetch('/api/rename', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: f.id,
+                new_name: newName,
+                is_folder: false,
+                user_id: userId
+              })
+            });
+            const data = await res.json();
+            if (data.ok) {
+              showToast(`✅ Nama berkas diubah!`);
+              f.file_name = newName;
+              document.getElementById('modalFileName').innerText = newName;
+              applyFilter();
+            } else {
+              alert('Gagal mengubah nama: ' + (data.error || 'Unknown error'));
+            }
+          } catch (err) {
+            alert('Gagal mengubah nama: ' + err);
+          }
+        }
+      });
+    }
+
+    // Generic Confirm Modal Logic (Deletion)
+    function openConfirmModal({ title, msg, onConfirm }) {
+      triggerHaptic();
+      document.getElementById('confirmModalTitle').innerText = title;
+      document.getElementById('confirmModalMsg').innerText = msg;
+      confirmCallback = onConfirm;
+      document.getElementById('genericConfirmModal').classList.add('active');
+    }
+
+    function closeConfirmModal(e) {
+      if (!e || e.target?.id === 'genericConfirmModal' || e.target?.classList?.contains('sheet-handle') || !e.target) {
+        document.getElementById('genericConfirmModal').classList.remove('active');
+        confirmCallback = null;
+      }
+    }
+
+    async function executeConfirmModal() {
+      triggerHaptic();
+      const cb = confirmCallback;
+      document.getElementById('genericConfirmModal').classList.remove('active');
+      confirmCallback = null;
+      if (cb) {
+        await cb();
+      }
+    }
+
+    function openDeleteConfirmModal(fileIds) {
+      if (!fileIds || !fileIds.length) return;
+      const count = fileIds.length;
+      openConfirmModal({
+        title: `🗑 Hapus ${count} Berkas?`,
+        msg: `Apakah Anda yakin ingin menghapus ${count} berkas ini secara permanen dari penyimpanan Anda?`,
+        onConfirm: async () => {
+          try {
+            const res = await fetch('/api/batch_delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                file_ids: fileIds,
+                user_id: userId
+              })
+            });
+            const data = await res.json();
+            if (data.ok) {
+              showToast(`✅ ${data.deleted_files || count} berkas berhasil dihapus!`);
+              document.getElementById('fileModal').classList.remove('active');
+              exitSelectMode();
+              await loadDriveData();
+            } else {
+              alert('Gagal menghapus: ' + (data.error || 'Unknown error'));
+            }
+          } catch (err) {
+            alert('Gagal menghapus: ' + err);
+          }
         }
       });
     }
