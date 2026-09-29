@@ -38,6 +38,15 @@ class BaseApiHandler(tornado.web.RequestHandler):
         self.finish()
 
 
+class ApiPingHandler(BaseApiHandler):
+    """Health check / ping endpoint for keep-alive worker and WebApp cold-start detection."""
+    def get(self):
+        self.write({"ok": True, "status": "awake", "service": "telegram-drive-bot"})
+
+    def head(self):
+        self.set_status(200)
+
+
 class WebAppPageHandler(tornado.web.RequestHandler):
     def get(self):
         try:
@@ -1177,6 +1186,8 @@ def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
         (r"/api/empty_trash/?", ApiEmptyTrashHandler),
         (r"/api/duplicates/?", ApiDuplicatesHandler),
         (r"/api/clean_duplicates/?", ApiCleanDuplicatesHandler),
+        (r"/api/ping/?", ApiPingHandler),
+        (r"/health/?", ApiPingHandler),
     ]
 
 
@@ -1234,6 +1245,8 @@ def start_standalone_webapp_server(port: int = 10000):
         (r"/api/empty_trash/?", ApiEmptyTrashHandler),
         (r"/api/duplicates/?", ApiDuplicatesHandler),
         (r"/api/clean_duplicates/?", ApiCleanDuplicatesHandler),
+        (r"/api/ping/?", ApiPingHandler),
+        (r"/health/?", ApiPingHandler),
     ]
     app = tornado.web.Application(routes)
     try:

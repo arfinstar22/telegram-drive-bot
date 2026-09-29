@@ -14,11 +14,43 @@ async def noop(update, context):
     await update.callback_query.answer()
 
 
+async def keep_alive_worker():
+    """Periodically ping self every 10 minutes to prevent Render free-tier idle spin-down."""
+    if not WEBHOOK_URL:
+        return
+    import urllib.request
+    ping_url = f"{WEBHOOK_URL.rstrip('/')}/api/ping"
+    log.info("Keep-alive worker started. Target: %s (interval: 10m)", ping_url)
+    # Wait 3 minutes before beginning recurring keep-alive pings
+    await asyncio.sleep(180)
+    while True:
+        try:
+            req = urllib.request.Request(
+                ping_url,
+                headers={"User-Agent": "DarfinStorage-KeepAlive/1.0"}
+            )
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                None,
+                lambda: urllib.request.urlopen(req, timeout=15)
+            )
+            log.info("Keep-alive ping OK -> %s", ping_url)
+        except Exception as e:
+            log.debug("Keep-alive ping note: %s", e)
+        await asyncio.sleep(600)
+
+
+async def post_init(application: Application) -> None:
+    """Post initialization hook to launch background keep-alive worker."""
+    if WEBHOOK_URL:
+        asyncio.create_task(keep_alive_worker())
+
+
 def main():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
 
     # ── Commands ───────────────────────────────────────
     app.add_handler(CommandHandler("start", menu.start))

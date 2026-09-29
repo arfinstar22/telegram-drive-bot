@@ -500,6 +500,7 @@
 
     let queuedFiles = [];
     let folderData = null;
+    let dzRetryCount = 0;
 
     // Load Dropzone info
     async function initDropzone() {
@@ -520,7 +521,13 @@
           showErrorView(data.error || 'Folder tidak ditemukan');
         }
       } catch (err) {
-        showErrorView('Koneksi terganggu: ' + err);
+        if (dzRetryCount < 6) {
+          dzRetryCount++;
+          document.getElementById('folderName').innerText = `Menghubungkan server (${dzRetryCount * 5}s)...`;
+          setTimeout(initDropzone, 3500);
+          return;
+        }
+        showErrorView('Koneksi terganggu. Pastikan server aktif: ' + err);
       }
     }
 

@@ -1722,6 +1722,242 @@
       border-color: var(--accent);
       box-shadow: 0 0 0 3px var(--accent-glow);
     }
+
+    /* ── Server Cold-Start Wakeup Overlay ── */
+    .wakeup-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(7, 11, 20, 0.92);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+      opacity: 0;
+      padding: 20px;
+      transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .wakeup-overlay.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .wakeup-card {
+      width: 100%;
+      max-width: 420px;
+      background: linear-gradient(180deg, rgba(17, 24, 39, 0.95) 0%, rgba(11, 17, 32, 0.98) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(6, 182, 212, 0.15);
+      border-radius: 24px;
+      padding: 28px 22px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      transform: scale(0.95);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .wakeup-overlay.active .wakeup-card {
+      transform: scale(1);
+    }
+
+    .wakeup-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--accent-purple), transparent);
+    }
+
+    .wakeup-radar-wrap {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 16px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .wakeup-radar-pulse {
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 2px solid rgba(56, 189, 248, 0.4);
+      animation: radar-pulse 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+
+    .wakeup-radar-pulse:nth-child(2) {
+      animation-delay: 0.65s;
+    }
+
+    .wakeup-radar-pulse:nth-child(3) {
+      animation-delay: 1.3s;
+    }
+
+    @keyframes radar-pulse {
+      0% {
+        transform: scale(0.6);
+        opacity: 0.9;
+      }
+      100% {
+        transform: scale(1.6);
+        opacity: 0;
+      }
+    }
+
+    .wakeup-icon-core {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(99, 102, 241, 0.25));
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+    }
+
+    .wakeup-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fbbf24;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+      letter-spacing: 0.3px;
+    }
+
+    .wakeup-badge.connected {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+
+    .wakeup-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+      margin: 0 0 8px 0;
+      letter-spacing: -0.3px;
+    }
+
+    .wakeup-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin: 0 0 18px 0;
+    }
+
+    .wakeup-counter-box {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+    }
+
+    .wakeup-timer-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .wakeup-timer-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .wakeup-timer-val {
+      font-size: 1.25rem;
+      font-weight: 800;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--accent);
+      letter-spacing: 0.5px;
+    }
+
+    .wakeup-bar-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .wakeup-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), #10B981);
+      border-radius: 3px;
+      transition: width 0.8s ease;
+    }
+
+    .wakeup-stage-status {
+      font-size: 0.73rem;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .wakeup-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .wakeup-btn-retry {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #0ea5e9, #0284c7);
+      color: #fff;
+      border: none;
+      padding: 11px 16px;
+      border-radius: 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.3);
+      transition: all 0.2s;
+    }
+
+    .wakeup-btn-retry:hover {
+      background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+    }
+
+    .wakeup-btn-dim {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      padding: 11px 16px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .wakeup-btn-dim:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -2255,6 +2491,57 @@
     </div>
   </div>
 
+  <!-- Server Cold-Start Wakeup Countdown Overlay -->
+  <div class="wakeup-overlay" id="serverWakeupOverlay">
+    <div class="wakeup-card" onclick="event.stopPropagation()">
+      <div class="wakeup-radar-wrap">
+        <div class="wakeup-radar-pulse"></div>
+        <div class="wakeup-radar-pulse"></div>
+        <div class="wakeup-radar-pulse"></div>
+        <div class="wakeup-icon-core">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
+            <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+            <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
+            <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="wakeup-badge" id="wakeupBadge">
+        <span>⚡</span> Mode Siaga Render.com
+      </div>
+
+      <h3 class="wakeup-title" id="wakeupTitle">Menyiapkan Server Bot...</h3>
+      <p class="wakeup-desc" id="wakeupDesc">
+        Server otomatis berhibernasi setelah 15 menit tanpa aktivitas untuk menghemat daya. Sistem sedang menyalakan kembali container server bot, mohon tunggu sebentar.
+      </p>
+
+      <div class="wakeup-counter-box">
+        <div class="wakeup-timer-row">
+          <span class="wakeup-timer-label">Estimasi Waktu Bangun</span>
+          <span class="wakeup-timer-val" id="wakeupCountdownVal">35s</span>
+        </div>
+        <div class="wakeup-bar-track">
+          <div class="wakeup-bar-fill" id="wakeupProgressBar" style="width: 0%;"></div>
+        </div>
+        <div class="wakeup-stage-status" id="wakeupStageText">
+          <span>🚀 Menghubungkan ke node cluster Render...</span>
+        </div>
+      </div>
+
+      <div class="wakeup-actions">
+        <button class="wakeup-btn-retry" onclick="forceServerWakeupRetry()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Hubungkan Sekarang
+        </button>
+        <button class="wakeup-btn-dim" onclick="dismissServerWakeupOverlay()">
+          Latar Belakang
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Upload FAB & Hidden Input -->
   <button class="upload-fab" id="uploadFab" onclick="triggerWebUpload()" title="Unggah Berkas">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
@@ -2315,27 +2602,167 @@
       }
     }
 
+    // ── Server Cold-Start Detection & Lazy Loading ───────
+    let coldStartTimer = null;
+    let wakeupCountdownInterval = null;
+    let wakeupPollInterval = null;
+    let wakeupSecondsRemaining = 35;
+    const WAKEUP_TOTAL_SECONDS = 35;
+    let isServerAwake = false;
+
+    function showServerWakeupOverlay(reason = 'slow') {
+      if (isServerAwake) return;
+      const overlay = document.getElementById('serverWakeupOverlay');
+      if (!overlay) return;
+      
+      overlay.classList.add('active');
+      triggerHaptic();
+
+      if (wakeupCountdownInterval) return; // already counting down
+
+      wakeupSecondsRemaining = WAKEUP_TOTAL_SECONDS;
+      updateWakeupCountdownUI();
+
+      wakeupCountdownInterval = setInterval(() => {
+        if (wakeupSecondsRemaining > 0) {
+          wakeupSecondsRemaining--;
+          updateWakeupCountdownUI();
+        } else {
+          const timerVal = document.getElementById('wakeupCountdownVal');
+          const stageText = document.getElementById('wakeupStageText');
+          if (timerVal) timerVal.innerText = 'Menunggu...';
+          if (stageText) stageText.innerHTML = `<span>🔄 Menunggu inisialisasi server selesai...</span>`;
+        }
+      }, 1000);
+
+      // Poll server status every 3.5s
+      if (!wakeupPollInterval) {
+        wakeupPollInterval = setInterval(pollServerStatus, 3500);
+      }
+    }
+
+    function updateWakeupCountdownUI() {
+      const timerVal = document.getElementById('wakeupCountdownVal');
+      const barFill = document.getElementById('wakeupProgressBar');
+      const stageText = document.getElementById('wakeupStageText');
+      if (!timerVal || !barFill) return;
+
+      timerVal.innerText = `${wakeupSecondsRemaining}s`;
+
+      const progress = Math.min(94, Math.round(((WAKEUP_TOTAL_SECONDS - wakeupSecondsRemaining) / WAKEUP_TOTAL_SECONDS) * 100));
+      barFill.style.width = `${progress}%`;
+
+      if (stageText) {
+        if (wakeupSecondsRemaining > 25) {
+          stageText.innerHTML = `<span>🚀 Menghubungkan ke node cluster Render...</span>`;
+        } else if (wakeupSecondsRemaining > 15) {
+          stageText.innerHTML = `<span>⚙️ Memulai instance Python & Supabase...</span>`;
+        } else if (wakeupSecondsRemaining > 5) {
+          stageText.innerHTML = `<span>📡 Menginisialisasi respon WebApp Drive...</span>`;
+        } else {
+          stageText.innerHTML = `<span>🔄 Memverifikasi handshake koneksi aktif...</span>`;
+        }
+      }
+    }
+
+    async function pollServerStatus() {
+      try {
+        let url = `/api/drive?user_id=${userId}`;
+        if (currentFolderId) url += `&folder_id=${currentFolderId}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          handleServerWakeupSuccess(data);
+        }
+      } catch (e) {
+        // Still cold-starting or booting, ignore harmless network error
+      }
+    }
+
+    function handleServerWakeupSuccess(data) {
+      isServerAwake = true;
+      if (coldStartTimer) clearTimeout(coldStartTimer);
+      if (wakeupCountdownInterval) {
+        clearInterval(wakeupCountdownInterval);
+        wakeupCountdownInterval = null;
+      }
+      if (wakeupPollInterval) {
+        clearInterval(wakeupPollInterval);
+        wakeupPollInterval = null;
+      }
+
+      const badge = document.getElementById('wakeupBadge');
+      const title = document.getElementById('wakeupTitle');
+      const desc = document.getElementById('wakeupDesc');
+      const timerVal = document.getElementById('wakeupCountdownVal');
+      const barFill = document.getElementById('wakeupProgressBar');
+      const stageText = document.getElementById('wakeupStageText');
+
+      if (badge) {
+        badge.classList.add('connected');
+        badge.innerHTML = `<span>✅</span> Terhubung`;
+      }
+      if (title) title.innerText = 'Server Telah Aktif!';
+      if (desc) desc.innerText = 'Koneksi berhasil terjalin. Berkas Drive Anda siap digunakan.';
+      if (timerVal) timerVal.innerText = '100%';
+      if (barFill) barFill.style.width = '100%';
+      if (stageText) stageText.innerHTML = `<span style="color:#34d399; font-weight:600;">✨ Berhasil memuat berkas!</span>`;
+
+      if (tg?.HapticFeedback) {
+        tg.HapticFeedback.notificationOccurred('success');
+      }
+
+      if (data) {
+        driveData = data;
+        renderStorage(driveData.storage);
+        renderBreadcrumbs(driveData.breadcrumbs || []);
+        renderFolders(driveData.folders || []);
+        renderFiles(driveData.files || []);
+      }
+
+      setTimeout(() => {
+        const overlay = document.getElementById('serverWakeupOverlay');
+        if (overlay) {
+          overlay.classList.remove('active');
+        }
+        showToast('🚀 Server aktif! Berkas Anda siap.');
+      }, 750);
+    }
+
+    function forceServerWakeupRetry() {
+      const stageText = document.getElementById('wakeupStageText');
+      if (stageText) stageText.innerHTML = `<span>⚡ Mencoba menghubungkan sekarang...</span>`;
+      triggerHaptic();
+      pollServerStatus();
+    }
+
+    function dismissServerWakeupOverlay() {
+      const overlay = document.getElementById('serverWakeupOverlay');
+      if (overlay) overlay.classList.remove('active');
+    }
+
     async function loadDriveData() {
+      if (!isServerAwake) {
+        if (coldStartTimer) clearTimeout(coldStartTimer);
+        coldStartTimer = setTimeout(() => {
+          showServerWakeupOverlay('slow');
+        }, 2500);
+      }
+
       try {
         let url = `/api/drive?user_id=${userId}`;
         if (currentFolderId) url += `&folder_id=${currentFolderId}`;
 
         const res = await fetch(url);
-        if (!res.ok) throw new Error('Network error');
-        driveData = await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
         
-        renderStorage(driveData.storage);
-        renderBreadcrumbs(driveData.breadcrumbs || []);
-        renderFolders(driveData.folders || []);
-        renderFiles(driveData.files || []);
+        if (coldStartTimer) clearTimeout(coldStartTimer);
+        handleServerWakeupSuccess(data);
       } catch (err) {
-        console.error('Failed to load drive:', err);
-        document.getElementById('filesContainer').innerHTML = `
-          <div class="empty-state" style="grid-column: 1/-1;">
-            <div class="empty-icon">⚠️</div>
-            <p>Gagal memuat berkas. Pastikan server aktif.</p>
-          </div>
-        `;
+        console.warn('Drive load attempt:', err);
+        if (coldStartTimer) clearTimeout(coldStartTimer);
+        showServerWakeupOverlay('error');
       }
     }
 

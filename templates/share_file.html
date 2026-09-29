@@ -388,6 +388,8 @@
       });
     }
 
+    let retryCount = 0;
+
     async function loadFileInfo() {
       shareToken = getTokenFromUrl();
       if (!shareToken) {
@@ -406,7 +408,13 @@
         fileData = data.file;
         renderFile(fileData);
       } catch (err) {
-        showError('Gagal memuat data berkas: ' + err.message);
+        if (retryCount < 6) {
+          retryCount++;
+          document.getElementById('fileTitle').innerText = `Menyiapkan server (${retryCount * 5}s)...`;
+          setTimeout(loadFileInfo, 3500);
+          return;
+        }
+        showError('Gagal memuat data berkas. Pastikan server aktif: ' + err.message);
       }
     }
 
