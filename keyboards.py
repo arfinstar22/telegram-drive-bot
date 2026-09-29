@@ -148,8 +148,8 @@ def file_actions(file_data: dict):
     buttons = [
         [InlineKeyboardButton("📥 Download", callback_data=f"fdl:{file_id}"),
          InlineKeyboardButton(star_label, callback_data=f"fst:{file_id}")],
-        [InlineKeyboardButton("✨ Smart Rename", callback_data=f"aisr:{file_id}"),
-         InlineKeyboardButton("📝 Ringkas/OCR", callback_data=f"aisum:{file_id}")],
+        [InlineKeyboardButton("📁 Auto Folder", callback_data=f"smf:{file_id}"),
+         InlineKeyboardButton("✨ Smart Rename", callback_data=f"smr:{file_id}")],
         [InlineKeyboardButton("🔗 Share Link", callback_data=f"fsh:{file_id}"),
          InlineKeyboardButton("📁 Move", callback_data=f"fm:{file_id}")],
         [InlineKeyboardButton("✏️ Rename", callback_data=f"fr:{file_id}"),
@@ -265,11 +265,21 @@ def settings_menu(trash_count: int = 0):
     buttons = [
         [InlineKeyboardButton("📊 Storage Info", callback_data="si"),
          InlineKeyboardButton("🩺 Storage Health", callback_data="sh:menu")],
-        [InlineKeyboardButton(trash_label, callback_data="tv")],
-        [InlineKeyboardButton("📋 Sort: by Date ↓", callback_data="ss:cycle")],
+        [InlineKeyboardButton(trash_label, callback_data="tv"),
+         InlineKeyboardButton("📋 Sort: by Date ↓", callback_data="ss:cycle")],
+        [InlineKeyboardButton("🔑 Pemulihan Akun", callback_data="rec:menu"),
+         InlineKeyboardButton("⚠️ Reset Storage", callback_data="rst:prompt")],
         [InlineKeyboardButton("🏠 Beranda", callback_data="home_nav")],
     ]
     return InlineKeyboardMarkup(buttons)
+
+
+def account_recovery_detected(old_user_id: int):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Pulihkan Data Akun Lama", callback_data=f"rec:link:{old_user_id}")],
+        [InlineKeyboardButton("✨ Buat Storage Baru", callback_data="rec:ignore")],
+    ])
+
 
 
 def storage_health_view(health: dict):
@@ -306,9 +316,16 @@ def duplicate_warning_keyboard():
     ])
 
 
+def smart_folder_confirm(file_id: int):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Ya, Pindahkan", callback_data=f"smf_ok:{file_id}")],
+        [InlineKeyboardButton("⬅️ Batal", callback_data=f"fi:{file_id}")],
+    ])
+
+
 def apply_rename_keyboard(file_id: int):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Terapkan Nama Ini", callback_data=f"aisrok:{file_id}")],
+        [InlineKeyboardButton("✅ Terapkan Nama Ini", callback_data=f"smr_ok:{file_id}")],
         [InlineKeyboardButton("✏️ Ketik Manual", callback_data=f"fr:{file_id}")],
         [InlineKeyboardButton("⬅️ Batal", callback_data=f"fi:{file_id}")],
     ])

@@ -61,6 +61,21 @@ def get_or_create_inbox_folder(user_id: int) -> dict:
     return new_folder.data[0]
 
 
+def get_or_create_folder(user_id: int, name: str, parent_id: int | None = None) -> dict:
+    """Get existing folder or create new folder with given name."""
+    upsert_user(user_id)
+    q = db.table("folders").select("*").eq("user_id", user_id).eq("name", name)
+    if parent_id:
+        q = q.eq("parent_id", parent_id)
+    else:
+        q = q.is_("parent_id", "null")
+    res = q.execute()
+    if res.data:
+        return res.data[0]
+    return create_folder(user_id, name, parent_id)
+
+
+
 def get_folders(user_id: int, parent_id: int | None = None) -> list[dict]:
     q = db.table("folders").select("*").eq("user_id", user_id)
     if parent_id:
@@ -441,3 +456,63 @@ def clean_duplicate_files(user_id: int) -> int:
             trash_file(extra["id"])
             trashed_count += 1
     return trashed_count
+
+
+# ── Storage Reset & Account Recovery ───────────────────
+
+def reset_user_storage(user_id: int):
+    """Permanently delete all files and folders of user, recreate default inbox."""
+    # Delete all files belonging to user
+    db.table("files").delete().eq("user_id", user_id).execute()
+    # Delete all folders belonging to user
+    db.table("folders").delete().eq("user_id", user_id).execute()
+    # Re-create clean inbox folder
+    return get_or_create_inbox_folder(user_id)
+
+
+def find_recoverable_account(new_user_id: int, username: str | None = None) -> dict | None:
+    """Find previous account with same username but different user_id."""
+    if not username:
+        return None
+    clean = username.lstrip("@").strip().lower()
+    if not clean:
+        return None
+
+    try:
+        res = db.table("users").select("*").ilike("username", clean).neq("id", new_user_id).execute()
+        candidates = res.data or []
+        for cand in candidates:
+            old_id = cand["id"]
+            f_count = db.table("files").select("id", count="exact").eq("user_id", old_id).execute().count or 0
+            d_count = db.table("folders").select("id", count="exact").eq("user_id", old_id).execute().count or 0
+            if f_count > 0 or d_count > 0:
+                return {
+                    "old_user_id": old_id,
+                    "old_username": cand.get("username"),
+                    "old_full_name": cand.get("full_name"),
+                    "total_files": f_count,
+                    "total_folders": d_count,
+                }
+    except Exception as exc:
+        log.error("Failed to query recoverable account: %s", exc)
+    return None
+
+
+def transfer_user_data(old_user_id: int, new_user_id: int) -> dict:
+    """Transfer all folders and files from old_user_id to new_user_id."""
+    upsert_user(new_user_id)
+    # Transfer all folders
+    db.table("folders").update({"user_id": new_user_id}).eq("user_id", old_user_id).execute()
+    # Transfer all files
+    db.table("files").update({"user_id": new_user_id}).eq("user_id", old_user_id).execute()
+    # Mark old user record so username won't conflict
+    try:
+        old_u = get_user(old_user_id)
+        if old_u and old_u.get("username"):
+            update_user(old_user_id, username=f"{old_u['username']}_transferred")
+    except Exception:
+        pass
+    # Ensure inbox exists
+    get_or_create_inbox_folder(new_user_id)
+    return get_storage_info(new_user_id)
+

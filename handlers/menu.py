@@ -32,6 +32,7 @@ def _reset(context: ContextTypes.DEFAULT_TYPE):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    existing_user = db.get_user(user.id)
     db.upsert_user(user.id, user.username, user.full_name)
     db.get_or_create_inbox_folder(user.id)
     _reset(context)
@@ -93,7 +94,44 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
+    # Check if this is a newly registered ID that has a previous account with same username
+    if not existing_user and user.username:
+        rec = db.find_recoverable_account(user.id, user.username)
+        if rec:
+            text = (
+                f"👋 <b>Halo, {user.first_name}!</b>\n\n"
+                f"🔍 <b>Deteksi Akun Lama:</b>\n"
+                f"Kami menemukan penyimpanan yang sebelumnya terdaftar dengan username @{user.username}:\n"
+                f"📁 <b>{rec['total_folders']} Folder</b> • 📄 <b>{rec['total_files']} File</b>\n\n"
+                f"Apakah Anda ingin memulihkan dan menyambungkan seluruh data lama Anda ke akun Telegram ini?"
+            )
+            await update.message.reply_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=kb.account_recovery_detected(rec["old_user_id"]),
+            )
+            return
+
+    # Returning user greeting with storage overview
+    from utils import format_size
+    info = db.get_storage_info(user.id)
+    if info["total_files"] > 0 or info["total_folders"] > 1:
+        welcome_back = (
+            f"👋 <b>Selamat Datang Kembali, {user.first_name}!</b>\n"
+            f"Semua data Anda tersimpan aman:\n"
+            f"📁 <b>{info['total_folders']} Folder</b> • 📄 <b>{info['total_files']} File</b> ({format_size(info['total_size'])})\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📁 <b>My Files</b> — Folder & file Anda\n"
+            f"📤 <b>Upload</b> — Upload file baru\n"
+            f"🔍 <b>Search</b> — Cari file cepat\n"
+            f"⚙️ <b>Settings</b> — Info, kesehatan & reset\n"
+            f"━━━━━━━━━━━━━━━━━━━"
+        )
+        await update.message.reply_text(welcome_back, parse_mode="HTML", reply_markup=kb.main_menu())
+        return
+
     await update.message.reply_text(WELCOME, parse_mode="HTML", reply_markup=kb.main_menu())
+
 
 
 async def starred_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -159,11 +197,89 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _rename_file(update, context, text)
     elif state == "searching":
         await _do_search(update, context, text)
+    elif state == "awaiting_recovery_key":
+        await _process_recovery_key(update, context, text)
     else:
         await update.message.reply_text(
             "Pilih menu di bawah, atau kirim file untuk upload.",
             reply_markup=kb.main_menu(),
         )
+
+
+async def _process_recovery_key(update: Update, context: ContextTypes.DEFAULT_TYPE, key_input: str):
+    clean = key_input.strip()
+    target_old_id = None
+
+    if clean.upper().startswith("DS-"):
+        num_str = clean[3:].strip()
+        if num_str.isdigit():
+            target_old_id = int(num_str)
+    elif clean.isdigit():
+        target_old_id = int(clean)
+    else:
+        clean_user = clean.lstrip("@").lower()
+        res = db.table("users").select("*").ilike("username", clean_user).execute()
+        candidates = res.data or []
+        for cand in candidates:
+            if cand["id"] != update.effective_user.id:
+                target_old_id = cand["id"]
+                break
+
+    _reset(context)
+
+    if not target_old_id:
+        await update.message.reply_text(
+            "❌ <b>Akun lama tidak ditemukan.</b>\nPastikan format Kunci Pemulihan (DS-xxx), Telegram ID, atau @username sudah benar.",
+            parse_mode="HTML",
+            reply_markup=kb.main_menu(),
+        )
+        return
+
+    info_old = db.get_storage_info(target_old_id)
+    if info_old["total_files"] == 0 and info_old["total_folders"] == 0:
+        await update.message.reply_text(
+            "⚠️ Akun tersebut ditemukan tetapi tidak memiliki file atau folder tersimpan.",
+            reply_markup=kb.main_menu(),
+        )
+        return
+
+    db.transfer_user_data(target_old_id, update.effective_user.id)
+    from utils import format_size
+    await update.message.reply_text(
+        f"🎉 <b>Data Berhasil Dipulihkan!</b>\n\n"
+        f"Berhasil menyambungkan 📁 <b>{info_old['total_folders']} Folder</b> dan 📄 <b>{info_old['total_files']} File</b> ({format_size(info_old['total_size'])}) ke akun ini.\n\n"
+        f"Selamat menikmati kembali Darfin Storage! 🚀",
+        parse_mode="HTML",
+        reply_markup=kb.main_menu(),
+    )
+
+
+async def callback_recovery_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """rec:link:{old_user_id} — execute 1-click account link from auto-detect."""
+    query = update.callback_query
+    await query.answer()
+    old_id = int(query.data.split(":")[2])
+    new_id = query.from_user.id
+
+    info = db.transfer_user_data(old_id, new_id)
+    from utils import format_size
+    text = (
+        f"🎉 <b>Data Berhasil Dipulihkan!</b>\n\n"
+        f"Seluruh file dari akun lama Anda telah disambungkan ke akun ini:\n"
+        f"📁 <b>{info['total_folders']} Folder</b> • 📄 <b>{info['total_files']} File</b> ({format_size(info['total_size'])})\n\n"
+        f"Buka 📁 <b>My Files</b> untuk melihat seluruh berkas Anda!"
+    )
+    await query.edit_message_text(text, parse_mode="HTML")
+    await query.message.reply_text("Silakan pilih menu:", reply_markup=kb.main_menu())
+
+
+async def callback_recovery_ignore(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """rec:ignore — ignore old account and start fresh."""
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("✅ Anda memilih memulai storage baru.", parse_mode="HTML")
+    await query.message.reply_text(WELCOME, parse_mode="HTML", reply_markup=kb.main_menu())
+
 
 
 async def _create_folder(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
@@ -209,17 +325,14 @@ async def _do_search(update: Update, context: ContextTypes.DEFAULT_TYPE, query: 
     results = db.search_files(user_id, query)
     _reset(context)
 
-    ai_used = False
+    smart_used = False
     if not results:
-        import ai_service
-        if ai_service.is_ai_enabled():
-            all_files = db.get_all_user_files(user_id, limit=60)
-            if all_files:
-                matching_ids = await ai_service.semantic_search(query, all_files)
-                if matching_ids:
-                    id_map = {f["id"]: f for f in all_files}
-                    results = [id_map[i] for i in matching_ids if i in id_map]
-                    ai_used = True
+        import smart_organizer
+        all_files = db.get_all_user_files(user_id, limit=100)
+        if all_files:
+            results = smart_organizer.smart_search(query, all_files)
+            if results:
+                smart_used = True
 
     if not results:
         await update.message.reply_text(f"🔍 Tidak ditemukan file untuk: <b>{query}</b>",
@@ -242,7 +355,7 @@ async def _do_search(update: Update, context: ContextTypes.DEFAULT_TYPE, query: 
             callback_data=f"fi:{f['id']}",
         )])
 
-    badge = " (🤖 Gemini 3.7 Smart Match)" if ai_used else ""
+    badge = " (⚡ Smart Match)" if smart_used else ""
     text = f"🔍 Hasil pencarian: <b>{query}</b>{badge}\n{len(results)} file ditemukan"
     await update.message.reply_text(text, parse_mode="HTML",
                                     reply_markup=InlineKeyboardMarkup(buttons))

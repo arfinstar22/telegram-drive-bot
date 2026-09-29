@@ -84,14 +84,7 @@ async def sort_cycle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     info = db.get_storage_info(user_id)
 
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    trash_label = f"🗑 Trash ({info['trash_count']})" if info["trash_count"] else "🗑 Trash"
-    buttons = [
-        [InlineKeyboardButton("📊 Storage Info", callback_data="si")],
-        [InlineKeyboardButton(trash_label, callback_data="tv")],
-        [InlineKeyboardButton(f"📋 Sort: {label}", callback_data="ss:cycle")],
-    ]
-    await query.edit_message_reply_markup(InlineKeyboardMarkup(buttons))
+    await query.edit_message_reply_markup(kb.settings_menu(info["trash_count"]))
 
 
 # ── Trash ──────────────────────────────────────────────
@@ -218,4 +211,104 @@ async def clean_duplicates(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cleaned = db.clean_duplicate_files(user_id)
     await query.answer(f"🧹 Berhasil memindahkan {cleaned} file duplikat ke Trash!", show_alert=True)
     await storage_health(update, context)
+
+
+# ── Reset Storage ──────────────────────────────────────
+
+async def reset_storage_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """rst:prompt — confirm before wiping all user storage."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    info = db.get_storage_info(user_id)
+
+    text = (
+        "⚠️ <b>Peringatan: Reset Seluruh Storage</b>\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        f"Data penyimpanan Anda saat ini:\n"
+        f"📁 <b>{info['total_folders']} Folder</b>\n"
+        f"📄 <b>{info['total_files']} File</b> ({format_size(info['total_size'])})\n"
+        f"🗑 <b>{info['trash_count']} File di Trash</b>\n\n"
+        "Tindakan ini akan <b>MENGHAPUS PERMANEN</b> seluruh folder dan file Anda dari Darfin Storage.\n\n"
+        "🚨 <b>Data yang terhapus TIDAK DAPAT dipulihkan lagi!</b>\n"
+        "Apakah Anda yakin ingin menghapus seluruh file dan mereset storage?"
+    )
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    buttons = [
+        [InlineKeyboardButton("🚨 Ya, Hapus Semua Data", callback_data="rst:confirm")],
+        [InlineKeyboardButton("⬅️ Batal / Kembali", callback_data="sb")],
+    ]
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
+
+
+async def reset_storage_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """rst:confirm — execute storage wipe."""
+    query = update.callback_query
+    user_id = query.from_user.id
+    db.reset_user_storage(user_id)
+    await query.answer("Storage berhasil di-reset ✅", show_alert=True)
+
+    text = (
+        "🧹 <b>Storage Berhasil Direset!</b>\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        "Seluruh file dan folder Anda telah dihapus secara permanen.\n"
+        "Penyimpanan Anda kini bersih seperti akun baru. Folder 📥 <b>File Masuk</b> telah disiapkan."
+    )
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    buttons = [
+        [InlineKeyboardButton("🏠 Menu Utama", callback_data="home_nav")],
+    ]
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
+
+
+# ── Account Recovery & Identity ────────────────────────
+
+async def account_recovery_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """rec:menu — show account recovery key and manual link option."""
+    query = update.callback_query
+    await query.answer()
+    user = query.from_user
+    key = f"DS-{user.id}"
+
+    text = (
+        "🔑 <b>Identitas & Pemulihan Akun</b>\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Nama:</b> {user.full_name}\n"
+        f"🆔 <b>Telegram ID:</b> <code>{user.id}</code>\n"
+        f"🏷 <b>Username:</b> @{user.username if user.username else '<i>Belum pasang username</i>'}\n"
+        f"🔐 <b>Kunci Pemulihan:</b> <code>{key}</code>\n\n"
+        "📌 <b>Bagaimana Bot Mengenali Anda?</b>\n"
+        "1. <b>Otomatis:</b> Selama akun Telegram Anda sama, bot otomatis mengenali dan menyimpan seluruh data Anda selamanya.\n"
+        "2. <b>Auto-Sync Username:</b> Jika Anda menghapus akun dan membuat akun baru dengan @username yang sama, bot otomatis menawarkan pemulihan data saat klik /start.\n"
+        "3. <b>Kunci Akun:</b> Simpan Kunci Pemulihan di atas. Jika Anda ganti akun atau nomor baru, gunakan tombol di bawah untuk menyambungkan data lama ke akun ini."
+    )
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    buttons = [
+        [InlineKeyboardButton("🔄 Sambungkan Akun Lama", callback_data="rec:input_prompt")],
+        [InlineKeyboardButton("⬅️ Kembali ke Settings", callback_data="sb")],
+    ]
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
+
+
+async def account_recovery_input_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """rec:input_prompt — ask user to send old username or recovery key."""
+    query = update.callback_query
+    await query.answer()
+    context.user_data["state"] = "awaiting_recovery_key"
+
+    text = (
+        "🔄 <b>Pemulihan Data Akun Lama</b>\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        "Kirimkan salah satu data akun lama Anda:\n"
+        "• <b>Kunci Pemulihan</b> (contoh: <code>DS-123456789</code>)\n"
+        "• <b>Telegram ID lama</b> (contoh: <code>123456789</code>)\n"
+        "• <b>Username lama</b> (contoh: <code>@darfinstar</code>)\n\n"
+        "Ketik datanya di chat sekarang atau klik Batal:"
+    )
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    buttons = [
+        [InlineKeyboardButton("❌ Batal", callback_data="sb")],
+    ]
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
+
 

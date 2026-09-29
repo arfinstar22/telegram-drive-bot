@@ -66,10 +66,11 @@ def main():
     app.add_handler(CallbackQueryHandler(files.public_save_to_drive, pattern=r"^psave:\d+$"))
     app.add_handler(CallbackQueryHandler(files.public_save_confirm, pattern=r"^psaveto:\d+:\d+$"))
 
-    # ── AI & Duplicate callbacks ───────────────────────
-    app.add_handler(CallbackQueryHandler(files.ai_smart_rename, pattern=r"^aisr:\d+$"))
-    app.add_handler(CallbackQueryHandler(files.ai_apply_rename, pattern=r"^aisrok:\d+$"))
-    app.add_handler(CallbackQueryHandler(files.ai_summarize_ocr, pattern=r"^aisum:\d+$"))
+    # ── Smart Organizer & Duplicate callbacks ──────────
+    app.add_handler(CallbackQueryHandler(files.smart_folder_suggest, pattern=r"^smf:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.smart_folder_apply, pattern=r"^smf_ok:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.smart_rename_suggest, pattern=r"^(smr|aisr):\d+$"))
+    app.add_handler(CallbackQueryHandler(files.smart_apply_rename, pattern=r"^(smr_ok|aisrok):\d+$"))
     app.add_handler(CallbackQueryHandler(files.duplicate_force_save, pattern=r"^dup_force$"))
     app.add_handler(CallbackQueryHandler(files.duplicate_skip, pattern=r"^dup_skip$"))
 
@@ -87,6 +88,12 @@ def main():
     app.add_handler(CallbackQueryHandler(settings.trash_permanent_delete, pattern=r"^tp:"))
     app.add_handler(CallbackQueryHandler(settings.trash_empty_prompt, pattern=r"^te$"))
     app.add_handler(CallbackQueryHandler(settings.trash_empty_confirm, pattern=r"^tec$"))
+    app.add_handler(CallbackQueryHandler(settings.reset_storage_prompt, pattern=r"^rst:prompt$"))
+    app.add_handler(CallbackQueryHandler(settings.reset_storage_confirm, pattern=r"^rst:confirm$"))
+    app.add_handler(CallbackQueryHandler(settings.account_recovery_menu, pattern=r"^rec:menu$"))
+    app.add_handler(CallbackQueryHandler(settings.account_recovery_input_prompt, pattern=r"^rec:input_prompt$"))
+    app.add_handler(CallbackQueryHandler(menu.callback_recovery_link, pattern=r"^rec:link:\d+$"))
+    app.add_handler(CallbackQueryHandler(menu.callback_recovery_ignore, pattern=r"^rec:ignore$"))
 
     # ── No-op ──────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(noop, pattern=r"^noop$"))
