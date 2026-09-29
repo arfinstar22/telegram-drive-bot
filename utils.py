@@ -136,3 +136,82 @@ def get_user_lang(context=None, user_id: int | None = None) -> str:
             return lang
     return "id"
 
+
+def parse_file_metadata(mime_type: str | None) -> tuple[str, str | None, list[str]]:
+    """Parse mime_type string which can contain '|NOTE:...|TAGS:...' suffix."""
+    if not mime_type:
+        return "application/octet-stream", None, []
+
+    parts = mime_type.split("|")
+    clean_mime = parts[0]
+    note = None
+    tags = []
+
+    for p in parts[1:]:
+        if p.startswith("NOTE:"):
+            note = p[5:].strip()
+        elif p.startswith("TAGS:"):
+            tag_str = p[5:].strip()
+            tags = [t.strip().lstrip("#").lower() for t in tag_str.split(",") if t.strip()]
+
+    return clean_mime, note, tags
+
+
+def encode_file_metadata(clean_mime: str, note: str | None = None, tags: list[str] | None = None) -> str:
+    """Encode clean_mime, note, and tags into a single string for storage."""
+    result = clean_mime.split("|")[0] if clean_mime else "application/octet-stream"
+    if note:
+        safe_note = note.replace("|", " ").strip()
+        result += f"|NOTE:{safe_note}"
+    if tags:
+        safe_tags = ",".join([t.strip().lstrip("#").lower() for t in tags if t.strip()])
+        if safe_tags:
+            result += f"|TAGS:{safe_tags}"
+    return result
+
+
+def parse_share_token(token_str: str | None) -> dict:
+    """Parse share_token which may contain '|exp:...|pin:...|lim:...|cnt:...'"""
+    if not token_str:
+        return {"token": "", "expires_at": None, "pin": None, "limit": None, "count": 0}
+
+    parts = token_str.split("|")
+    token = parts[0]
+    res = {"token": token, "expires_at": None, "pin": None, "limit": None, "count": 0}
+
+    for p in parts[1:]:
+        if p.startswith("exp:"):
+            try:
+                res["expires_at"] = int(p[4:])
+            except ValueError:
+                pass
+        elif p.startswith("pin:"):
+            res["pin"] = p[4:].strip()
+        elif p.startswith("lim:"):
+            try:
+                res["limit"] = int(p[4:])
+            except ValueError:
+                pass
+        elif p.startswith("cnt:"):
+            try:
+                res["count"] = int(p[4:])
+            except ValueError:
+                pass
+    return res
+
+
+def encode_share_token(token: str, expires_at: int | None = None, pin: str | None = None, limit: int | None = None, count: int = 0) -> str:
+    """Encode token and security properties into a share_token string."""
+    clean_token = token.split("|")[0]
+    result = clean_token
+    if expires_at:
+        result += f"|exp:{expires_at}"
+    if pin:
+        result += f"|pin:{pin.strip()}"
+    if limit is not None:
+        result += f"|lim:{limit}"
+    if count:
+        result += f"|cnt:{count}"
+    return result
+
+

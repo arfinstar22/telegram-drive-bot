@@ -323,6 +323,17 @@ def get_file_tags(file_obj: dict) -> set[str]:
     for word in re.findall(r'\w+', stem):
         tags.add(word)
 
+    # Custom notes and custom tags
+    from utils import parse_file_metadata
+    _, custom_note, custom_tags = parse_file_metadata(file_obj.get("mime_type"))
+    if custom_tags:
+        for t in custom_tags:
+            tags.add(t.lower())
+    if custom_note:
+        for word in re.findall(r'\w+', custom_note.lower()):
+            if len(word) > 2:
+                tags.add(word)
+
     return tags
 
 

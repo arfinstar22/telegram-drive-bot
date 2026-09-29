@@ -81,10 +81,42 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
 
-            from utils import file_emoji, format_size
+            import time
+            from utils import file_emoji, format_size, parse_share_token
+            sec = parse_share_token(f.get("share_token") or "")
+
+            # Expiration check
+            if sec.get("expires_at") and int(time.time()) > sec["expires_at"]:
+                err_msg = "⏳ This shared link has expired." if lang == "en" else "⏳ Link file ini sudah kadaluarsa (expired)."
+                await update.message.reply_text(err_msg, reply_markup=kb.main_menu(lang))
+                return
+
+            # Download limit / burn check
+            if sec.get("limit") is not None and sec.get("count", 0) >= sec["limit"]:
+                err_msg = "🔥 This link was 1-time download only and has expired." if lang == "en" else "🔥 Link file ini memiliki batas 1x unduh dan sudah hangus."
+                await update.message.reply_text(err_msg, reply_markup=kb.main_menu(lang))
+                return
+
+            is_own_file = (f["user_id"] == user.id)
+
+            # PIN check
+            if sec.get("pin") and not is_own_file:
+                context.user_data["state"] = f"awaiting_share_pin:{token}"
+                context.user_data["share_file_id"] = f["id"]
+                prompt = (
+                    f"🔒 <b>PIN Protected File</b>\n\n"
+                    f"File <code>{f['file_name']}</code> is protected with a 4-digit PIN.\n\n"
+                    f"Please enter the 4-digit PIN to unlock access:"
+                ) if lang == "en" else (
+                    f"🔒 <b>File Dilindungi PIN</b>\n\n"
+                    f"File <code>{f['file_name']}</code> diproteksi dengan 4-digit PIN rahasia oleh pemiliknya.\n\n"
+                    f"Silakan ketik PIN untuk membuka akses:"
+                )
+                await update.message.reply_text(prompt, parse_mode="HTML")
+                return
+
             emoji = file_emoji(f["file_type"])
             size = format_size(f.get("file_size", 0))
-            is_own_file = (f["user_id"] == user.id)
 
             title = "🔗 <b>Shared File</b>" if lang == "en" else "🔗 <b>File Bersama</b>"
             subtitle = "Shared with you:" if lang == "en" else "File ini dibagikan kepada kamu:"
@@ -296,6 +328,12 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _do_search(update, context, text)
     elif state == "awaiting_recovery_key":
         await _process_recovery_key(update, context, text)
+    elif state.startswith("awaiting_share_pin:"):
+        await _verify_share_pin(update, context, text)
+    elif state == "awaiting_file_share_pin":
+        await _save_file_share_pin(update, context, text)
+    elif state == "awaiting_file_tags":
+        await _save_file_tags(update, context, text)
     else:
         user_id = update.effective_user.id
         from utils import get_user_lang
@@ -350,6 +388,86 @@ async def _process_recovery_key(update: Update, context: ContextTypes.DEFAULT_TY
         f"🎉 <b>Data Berhasil Dipulihkan!</b>\n\n"
         f"Berhasil menyambungkan 📁 <b>{info_old['total_folders']} Folder</b> dan 📄 <b>{info_old['total_files']} File</b> ({format_size(info_old['total_size'])}) ke akun ini.\n\n"
         f"Selamat menikmati kembali Darfin Storage! 🚀",
+        parse_mode="HTML",
+        reply_markup=kb.main_menu(),
+    )
+
+
+async def _verify_share_pin(update: Update, context: ContextTypes.DEFAULT_TYPE, pin_text: str):
+    file_id = context.user_data.get("share_file_id")
+    f = db.get_file(file_id) if file_id else None
+    if not f:
+        _reset(context)
+        await update.message.reply_text("❌ File tidak ditemukan atau link sudah kadaluarsa.", reply_markup=kb.main_menu())
+        return
+
+    from utils import parse_share_token, file_emoji, format_size
+    sec = parse_share_token(f.get("share_token") or "")
+    if sec.get("pin") and pin_text.strip() != str(sec["pin"]).strip():
+        await update.message.reply_text("❌ <b>PIN salah!</b> Silakan coba lagi:", parse_mode="HTML")
+        return
+
+    _reset(context)
+    user = update.effective_user
+    is_own_file = (f["user_id"] == user.id)
+    emoji = file_emoji(f["file_type"])
+    size = format_size(f.get("file_size", 0))
+
+    await update.message.reply_text(
+        f"🔓 <b>PIN Benar! Akses Diberikan.</b>\n\n"
+        f"🔗 <b>File Bersama:</b>\n"
+        f"{emoji} <b>{f['file_name']}</b> ({size})\n\n"
+        f"File ini dibagikan kepada kamu:",
+        parse_mode="HTML",
+        reply_markup=kb.public_shared_file(f["id"], can_save=not is_own_file),
+    )
+
+
+async def _save_file_share_pin(update: Update, context: ContextTypes.DEFAULT_TYPE, pin_text: str):
+    file_id = context.user_data.get("sec_file_id")
+    clean_pin = pin_text.strip()
+    if not clean_pin.isdigit() or len(clean_pin) != 4:
+        await update.message.reply_text(
+            "❌ <b>Format PIN salah.</b>\nPIN harus 4 digit angka (contoh: <code>1234</code>).\nSilakan coba lagi atau kirim /cancel:",
+            parse_mode="HTML",
+        )
+        return
+
+    _reset(context)
+    db.update_file_share_security(file_id, pin=clean_pin)
+    await update.message.reply_text(
+        f"✅ <b>PIN Proteksi Berhasil Disimpan!</b>\n\n"
+        f"PIN: <code>{clean_pin}</code>\n"
+        f"Setiap pengguna yang membuka link harus memasukkan PIN ini untuk mengunduh.",
+        parse_mode="HTML",
+        reply_markup=kb.main_menu(),
+    )
+
+
+async def _save_file_tags(update: Update, context: ContextTypes.DEFAULT_TYPE, raw_text: str):
+    import re
+    file_id = context.user_data.get("tag_file_id")
+    _reset(context)
+
+    f = db.get_file(file_id) if file_id else None
+    if not f:
+        await update.message.reply_text("❌ File tidak ditemukan.", reply_markup=kb.main_menu())
+        return
+
+    found_tags = re.findall(r"#([a-zA-Z0-9_-]+)", raw_text)
+    note_clean = re.sub(r"#[a-zA-Z0-9_-]+", "", raw_text).strip()
+    note_clean = re.sub(r"\s+", " ", note_clean)
+
+    db.update_file_notes_and_tags(file_id, note=note_clean, tags=found_tags)
+
+    tag_str = " ".join(f"#{t}" for t in found_tags) if found_tags else "<i>(Tidak ada)</i>"
+    note_str = f"<i>{note_clean}</i>" if note_clean else "<i>(Tidak ada)</i>"
+
+    await update.message.reply_text(
+        f"✅ <b>Catatan & Tag Disimpan!</b>\n\n"
+        f"📄 File: <code>{f['file_name']}</code>\n"
+        f"📝 Catatan: {note_str}\n"
+        f"🏷 Tag: {tag_str}",
         parse_mode="HTML",
         reply_markup=kb.main_menu(),
     )

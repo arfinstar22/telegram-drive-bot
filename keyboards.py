@@ -146,10 +146,11 @@ def folder_contents(folder_id: int, files: list[dict], subfolders: list[dict],
         InlineKeyboardButton("🔗 Share Folder", callback_data=f"dsh:{folder_id}"),
     ])
 
-    # Row 3: Batch Download & Rename
+    # Row 3: Batch Download & Unduh ZIP & Rename
     row_actions = []
     if has_any_files:
-        row_actions.append(InlineKeyboardButton("📦 Download All", callback_data=f"dlall:{folder_id}"))
+        row_actions.append(InlineKeyboardButton("📥 Download All", callback_data=f"dlall:{folder_id}"))
+        row_actions.append(InlineKeyboardButton("📦 Unduh ZIP", callback_data=f"dlzip:{folder_id}"))
     row_actions.append(InlineKeyboardButton("✏️ Rename", callback_data=f"dr:{folder_id}"))
     buttons.append(row_actions)
 
@@ -177,10 +178,11 @@ def file_actions(file_data: dict):
          InlineKeyboardButton(star_label, callback_data=f"fst:{file_id}")],
         [InlineKeyboardButton("📁 Auto Folder", callback_data=f"smf:{file_id}"),
          InlineKeyboardButton("✨ Smart Rename", callback_data=f"smr:{file_id}")],
-        [InlineKeyboardButton("🔗 Share Link", callback_data=f"fsh:{file_id}"),
-         InlineKeyboardButton("📁 Move", callback_data=f"fm:{file_id}")],
-        [InlineKeyboardButton("✏️ Rename", callback_data=f"fr:{file_id}"),
-         InlineKeyboardButton("🗑 Delete", callback_data=f"fx:{file_id}")],
+        [InlineKeyboardButton("🏷 Tag & Catatan", callback_data=f"ftag:{file_id}"),
+         InlineKeyboardButton("🔗 Share Link", callback_data=f"fsh:{file_id}")],
+        [InlineKeyboardButton("📁 Move", callback_data=f"fm:{file_id}"),
+         InlineKeyboardButton("✏️ Rename", callback_data=f"fr:{file_id}")],
+        [InlineKeyboardButton("🗑 Delete", callback_data=f"fx:{file_id}")],
         [InlineKeyboardButton("⬅️ Back", callback_data=f"fb:{folder_id}"),
          InlineKeyboardButton("🏠 Beranda", callback_data="home_nav")],
     ]
@@ -217,8 +219,33 @@ def recent_list(files: list[dict]):
 
 def share_file_view(file_id: int):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("❌ Revoke Link", callback_data=f"fsh_rev:{file_id}")],
-        [InlineKeyboardButton("⬅️ Back to File", callback_data=f"fi:{file_id}")],
+        [InlineKeyboardButton("🔒 Keamanan & Expired", callback_data=f"fsh_sec:{file_id}")],
+        [InlineKeyboardButton("❌ Revoke Link", callback_data=f"fsh_rev:{file_id}"),
+         InlineKeyboardButton("⬅️ Back to File", callback_data=f"fi:{file_id}")],
+    ])
+
+
+def share_security_menu(file_id: int, current_sec: dict):
+    pin_label = f"🔑 PIN: {current_sec['pin']} (Ubah)" if current_sec.get("pin") else "🔑 Pasang PIN 4-Digit"
+    exp_status = "Aktif" if current_sec.get("expires_at") else "Mati"
+    burn_status = "Aktif" if current_sec.get("limit") == 1 else "Mati"
+
+    buttons = [
+        [InlineKeyboardButton(pin_label, callback_data=f"fsh_pin:{file_id}")],
+        [InlineKeyboardButton(f"⏳ Exp: 24 Jam ({exp_status})", callback_data=f"fsh_exp:{file_id}:24h"),
+         InlineKeyboardButton(f"⏳ Exp: 7 Hari", callback_data=f"fsh_exp:{file_id}:7d")],
+        [InlineKeyboardButton(f"🔥 1x Unduh / Burn ({burn_status})", callback_data=f"fsh_burn:{file_id}")],
+        [InlineKeyboardButton("🔓 Hapus Semua Proteksi", callback_data=f"fsh_clear:{file_id}")],
+        [InlineKeyboardButton("⬅️ Kembali ke Share Link", callback_data=f"fsh:{file_id}")],
+    ]
+    return InlineKeyboardMarkup(buttons)
+
+
+def file_tag_view(file_id: int, folder_id: int):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✏️ Ubah Catatan & Tag", callback_data=f"ftag_edit:{file_id}")],
+        [InlineKeyboardButton("🗑 Hapus Catatan/Tag", callback_data=f"ftag_del:{file_id}")],
+        [InlineKeyboardButton("⬅️ Kembali ke File", callback_data=f"fi:{file_id}")],
     ])
 
 

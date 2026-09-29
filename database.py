@@ -321,8 +321,69 @@ def revoke_file_share_token(file_id: int):
 
 
 def get_file_by_share_token(token: str) -> dict | None:
-    res = db.table("files").select("*, folders(name)").eq("share_token", token).eq("is_trashed", False).execute()
+    res = db.table("files").select("*, folders(name)").ilike("share_token", f"{token}%").eq("is_trashed", False).execute()
     return res.data[0] if res.data else None
+
+
+_UNSET = object()
+
+
+def update_file_share_security(
+    file_id: int,
+    expires_at=_UNSET,
+    pin=_UNSET,
+    limit=_UNSET,
+    clear_all: bool = False,
+) -> str | None:
+    from utils import parse_share_token, encode_share_token
+    f = get_file(file_id)
+    if not f:
+        return None
+    raw = f.get("share_token") or secrets.token_urlsafe(8)
+    p = parse_share_token(raw)
+
+    if clear_all:
+        final_exp = None
+        final_pin = None
+        final_lim = None
+        final_cnt = 0
+    else:
+        final_exp = p["expires_at"] if expires_at is _UNSET else expires_at
+        final_pin = p["pin"] if pin is _UNSET else pin
+        final_lim = p["limit"] if limit is _UNSET else limit
+        final_cnt = p["count"]
+
+    new_token_str = encode_share_token(p["token"], expires_at=final_exp, pin=final_pin, limit=final_lim, count=final_cnt)
+    db.table("files").update({"share_token": new_token_str, "updated_at": _now()}).eq("id", file_id).execute()
+    return p["token"]
+
+
+def record_file_share_download(file_id: int) -> bool:
+    from utils import parse_share_token, encode_share_token
+    f = get_file(file_id)
+    if not f or not f.get("share_token"):
+        return False
+    p = parse_share_token(f["share_token"])
+    new_cnt = p["count"] + 1
+    if p["limit"] is not None and new_cnt >= p["limit"]:
+        revoke_file_share_token(file_id)
+        return True
+    new_token_str = encode_share_token(p["token"], expires_at=p["expires_at"], pin=p["pin"], limit=p["limit"], count=new_cnt)
+    db.table("files").update({"share_token": new_token_str, "updated_at": _now()}).eq("id", file_id).execute()
+    return True
+
+
+def update_file_notes_and_tags(file_id: int, note: str | None = None, tags: list[str] | None = None) -> bool:
+    from utils import parse_file_metadata, encode_file_metadata
+    f = get_file(file_id)
+    if not f:
+        return False
+    clean_mime, curr_note, curr_tags = parse_file_metadata(f.get("mime_type"))
+    final_note = note if note is not None else curr_note
+    final_tags = tags if tags is not None else curr_tags
+    new_mime = encode_file_metadata(clean_mime, final_note, final_tags)
+    db.table("files").update({"mime_type": new_mime, "updated_at": _now()}).eq("id", file_id).execute()
+    return True
 
 
 def get_or_create_folder_share_token(folder_id: int) -> str | None:
@@ -342,7 +403,7 @@ def revoke_folder_share_token(folder_id: int):
 
 
 def get_folder_by_share_token(token: str) -> dict | None:
-    res = db.table("folders").select("*").eq("share_token", token).execute()
+    res = db.table("folders").select("*").ilike("share_token", f"{token}%").execute()
     return res.data[0] if res.data else None
 
 

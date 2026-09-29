@@ -1,10 +1,10 @@
 import asyncio
 import logging
 
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, InlineQueryHandler, filters
 
 from config import BOT_TOKEN, WEBHOOK_URL, PORT
-from handlers import menu, folders, files, settings
+from handlers import menu, folders, files, settings, inline
 
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(name)s: %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -63,6 +63,15 @@ def main():
     app.add_handler(CallbackQueryHandler(files.share_file_prompt, pattern=r"^fsh:\d+$"))
     app.add_handler(CallbackQueryHandler(files.revoke_file_share, pattern=r"^fsh_rev:\d+$"))
     app.add_handler(CallbackQueryHandler(files.batch_download_folder, pattern=r"^dlall:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.download_folder_zip, pattern=r"^dlzip:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.share_file_security_menu, pattern=r"^fsh_sec:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.share_file_set_pin_prompt, pattern=r"^fsh_pin:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.share_file_set_expire, pattern=r"^fsh_exp:\d+:(24h|7d)$"))
+    app.add_handler(CallbackQueryHandler(files.share_file_set_burn, pattern=r"^fsh_burn:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.share_file_clear_security, pattern=r"^fsh_clear:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.file_tag_view, pattern=r"^ftag:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.file_tag_edit_prompt, pattern=r"^ftag_edit:\d+$"))
+    app.add_handler(CallbackQueryHandler(files.file_tag_delete, pattern=r"^ftag_del:\d+$"))
     app.add_handler(CallbackQueryHandler(files.public_download_file, pattern=r"^pdl:\d+$"))
     app.add_handler(CallbackQueryHandler(files.public_save_to_drive, pattern=r"^psave:\d+$"))
     app.add_handler(CallbackQueryHandler(files.public_save_confirm, pattern=r"^psaveto:\d+:\d+$"))
@@ -112,6 +121,9 @@ def main():
 
     # ── Free text input (folder names, search, rename) ─
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu.handle_text_input))
+
+    # ── Telegram Inline Mode (@bot query) ──────────────
+    app.add_handler(InlineQueryHandler(inline.inline_query_handler))
 
     # ── Run ────────────────────────────────────────────
     if WEBHOOK_URL:

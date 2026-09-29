@@ -13,7 +13,8 @@ import database as db
 import keyboards as kb
 import time
 import secrets
-from utils import extract_file_info, file_emoji, format_size
+import zipfile
+from utils import extract_file_info, file_emoji, format_size, parse_file_metadata, parse_share_token
 
 log = logging.getLogger(__name__)
 
@@ -449,7 +450,10 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     emoji = file_emoji(f["file_type"])
     size = format_size(f.get("file_size", 0))
     created = f.get("created_at", "")[:10]
-    caption = f"{emoji} <b>{f['file_name']}</b>\n📊 {size} • 📅 {created}"
+    _, note, tags = parse_file_metadata(f.get("mime_type"))
+    note_line = f"\n📝 <i>{note}</i>" if note else ""
+    tags_line = f"\n🏷 " + " ".join(f"#{t}" for t in tags) if tags else ""
+    caption = f"{emoji} <b>{f['file_name']}</b>\n📊 {size} • 📅 {created}{note_line}{tags_line}"
     markup = kb.file_actions(f)
 
     try:
@@ -700,6 +704,313 @@ async def batch_download_folder(update: Update, context: ContextTypes.DEFAULT_TY
     await status_msg.edit_text(f"✅ Selesai! {success_count}/{total} file berhasil dikirim.")
 
 
+async def download_folder_zip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """dlzip:{folder_id} — download all files in a folder packaged as a single ZIP archive."""
+    query = update.callback_query
+    folder_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
+
+    folder = db.get_folder(folder_id)
+    files = db.get_all_files_in_folder(folder_id)
+    if not files:
+        await query.answer("Folder ini belum memiliki file.", show_alert=True)
+        return
+
+    # Check total size limit (Telegram bot upload limit is 50MB)
+    total_size = sum(f.get("file_size", 0) for f in files)
+    if total_size > 48 * 1024 * 1024:
+        await query.answer("Total ukuran file > 48 MB! Gunakan tombol 'Unduh Semua' untuk unduh bertahap.", show_alert=True)
+        return
+
+    total = len(files)
+    folder_name = folder["name"] if folder else "Folder"
+    await query.answer("Menyiapkan arsip ZIP...")
+    status_msg = await query.message.reply_text(f"📦 Mengompres {total} file ke ZIP... (0/{total})")
+
+    zip_buffer = io.BytesIO()
+    success_count = 0
+
+    try:
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for idx, f in enumerate(files, 1):
+                try:
+                    tg_file = await context.bot.get_file(f["file_id"])
+                    file_bytes = await tg_file.download_as_bytearray()
+                    entry_name = f["file_name"]
+                    zf.writestr(entry_name, file_bytes)
+                    success_count += 1
+                except Exception as e:
+                    log.warning("Failed to include %s in ZIP: %s", f.get("file_name"), e)
+
+                if idx % 3 == 0 or idx == total:
+                    try:
+                        await status_msg.edit_text(f"📦 Mengompres file... ({idx}/{total})")
+                    except Exception:
+                        pass
+                await asyncio.sleep(0.2)
+
+        zip_buffer.seek(0)
+        zip_size = zip_buffer.getbuffer().nbytes
+        if success_count == 0 or zip_size == 0:
+            await status_msg.edit_text("❌ Gagal mengompres berkas ke dalam ZIP.")
+            return
+
+        zip_filename = f"{folder_name}.zip"
+        await context.bot.send_document(
+            chat_id=user_id,
+            document=zip_buffer,
+            filename=zip_filename,
+            caption=f"📦 <b>Arsip ZIP: {folder_name}</b>\n📊 {success_count} file • {format_size(zip_size)}",
+            parse_mode="HTML",
+        )
+        await status_msg.edit_text(f"✅ Arsip <b>{zip_filename}</b> berhasil dikirim!", parse_mode="HTML")
+    except Exception as e:
+        log.error("ZIP creation failed: %s", e)
+        await status_msg.edit_text(f"❌ Gagal membuat file ZIP: {e}")
+
+
+# ── Share Link Security ────────────────────────────────
+
+async def share_file_security_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """fsh_sec:{file_id} — open share security and expiry settings."""
+    query = update.callback_query
+    await query.answer()
+    file_id = int(query.data.split(":")[1])
+
+    f = db.get_file(file_id)
+    if not f:
+        await query.answer("File tidak ditemukan", show_alert=True)
+        return
+
+    sec = parse_share_token(f.get("share_token") or "")
+
+    pin_txt = f"🔑 <code>{sec['pin']}</code>" if sec.get("pin") else "<i>Tidak ada</i>"
+    if sec.get("expires_at"):
+        diff = sec["expires_at"] - int(time.time())
+        if diff > 0:
+            hours = diff // 3600
+            mins = (diff % 3600) // 60
+            exp_txt = f"⏳ Aktif (sisa {hours}j {mins}m)"
+        else:
+            exp_txt = "⏳ <b>Sudah Kadaluarsa</b>"
+    else:
+        exp_txt = "<i>Selamanya</i>"
+
+    burn_txt = f"🔥 Maks 1x (Terunduh: {sec['count']}x)" if sec.get("limit") == 1 else "<i>Tak terbatas</i>"
+
+    text = (
+        f"🔒 <b>Keamanan & Privasi Link Share</b>\n\n"
+        f"File: <code>{f['file_name']}</code>\n\n"
+        f"Status Keamanan Saat Ini:\n"
+        f"• PIN Proteksi: {pin_txt}\n"
+        f"• Batas Waktu: {exp_txt}\n"
+        f"• Batas Unduhan: {burn_txt}\n\n"
+        f"Pilih opsi di bawah untuk mengatur:"
+    )
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=kb.share_security_menu(file_id, sec),
+    )
+
+
+async def share_file_set_pin_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """fsh_pin:{file_id} — ask user to type PIN."""
+    query = update.callback_query
+    await query.answer()
+    file_id = int(query.data.split(":")[1])
+
+    context.user_data["state"] = "awaiting_file_share_pin"
+    context.user_data["sec_file_id"] = file_id
+
+    await query.message.reply_text(
+        "🔑 <b>Pasang PIN Proteksi Link</b>\n\n"
+        "Kirim 4-digit angka (contoh: <code>1234</code>) yang harus dimasukkan orang lain sebelum bisa mengunduh file ini.\n\n"
+        "Ketik angka sekarang atau klik /cancel untuk batal:",
+        parse_mode="HTML",
+    )
+
+
+async def share_file_set_expire(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """fsh_exp:{file_id}:(24h|7d) — set link expiration time."""
+    query = update.callback_query
+    parts = query.data.split(":")
+    file_id = int(parts[1])
+    duration = parts[2]
+
+    hours = 24 if duration == "24h" else 168
+    exp_ts = int(time.time()) + (hours * 3600)
+    db.update_file_share_security(file_id, expires_at=exp_ts)
+    await query.answer(f"Masa berlaku diatur ke {hours // 24} hari! ✅")
+
+    f = db.get_file(file_id)
+    sec = parse_share_token(f.get("share_token") or "")
+    pin_txt = f"🔑 <code>{sec['pin']}</code>" if sec.get("pin") else "<i>Tidak ada</i>"
+    diff = sec["expires_at"] - int(time.time())
+    h = diff // 3600
+    m = (diff % 3600) // 60
+    exp_txt = f"⏳ Aktif (sisa {h}j {m}m)"
+    burn_txt = f"🔥 Maks 1x (Terunduh: {sec['count']}x)" if sec.get("limit") == 1 else "<i>Tak terbatas</i>"
+
+    text = (
+        f"🔒 <b>Keamanan & Privasi Link Share</b>\n\n"
+        f"File: <code>{f['file_name']}</code>\n\n"
+        f"Status Keamanan Saat Ini:\n"
+        f"• PIN Proteksi: {pin_txt}\n"
+        f"• Batas Waktu: {exp_txt}\n"
+        f"• Batas Unduhan: {burn_txt}\n\n"
+        f"Pilih opsi di bawah untuk mengatur:"
+    )
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=kb.share_security_menu(file_id, sec),
+    )
+
+
+async def share_file_set_burn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """fsh_burn:{file_id} — toggle 1-time download limit."""
+    query = update.callback_query
+    file_id = int(query.data.split(":")[1])
+
+    f = db.get_file(file_id)
+    if not f:
+        await query.answer("File tidak ditemukan", show_alert=True)
+        return
+
+    sec = parse_share_token(f.get("share_token") or "")
+    new_limit = None if sec.get("limit") == 1 else 1
+    db.update_file_share_security(file_id, limit=new_limit)
+
+    status_str = "diaktifkan" if new_limit == 1 else "dinonaktifkan"
+    await query.answer(f"1x unduh {status_str}! ✅")
+
+    sec = parse_share_token(db.get_file(file_id).get("share_token") or "")
+    pin_txt = f"🔑 <code>{sec['pin']}</code>" if sec.get("pin") else "<i>Tidak ada</i>"
+    if sec.get("expires_at"):
+        diff = sec["expires_at"] - int(time.time())
+        exp_txt = f"⏳ Aktif (sisa {diff // 3600}j)"
+    else:
+        exp_txt = "<i>Selamanya</i>"
+    burn_txt = f"🔥 Maks 1x (Terunduh: {sec['count']}x)" if sec.get("limit") == 1 else "<i>Tak terbatas</i>"
+
+    text = (
+        f"🔒 <b>Keamanan & Privasi Link Share</b>\n\n"
+        f"File: <code>{f['file_name']}</code>\n\n"
+        f"Status Keamanan Saat Ini:\n"
+        f"• PIN Proteksi: {pin_txt}\n"
+        f"• Batas Waktu: {exp_txt}\n"
+        f"• Batas Unduhan: {burn_txt}\n\n"
+        f"Pilih opsi di bawah untuk mengatur:"
+    )
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=kb.share_security_menu(file_id, sec),
+    )
+
+
+async def share_file_clear_security(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """fsh_clear:{file_id} — remove all PIN, expiry, and limits."""
+    query = update.callback_query
+    file_id = int(query.data.split(":")[1])
+
+    db.update_file_share_security(file_id, clear_all=True)
+    await query.answer("Semua proteksi dihapus! 🔓")
+
+    f = db.get_file(file_id)
+    sec = parse_share_token(f.get("share_token") or "")
+
+    text = (
+        f"🔒 <b>Keamanan & Privasi Link Share</b>\n\n"
+        f"File: <code>{f['file_name']}</code>\n\n"
+        f"Status Keamanan Saat Ini:\n"
+        f"• PIN Proteksi: <i>Tidak ada</i>\n"
+        f"• Batas Waktu: <i>Selamanya</i>\n"
+        f"• Batas Unduhan: <i>Tak terbatas</i>\n\n"
+        f"Pilih opsi di bawah untuk mengatur:"
+    )
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=kb.share_security_menu(file_id, sec),
+    )
+
+
+# ── Custom Tags & Notes ────────────────────────────────
+
+async def file_tag_view(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ftag:{file_id} — view and manage tags & notes."""
+    query = update.callback_query
+    await query.answer()
+    file_id = int(query.data.split(":")[1])
+
+    f = db.get_file(file_id)
+    if not f:
+        await query.answer("File tidak ditemukan", show_alert=True)
+        return
+
+    _, note, tags = parse_file_metadata(f.get("mime_type"))
+
+    note_val = f"<i>{note}</i>" if note else "<i>(Belum ada catatan)</i>"
+    tag_val = " ".join(f"#{t}" for t in tags) if tags else "<i>(Belum ada tag)</i>"
+
+    text = (
+        f"🏷 <b>Tag & Catatan Pribadi</b>\n\n"
+        f"📄 File: <code>{f['file_name']}</code>\n\n"
+        f"📝 <b>Catatan:</b>\n{note_val}\n\n"
+        f"🏷 <b>Tag:</b>\n{tag_val}\n\n"
+        f"💡 <i>Gunakan tombol di bawah untuk menambah atau mengedit. Anda dapat mencari file ini nanti menggunakan tag!</i>"
+    )
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=kb.file_tag_view(file_id, f["folder_id"]),
+    )
+
+
+async def file_tag_edit_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ftag_edit:{file_id} — prompt user to send note & tags."""
+    query = update.callback_query
+    await query.answer()
+    file_id = int(query.data.split(":")[1])
+
+    context.user_data["state"] = "awaiting_file_tags"
+    context.user_data["tag_file_id"] = file_id
+
+    await query.message.reply_text(
+        "✏️ <b>Tambah/Ubah Catatan & Tag</b>\n\n"
+        "Kirim teks berisi catatan beserta tanda pagar <code>#</code> untuk tag.\n\n"
+        "Contoh:\n"
+        "<code>Laporan keuangan kantor kuartal 1 #keuangan #2024 #penting</code>\n\n"
+        "Kirim pesan Anda sekarang:",
+        parse_mode="HTML",
+    )
+
+
+async def file_tag_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ftag_del:{file_id} — remove all note & tags."""
+    query = update.callback_query
+    file_id = int(query.data.split(":")[1])
+
+    db.update_file_notes_and_tags(file_id, note="", tags=[])
+    await query.answer("Catatan & tag dibersihkan! ✅")
+
+    f = db.get_file(file_id)
+    text = (
+        f"🏷 <b>Tag & Catatan Pribadi</b>\n\n"
+        f"📄 File: <code>{f['file_name']}</code>\n\n"
+        f"📝 <b>Catatan:</b>\n<i>(Belum ada catatan)</i>\n\n"
+        f"🏷 <b>Tag:</b>\n<i>(Belum ada tag)</i>\n\n"
+        f"💡 <i>Catatan dan tag telah dihapus.</i>"
+    )
+    await query.edit_message_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=kb.file_tag_view(file_id, f["folder_id"]),
+    )
+
+
 # ── Public Shared File Actions ─────────────────────────
 
 async def public_download_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -714,6 +1025,7 @@ async def public_download_file(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     await query.message.reply_document(f["file_id"], caption=f"📥 {f['file_name']}")
+    db.record_file_share_download(file_id)
 
 
 async def public_save_to_drive(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -757,6 +1069,7 @@ async def public_save_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     saved = db.copy_file_to_user_folder(source_file, user_id, folder_id)
     if saved:
+        db.record_file_share_download(file_id)
         emoji = file_emoji(source_file["file_type"])
         await query.edit_message_text(
             f"✅ {emoji} <b>{source_file['file_name']}</b> berhasil disimpan ke folder <b>{folder_name}</b>!",
