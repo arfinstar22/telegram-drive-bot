@@ -22,6 +22,7 @@ def main():
 
     # ── Commands ───────────────────────────────────────
     app.add_handler(CommandHandler("start", menu.start))
+    app.add_handler(CommandHandler("done", files.done_uploading))
 
     # ── Reply Keyboard buttons ─────────────────────────
     app.add_handler(MessageHandler(filters.Regex(r"^📁 My Files$"), folders.my_files))
@@ -73,6 +74,8 @@ def main():
     app.add_handler(CallbackQueryHandler(files.smart_apply_rename, pattern=r"^(smr_ok|aisrok):\d+$"))
     app.add_handler(CallbackQueryHandler(files.duplicate_force_save, pattern=r"^dup_force$"))
     app.add_handler(CallbackQueryHandler(files.duplicate_skip, pattern=r"^dup_skip$"))
+    app.add_handler(CallbackQueryHandler(files.delete_notification_msg, pattern=r"^msg_del$"))
+    app.add_handler(CallbackQueryHandler(files.batch_smart_sort, pattern=r"^bsm:[0-9a-fA-F]+$"))
 
     # ── Navigation callbacks ───────────────────────────
     app.add_handler(CallbackQueryHandler(menu.go_home, pattern=r"^home_nav$"))
