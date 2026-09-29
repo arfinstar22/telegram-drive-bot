@@ -2072,6 +2072,8 @@
         </div>
       </div>
     </div>
+  </div>
+
   <!-- File Public Share Modal Sheet -->
   <div class="modal-overlay" id="fileShareModal" onclick="closeFileShareModal(event)">
     <div class="modal-sheet" onclick="event.stopPropagation()">
@@ -3294,6 +3296,16 @@
       if (!activeModalFile) return;
       const fileId = activeModalFile.id;
 
+      // Close fileModal so fileShareModal is clearly visible in foreground
+      document.getElementById('fileModal').classList.remove('active');
+
+      document.getElementById('fileShareWebUrlInput').value = 'Membuat tautan berbagi...';
+      document.getElementById('fileShareDirectUrlInput').value = 'Membuat tautan direct...';
+      const statusPill = document.getElementById('fileShareStatusPill');
+      statusPill.innerText = 'Memuat...';
+      statusPill.style.color = 'var(--accent)';
+      document.getElementById('fileShareModal').classList.add('active');
+
       try {
         const res = await fetch('/api/file_share_link', {
           method: 'POST',
@@ -3305,21 +3317,22 @@
           currentShareData = data;
           document.getElementById('fileShareWebUrlInput').value = data.share_url;
           document.getElementById('fileShareDirectUrlInput').value = data.direct_download_url;
-          const statusPill = document.getElementById('fileShareStatusPill');
           statusPill.innerText = 'Aktif';
           statusPill.style.color = 'var(--emerald)';
-          document.getElementById('fileShareModal').classList.add('active');
         } else {
-          alert('Gagal membuat tautan berbagi: ' + (data.error || 'Unknown error'));
+          showToast('⚠️ Gagal membuat tautan: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('Gagal membuat tautan berbagi: ' + err);
+        showToast('⚠️ Gagal membuat tautan: ' + err.message);
       }
     }
 
     function closeFileShareModal(e) {
       if (!e || e.target?.id === 'fileShareModal' || e.target?.classList?.contains('sheet-handle') || !e.target) {
         document.getElementById('fileShareModal').classList.remove('active');
+        if (activeModalFile) {
+          document.getElementById('fileModal').classList.add('active');
+        }
       }
     }
 

@@ -944,7 +944,7 @@ class ApiFileShareLinkHandler(BaseApiHandler):
                 return
 
             f = db.get_file(int(file_id))
-            if not f or f["user_id"] != int(user_id):
+            if not f or int(f.get("user_id", 0)) != int(user_id):
                 self.set_status(403)
                 self.write(json.dumps({"error": "Berkas tidak ditemukan atau akses ditolak"}))
                 return
