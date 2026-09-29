@@ -19,6 +19,8 @@ async def open_folder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Inline callback f:{id} — open folder or root."""
     query = update.callback_query
     await query.answer()
+    from handlers.files import cancel_auto_delete
+    cancel_auto_delete(query.message.chat_id, query.message.message_id)
     folder_id = int(query.data.split(":")[1])
     user_id = query.from_user.id
 

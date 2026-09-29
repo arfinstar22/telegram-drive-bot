@@ -63,6 +63,31 @@ async def upload_to_folder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 _upload_batches: dict[int, dict] = {}
+_auto_delete_tasks: dict[tuple[int, int], asyncio.Task] = {}
+
+
+def schedule_auto_delete(bot, chat_id: int, message_id: int, delay: float = 6.0):
+    """Schedule automatic deletion of a bot notification message."""
+    cancel_auto_delete(chat_id, message_id)
+    task = asyncio.create_task(_auto_delete_worker(bot, chat_id, message_id, delay))
+    _auto_delete_tasks[(chat_id, message_id)] = task
+
+
+def cancel_auto_delete(chat_id: int, message_id: int):
+    """Cancel scheduled auto-deletion if user interacts with the message."""
+    task = _auto_delete_tasks.pop((chat_id, message_id), None)
+    if task and not task.done():
+        task.cancel()
+
+
+async def _auto_delete_worker(bot, chat_id: int, message_id: int, delay: float):
+    try:
+        await asyncio.sleep(delay)
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
+    except (asyncio.CancelledError, Exception):
+        pass
+    finally:
+        _auto_delete_tasks.pop((chat_id, message_id), None)
 
 
 async def _debounce_flush(user_id: int, context: ContextTypes.DEFAULT_TYPE, delay: float = 1.8):
@@ -100,9 +125,11 @@ async def _flush_upload_batch(user_id: int, context: ContextTypes.DEFAULT_TYPE):
         size_str = format_size(f["size"])
         text = (
             f"{emoji} <b>{f['name']}</b> ({size_str})\n"
-            f"📁 Disimpan ke <b>{folder_name}</b> ✅"
+            f"📁 Disimpan ke <b>{folder_name}</b> ✅\n"
+            f"<i>⏱ Pesan ini otomatis bersih dalam 5 detik...</i>"
         )
         keyboard = kb.single_upload_keyboard(folder_id, f["id"])
+        delay = 5.0
     else:
         # Multiple files in batch
         count = len(files)
@@ -125,12 +152,14 @@ async def _flush_upload_batch(user_id: int, context: ContextTypes.DEFAULT_TYPE):
             f"✅ <b>{count} file</b> berhasil disimpan!\n"
             f"💾 Total: <b>{format_size(total_size)}</b>\n"
             f"📁 Folder: <b>{folder_name}</b>{dup_info}\n\n"
-            f"📋 <b>Rincian File:</b>\n{preview_lines}"
+            f"📋 <b>Rincian File:</b>\n{preview_lines}\n"
+            f"<i>⏱ Pesan ini otomatis bersih dalam 7 detik...</i>"
         )
 
         batch_id = secrets.token_hex(4)
         context.user_data[f"batch_files_{batch_id}"] = [f["id"] for f in files]
         keyboard = kb.batch_upload_keyboard(folder_id, batch_id, can_smart_sort=is_inbox)
+        delay = 7.0
 
     if msg_id:
         try:
@@ -141,21 +170,27 @@ async def _flush_upload_batch(user_id: int, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML",
                 reply_markup=keyboard,
             )
+            schedule_auto_delete(context.bot, chat_id, msg_id, delay=delay)
             return
         except Exception:
             pass
 
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=text,
-        parse_mode="HTML",
-        reply_markup=keyboard,
-    )
+    try:
+        sent = await context.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode="HTML",
+            reply_markup=keyboard,
+        )
+        schedule_auto_delete(context.bot, chat_id, sent.message_id, delay=delay)
+    except Exception as exc:
+        log.warning("Could not send final upload batch summary: %s", exc)
 
 
 async def done_uploading(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Reply Keyboard: ✅ Done — exit upload mode."""
     user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
     folder_id = context.user_data.get("upload_folder_id")
     context.user_data["state"] = "idle"
     context.user_data.pop("upload_folder_id", None)
@@ -167,7 +202,19 @@ async def done_uploading(update: Update, context: ContextTypes.DEFAULT_TYPE):
             b["task"].cancel()
         await _flush_upload_batch(user_id, context)
 
-    await update.message.reply_text("✅ Mode upload selesai!", reply_markup=kb.main_menu())
+    # Delete incoming "✅ Done" text message from user to keep chat clean
+    try:
+        if update.message:
+            await update.message.delete()
+    except Exception:
+        pass
+
+    done_msg = await context.bot.send_message(
+        chat_id=chat_id,
+        text="✅ Mode upload selesai!",
+        reply_markup=kb.main_menu(),
+    )
+    schedule_auto_delete(context.bot, chat_id, done_msg.message_id, delay=3.5)
 
     if folder_id:
         from handlers.folders import _show_folder_view
@@ -275,6 +322,7 @@ async def batch_smart_sort(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """bsm:{batch_id} — auto-organize all files in a batch into smart folders."""
     query = update.callback_query
     await query.answer()
+    cancel_auto_delete(query.message.chat_id, query.message.message_id)
     batch_id = query.data.split(":")[1]
     user_id = query.from_user.id
 
@@ -314,16 +362,19 @@ async def batch_smart_sort(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"Berhasil merapikan <b>{moved_count} file</b> ke dalam folder:\n"
         f"{summary_lines}\n"
-        f"Semua file telah tertata rapi sesuai kategori dan tahunnya!",
+        f"Semua file telah tertata rapi sesuai kategori dan tahunnya!\n\n"
+        f"<i>⏱ Pesan ini otomatis bersih dalam 6 detik...</i>",
         parse_mode="HTML",
         reply_markup=btn,
     )
+    schedule_auto_delete(context.bot, query.message.chat_id, query.message.message_id, delay=6.0)
 
 
 async def delete_notification_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """msg_del — delete notification message to keep chat completely clean."""
     query = update.callback_query
     await query.answer("Notifikasi dibersihkan 🧹")
+    cancel_auto_delete(query.message.chat_id, query.message.message_id)
     try:
         await query.message.delete()
     except Exception:
@@ -335,6 +386,7 @@ async def quick_upload_to_folder(update: Update, context: ContextTypes.DEFAULT_T
     """qup:{folder_id} — save pending file to chosen folder."""
     query = update.callback_query
     await query.answer()
+    cancel_auto_delete(query.message.chat_id, query.message.message_id)
     folder_id = int(query.data.split(":")[1])
     user_id = query.from_user.id
 
@@ -359,9 +411,11 @@ async def quick_upload_to_folder(update: Update, context: ContextTypes.DEFAULT_T
         folder_name = folder["name"] if folder else "?"
         await query.edit_message_text(
             f"{emoji} <b>{pending['file_name']}</b> ({size})\n"
-            f"📁 Disimpan ke <b>{folder_name}</b> ✅",
+            f"📁 Disimpan ke <b>{folder_name}</b> ✅\n\n"
+            f"<i>⏱ Pesan ini otomatis bersih dalam 5 detik...</i>",
             parse_mode="HTML",
         )
+        schedule_auto_delete(context.bot, query.message.chat_id, query.message.message_id, delay=5.0)
     else:
         await query.edit_message_text("❌ Gagal menyimpan file.")
 
@@ -460,6 +514,7 @@ async def move_file_picker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """fm:{file_id} — show folder picker to move file."""
     query = update.callback_query
     await query.answer()
+    cancel_auto_delete(query.message.chat_id, query.message.message_id)
     file_id = int(query.data.split(":")[1])
 
     user_id = query.from_user.id
@@ -492,9 +547,11 @@ async def move_to_folder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_name = f["file_name"] if f else "?"
     folder_name = folder["name"] if folder else "?"
     await query.edit_message_text(
-        f"✅ <b>{file_name}</b> dipindahkan ke 📁 <b>{folder_name}</b>",
+        f"✅ <b>{file_name}</b> dipindahkan ke 📁 <b>{folder_name}</b>\n\n"
+        f"<i>⏱ Pesan ini otomatis bersih dalam 4 detik...</i>",
         parse_mode="HTML",
     )
+    schedule_auto_delete(context.bot, query.message.chat_id, query.message.message_id, delay=4.0)
 
 
 async def delete_file_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
