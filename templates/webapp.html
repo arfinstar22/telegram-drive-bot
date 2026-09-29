@@ -162,6 +162,26 @@
       font-family: 'JetBrains Mono', monospace;
     }
 
+    .btn-clean-dup {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: var(--gold);
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+
+    .btn-clean-dup:hover, .btn-clean-dup:active {
+      background: rgba(245, 158, 11, 0.22);
+      transform: scale(0.96);
+    }
+
     .storage-progress {
       height: 6px;
       background: rgba(255, 255, 255, 0.08);
@@ -1436,7 +1456,13 @@
     <div class="storage-bar-card">
       <div class="storage-header">
         <span>Penggunaan Kapasitas</span>
-        <span class="storage-used" id="storageSummary">0 MB • 0 File</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="storage-used" id="storageSummary">0 MB • 0 File</span>
+          <button class="btn-clean-dup" onclick="openDuplicatesModal()" title="Pindai & Bersihkan Berkas Duplikat">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Duplikat
+          </button>
+        </div>
       </div>
       <div class="storage-progress">
         <div class="storage-fill" id="storageFill" style="width: 15%"></div>
@@ -1460,6 +1486,7 @@
       <div class="chip" data-type="video">🎬 Video</div>
       <div class="chip" data-type="audio">🎵 Audio</div>
       <div class="chip" data-type="starred">⭐ Favorit</div>
+      <div class="chip" data-type="trash" id="chipTrash">🗑️ Sampah (<span id="trashCountPill">0</span>)</div>
     </div>
 
     <!-- Breadcrumb Path -->
@@ -1732,6 +1759,32 @@
     </div>
   </div>
 
+  <!-- Duplicates Cleaner Modal Sheet -->
+  <div class="modal-overlay" id="duplicatesModal" onclick="closeDuplicatesModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <h3 class="sheet-title" style="margin-bottom: 0;">🧹 Pembersih Berkas Ganda</h3>
+        <span class="tag-pill" id="dupCountBadge" style="color: var(--gold); border-color: rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.1);">Pindai...</span>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 14px;" id="dupModalSub">
+        Mendeteksi berkas dengan konten identik yang memakan ruang ganda di penyimpanan Anda.
+      </p>
+
+      <div id="dupListContainer" style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+        <div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 0.8rem;">Memindai berkas duplikat...</div>
+      </div>
+
+      <div class="sheet-actions">
+        <button class="btn btn-secondary" onclick="closeDuplicatesModal()">Tutup</button>
+        <button class="btn btn-primary" id="btnExecuteCleanDup" onclick="executeCleanDuplicates()" disabled>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Bersihkan Duplikat
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Upload FAB & Hidden Input -->
   <button class="upload-fab" id="uploadFab" onclick="triggerWebUpload()" title="Unggah Berkas">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
@@ -1819,6 +1872,8 @@
     function renderStorage(storage) {
       if (!storage) return;
       document.getElementById('storageSummary').innerText = `${storage.total_size} • ${storage.total_files} File`;
+      const pill = document.getElementById('trashCountPill');
+      if (pill) pill.innerText = storage.trash_count || 0;
     }
 
     function renderBreadcrumbs(crumbs) {
@@ -1998,6 +2053,16 @@
     document.querySelectorAll('.chip').forEach(chip => {
       chip.addEventListener('click', () => {
         triggerHaptic();
+        if (chip.dataset.type === 'trash') {
+          document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          openTrashView();
+          return;
+        }
+        if (isTrashMode) {
+          isTrashMode = false;
+          document.getElementById('uploadFab').style.display = 'flex';
+        }
         document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         currentCategory = chip.dataset.type;
@@ -2951,6 +3016,246 @@
         }
       } catch (err) {
         alert('Gagal menonaktifkan: ' + err);
+      }
+    }
+
+    // Trash View & Logic
+    let isTrashMode = false;
+    let trashFiles = [];
+
+    async function openTrashView() {
+      triggerHaptic();
+      isTrashMode = true;
+      document.getElementById('foldersSection').style.display = 'none';
+      document.getElementById('uploadFab').style.display = 'none';
+
+      const el = document.getElementById('breadcrumbs');
+      el.innerHTML = `
+        <span class="crumb-item" onclick="exitTrashMode()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          My Drive
+        </span>
+        <span class="crumb-sep">/</span>
+        <span class="crumb-current">🗑️ Kotak Sampah</span>
+        <button class="btn btn-danger" style="margin-left: auto; padding: 4px 10px; font-size: 0.72rem;" onclick="confirmEmptyTrash()">
+          Kosongkan Sampah
+        </button>
+      `;
+
+      const container = document.getElementById('filesContainer');
+      container.innerHTML = `
+        <div class="empty-state" style="grid-column: 1/-1;">
+          <div class="empty-icon">⏳</div>
+          <p>Memuat kotak sampah...</p>
+        </div>
+      `;
+
+      try {
+        const res = await fetch(`/api/trash?user_id=${userId}`);
+        const data = await res.json();
+        if (data.ok) {
+          trashFiles = data.files || [];
+          renderTrashFiles(trashFiles);
+          const pill = document.getElementById('trashCountPill');
+          if (pill) pill.innerText = trashFiles.length;
+        } else {
+          container.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><p>Gagal memuat sampah.</p></div>`;
+        }
+      } catch (err) {
+        container.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><p>Error: ${err}</p></div>`;
+      }
+    }
+
+    function exitTrashMode() {
+      isTrashMode = false;
+      document.getElementById('uploadFab').style.display = 'flex';
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      const allChip = document.querySelector('.chip[data-type="all"]');
+      if (allChip) allChip.classList.add('active');
+      currentCategory = 'all';
+      loadDriveData();
+    }
+
+    function renderTrashFiles(files) {
+      const container = document.getElementById('filesContainer');
+      if (!files.length) {
+        container.innerHTML = `
+          <div class="empty-state" style="grid-column: 1/-1;">
+            <div class="empty-icon">✨</div>
+            <p>Kotak sampah bersih. Tidak ada berkas yang dibuang.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.className = 'files-grid';
+      container.innerHTML = files.map(f => {
+        const iconSvg = getFileIconSvg(f.file_type);
+        const thumbUrl = f.thumb_url;
+        const thumbHtml = thumbUrl
+          ? `<img class="file-thumb-img" src="${thumbUrl}" loading="lazy" alt="${escapeHtml(f.file_name)}" onerror="this.parentElement.innerHTML = getFileIconSvg('${f.file_type}');">`
+          : iconSvg;
+
+        return `
+          <div class="file-card" style="opacity: 0.95;">
+            <div class="file-thumb-wrap">
+              ${thumbHtml}
+              <span class="file-type-badge" style="background: rgba(244, 63, 94, 0.8);">Sampah</span>
+            </div>
+            <div class="file-name" title="${escapeHtml(f.file_name)}">${escapeHtml(f.file_name)}</div>
+            <div class="file-meta" style="margin-bottom: 8px;">
+              <span>${f.file_size_formatted}</span>
+              <span>${f.trashed_at || ''}</span>
+            </div>
+            <div style="display: flex; gap: 6px; margin-top: auto;">
+              <button class="btn btn-secondary" style="flex: 1; padding: 6px 4px; font-size: 0.72rem; justify-content: center;" onclick="restoreTrashFile(${f.id})">
+                🔄 Pulihkan
+              </button>
+              <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.72rem;" onclick="openDeleteConfirmModal([${f.id}])" title="Hapus Permanen">
+                🗑️
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function restoreTrashFile(fileId) {
+      triggerHaptic();
+      try {
+        const res = await fetch('/api/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_ids: [fileId], user_id: userId })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('✅ Berkas berhasil dipulihkan ke Drive!');
+          openTrashView();
+        } else {
+          alert('Gagal memulihkan berkas: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Error memulihkan berkas: ' + err);
+      }
+    }
+
+    function confirmEmptyTrash() {
+      if (!trashFiles.length) {
+        showToast('Kotak sampah sudah kosong.');
+        return;
+      }
+      openConfirmModal({
+        title: '🗑️ Kosongkan Kotak Sampah?',
+        msg: `Semua berkas (${trashFiles.length} item) di kotak sampah akan dihapus secara permanen dan tidak dapat dipulihkan.`,
+        onConfirm: async () => {
+          try {
+            const res = await fetch('/api/empty_trash', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ user_id: userId })
+            });
+            const data = await res.json();
+            if (data.ok) {
+              showToast('✨ Kotak sampah berhasil dikosongkan!');
+              openTrashView();
+            } else {
+              alert('Gagal mengosongkan sampah: ' + (data.error || 'Unknown error'));
+            }
+          } catch (err) {
+            alert('Error: ' + err);
+          }
+        }
+      });
+    }
+
+    // Duplicate Cleaner Modal Logic
+    async function openDuplicatesModal() {
+      triggerHaptic();
+      document.getElementById('duplicatesModal').classList.add('active');
+      const listEl = document.getElementById('dupListContainer');
+      const badge = document.getElementById('dupCountBadge');
+      const sub = document.getElementById('dupModalSub');
+      const btn = document.getElementById('btnExecuteCleanDup');
+
+      listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.8rem;">Memindai berkas duplikat...</div>';
+      badge.innerText = 'Memindai...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/duplicates?user_id=${userId}`);
+        const data = await res.json();
+        if (data.ok) {
+          if (!data.total_duplicates) {
+            badge.innerText = '0 Duplikat';
+            badge.style.color = 'var(--emerald)';
+            sub.innerText = 'Penyimpanan Anda bersih dan teratur! Tidak ada berkas duplikat yang terdeteksi.';
+            listEl.innerHTML = `
+              <div style="text-align: center; padding: 25px 10px;">
+                <div style="font-size: 2.2rem; margin-bottom: 8px;">🎉</div>
+                <div style="font-weight: 700; color: #fff; font-size: 0.92rem;">Bebas Berkas Ganda</div>
+                <div style="color: var(--text-muted); font-size: 0.78rem; margin-top: 4px;">Semua berkas di cloud storage Anda unik.</div>
+              </div>
+            `;
+            btn.disabled = true;
+            return;
+          }
+
+          badge.innerText = `${data.total_duplicates} Duplikat (${data.dup_wasted_size})`;
+          sub.innerText = `Ditemukan ${data.total_duplicates} berkas kembar yang memboroskan ruang ${data.dup_wasted_size}. Bersihkan untuk merapikan drive.`;
+          btn.disabled = false;
+          btn.innerText = `Bersihkan ${data.total_duplicates} Berkas Duplikat (${data.dup_wasted_size})`;
+
+          listEl.innerHTML = data.groups.map(grp => `
+            <div style="background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <span style="font-weight: 600; color: #fff; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px;">${escapeHtml(grp.file_name)}</span>
+                <span style="color: var(--gold); font-size: 0.72rem; font-weight: 700;">${grp.count}x kembar</span>
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+                <span>Ukuran: ${grp.file_size_formatted}</span>
+                <span>Boros: +${grp.wasted_size}</span>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          listEl.innerHTML = `<div style="text-align:center; color:var(--rose); padding:16px;">Gagal memindai: ${data.error}</div>`;
+        }
+      } catch (err) {
+        listEl.innerHTML = `<div style="text-align:center; color:var(--rose); padding:16px;">Error koneksi: ${err}</div>`;
+      }
+    }
+
+    function closeDuplicatesModal(e) {
+      if (!e || e.target?.id === 'duplicatesModal' || e.target?.classList?.contains('sheet-handle') || !e.target) {
+        document.getElementById('duplicatesModal').classList.remove('active');
+      }
+    }
+
+    async function executeCleanDuplicates() {
+      triggerHaptic();
+      const btn = document.getElementById('btnExecuteCleanDup');
+      btn.disabled = true;
+      btn.innerText = 'Membersihkan...';
+
+      try {
+        const res = await fetch('/api/clean_duplicates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`🧹 ${data.cleaned_count} berkas duplikat dipindahkan ke Sampah!`);
+          document.getElementById('duplicatesModal').classList.remove('active');
+          await loadDriveData();
+        } else {
+          alert('Gagal membersihkan: ' + (data.error || 'Unknown error'));
+          btn.disabled = false;
+        }
+      } catch (err) {
+        alert('Error: ' + err);
+        btn.disabled = false;
       }
     }
 

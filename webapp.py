@@ -89,6 +89,7 @@ class ApiDriveHandler(BaseApiHandler):
             "total_folders": info.get("total_folders", 0),
             "total_size": format_size(info.get("total_size", 0)),
             "total_size_bytes": info.get("total_size", 0),
+            "trash_count": info.get("trash_count", 0),
         }
 
         # Breadcrumbs
@@ -824,6 +825,132 @@ class ApiFolderDropzoneHandler(BaseApiHandler):
             self.write(json.dumps({"error": str(e)}))
 
 
+class ApiTrashHandler(BaseApiHandler):
+    """List all trashed files for a user."""
+    async def get(self):
+        user_id_raw = self.get_argument("user_id", None)
+        if not user_id_raw or not user_id_raw.isdigit():
+            self.set_status(400)
+            self.write(json.dumps({"error": "Invalid user_id"}))
+            return
+
+        user_id = int(user_id_raw)
+        trash_files = db.get_trash(user_id)
+        res_files = []
+        for f in trash_files:
+            has_thumb = bool(f.get("thumbnail_file_id") or f.get("file_type") == "photo")
+            res_files.append({
+                "id": f["id"],
+                "file_name": f.get("file_name", "File"),
+                "file_size": f.get("file_size", 0),
+                "file_size_formatted": format_size(f.get("file_size", 0)),
+                "file_type": f.get("file_type", "document"),
+                "trashed_at": f.get("trashed_at", "")[:10] if f.get("trashed_at") else "",
+                "has_thumb": has_thumb,
+                "thumb_url": f"/api/thumbnail?file_id={f['id']}" if has_thumb else None,
+            })
+        self.write(json.dumps({"ok": True, "files": res_files, "count": len(res_files)}))
+
+
+class ApiRestoreHandler(BaseApiHandler):
+    """Restore trashed file(s)."""
+    async def post(self):
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            file_ids = data.get("file_ids", [])
+            user_id = data.get("user_id")
+
+            if not file_ids or not user_id:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Missing parameters"}))
+                return
+
+            restored = 0
+            for fid in file_ids:
+                try:
+                    db.restore_file(int(fid))
+                    restored += 1
+                except Exception as ex:
+                    log.warning("Failed restoring file %s: %s", fid, ex)
+
+            self.write(json.dumps({"ok": True, "restored_count": restored}))
+        except Exception as e:
+            log.exception("Error restoring file: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
+class ApiEmptyTrashHandler(BaseApiHandler):
+    """Permanently delete all trashed files of user."""
+    async def post(self):
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            user_id = data.get("user_id")
+            if not user_id:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Missing user_id"}))
+                return
+
+            db.empty_trash(int(user_id))
+            self.write(json.dumps({"ok": True}))
+        except Exception as e:
+            log.exception("Error emptying trash: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
+class ApiDuplicatesHandler(BaseApiHandler):
+    """Get duplicate files report and potential space savings."""
+    async def get(self):
+        user_id_raw = self.get_argument("user_id", None)
+        if not user_id_raw or not user_id_raw.isdigit():
+            self.set_status(400)
+            self.write(json.dumps({"error": "Invalid user_id"}))
+            return
+
+        user_id = int(user_id_raw)
+        health = db.get_storage_health(user_id)
+
+        formatted_groups = []
+        for grp in health.get("duplicate_groups", []):
+            formatted_groups.append({
+                "file_name": grp[0].get("file_name", "Berkas"),
+                "file_size_formatted": format_size(grp[0].get("file_size", 0)),
+                "count": len(grp),
+                "wasted_size": format_size(sum(item.get("file_size", 0) for item in grp[1:])),
+                "items": [{
+                    "id": item["id"],
+                    "folder_name": (item.get("folders") or {}).get("name") if isinstance(item.get("folders"), dict) else "Inbox"
+                } for item in grp]
+            })
+
+        self.write(json.dumps({
+            "ok": True,
+            "total_duplicates": health.get("total_duplicates", 0),
+            "dup_wasted_size": format_size(health.get("dup_wasted_size", 0)),
+            "groups": formatted_groups,
+        }))
+
+
+class ApiCleanDuplicatesHandler(BaseApiHandler):
+    """One-click cleanup redundant duplicate copies to trash."""
+    async def post(self):
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            user_id = data.get("user_id")
+            if not user_id:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Missing user_id"}))
+                return
+
+            cleaned = db.clean_duplicate_files(int(user_id))
+            self.write(json.dumps({"ok": True, "cleaned_count": cleaned}))
+        except Exception as e:
+            log.exception("Error cleaning duplicates: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
 def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
     """Compile all WebApp + Telegram Webhook routes."""
     import telegram.ext._utils.webhookhandler as wh
@@ -849,6 +976,11 @@ def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
         (r"/api/dropzone/info/?", ApiDropzoneInfoHandler),
         (r"/api/dropzone/upload/?", ApiDropzoneUploadHandler),
         (r"/api/folder_dropzone/?", ApiFolderDropzoneHandler),
+        (r"/api/trash/?", ApiTrashHandler),
+        (r"/api/restore/?", ApiRestoreHandler),
+        (r"/api/empty_trash/?", ApiEmptyTrashHandler),
+        (r"/api/duplicates/?", ApiDuplicatesHandler),
+        (r"/api/clean_duplicates/?", ApiCleanDuplicatesHandler),
     ]
 
 
@@ -898,6 +1030,11 @@ def start_standalone_webapp_server(port: int = 10000):
         (r"/api/dropzone/info/?", ApiDropzoneInfoHandler),
         (r"/api/dropzone/upload/?", ApiDropzoneUploadHandler),
         (r"/api/folder_dropzone/?", ApiFolderDropzoneHandler),
+        (r"/api/trash/?", ApiTrashHandler),
+        (r"/api/restore/?", ApiRestoreHandler),
+        (r"/api/empty_trash/?", ApiEmptyTrashHandler),
+        (r"/api/duplicates/?", ApiDuplicatesHandler),
+        (r"/api/clean_duplicates/?", ApiCleanDuplicatesHandler),
     ]
     app = tornado.web.Application(routes)
     try:
