@@ -194,26 +194,104 @@ def detect_topic(file_name: str, file_type: str = "") -> str | None:
 
 
 
-def suggest_folder(file_name: str, file_type: str = "document") -> tuple[str, str, str | None]:
-    """Suggest an organized folder name based on topic dictionary and year.
-    Returns: (suggested_folder_name, detected_topic, detected_year)
-    Examples:
-      'Foto Kenangan 2019.jpg' -> ('Kenangan 2019', 'Kenangan', '2019')
-      'video_20260929_015229.mp4' -> ('Video 2026', 'Video', '2026')
-      'Invoice Shopee Maret 2024.pdf' -> ('Keuangan & Tagihan 2024', 'Keuangan & Tagihan', '2024')
-      'Skripsi Bab 1 Final.docx' -> ('Pendidikan & Tugas', 'Pendidikan & Tugas', None)
-      'Resep Dokter MCU.pdf' -> ('Kesehatan & Medis', 'Kesehatan & Medis', None)
+# ── Format Extensions Classification ──────────────────────────
+VIDEO_EXTENSIONS: set[str] = {
+    ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".3gp",
+    ".m4v", ".ts", ".mpg", ".mpeg", ".vob", ".rmvb", ".divx", ".m2ts",
+    ".mts", ".asf", ".f4v", ".ogv"
+}
+
+PHOTO_EXTENSIONS: set[str] = {
+    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic", ".heif",
+    ".svg", ".tiff", ".tif", ".ico", ".raw", ".cr2", ".nef", ".arw",
+    ".dng", ".psd", ".ai", ".eps"
+}
+
+AUDIO_EXTENSIONS: set[str] = {
+    ".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wma",
+    ".alac", ".aiff", ".mid", ".midi", ".amr"
+}
+
+ARCHIVE_EXTENSIONS: set[str] = {
+    ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".iso", ".tgz",
+    ".cab", ".7zip"
+}
+
+APP_EXTENSIONS: set[str] = {
+    ".apk", ".xapk", ".exe", ".msi", ".dmg", ".pkg", ".deb", ".rpm",
+    ".bat", ".sh", ".cmd", ".bin"
+}
+
+DOC_EXTENSIONS: set[str] = {
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt",
+    ".csv", ".rtf", ".odt", ".ods", ".odp", ".epub", ".mobi", ".pages",
+    ".numbers", ".key", ".md", ".json", ".xml", ".html", ".htm"
+}
+
+
+def detect_format(file_name: str, file_type: str = "", mime_type: str = "") -> str:
+    """Detect file format category strictly based on extension, file_type, and mime_type.
+    Returns: 'Video', 'Foto', 'Musik', 'Dokumen', 'Arsip', or 'Aplikasi'
     """
-    topic = detect_topic(file_name, file_type)
+    ext = Path(file_name).suffix.lower()
+    ftype = (file_type or "").lower()
+    mtype = (mime_type or "").lower()
+
+    # 1. Direct Extension match (most accurate)
+    if ext in VIDEO_EXTENSIONS:
+        return "Video"
+    if ext in PHOTO_EXTENSIONS:
+        return "Foto"
+    if ext in AUDIO_EXTENSIONS:
+        return "Musik"
+    if ext in ARCHIVE_EXTENSIONS:
+        return "Arsip"
+    if ext in APP_EXTENSIONS:
+        return "Aplikasi"
+    if ext in DOC_EXTENSIONS:
+        return "Dokumen"
+
+    # 2. Telegram file_type match
+    if ftype in ("video", "video_note"):
+        return "Video"
+    if ftype in ("photo", "animation"):
+        return "Foto"
+    if ftype in ("audio", "voice"):
+        return "Musik"
+
+    # 3. MIME type match
+    if mtype.startswith("video/"):
+        return "Video"
+    if mtype.startswith("image/"):
+        return "Foto"
+    if mtype.startswith("audio/"):
+        return "Musik"
+    if any(k in mtype for k in ("zip", "compressed", "tar", "archive")):
+        return "Arsip"
+    if any(k in mtype for k in ("pdf", "document", "text", "word", "excel", "presentation")):
+        return "Dokumen"
+
+    # 4. Fallback based on ftype
+    if ftype == "document":
+        return "Dokumen"
+
+    return "Dokumen"
+
+
+def suggest_folder(file_name: str, file_type: str = "document", mime_type: str = "") -> tuple[str, str, str | None]:
+    """Suggest an organized folder name strictly based on file format.
+    Returns: (suggested_folder_name, detected_format, detected_year)
+    Examples:
+      'Surat.untuk.masa.mudaku.mp4' -> ('Video', 'Video', None)
+      'IMG_20240929_WA0001.jpg'     -> ('Foto', 'Foto', None)
+      'Laporan Keuangan.pdf'        -> ('Dokumen', 'Dokumen', None)
+      'Lagu Romantis.mp3'           -> ('Musik', 'Musik', None)
+      'Backup Proyek.zip'           -> ('Arsip', 'Arsip', None)
+      'Game Android.apk'            -> ('Aplikasi', 'Aplikasi', None)
+    """
+    category = detect_format(file_name, file_type, mime_type)
     year = extract_year(file_name)
-
-    if topic:
-        folder = f"{topic} {year}" if year else topic
-        return folder, topic, year
-
-    prefix = TYPE_DEFAULT_FOLDERS.get(file_type, "Koleksi File")
-    folder = f"{prefix} {year}" if year else prefix
-    return folder, prefix, year
+    return category, category, year
 
 
 def smart_rename(file_name: str) -> str:

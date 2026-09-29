@@ -340,7 +340,9 @@ async def batch_smart_sort(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f = db.get_file(fid)
         if not f:
             continue
-        suggested_name, _, _ = smart_organizer.suggest_folder(f["file_name"], f.get("file_type", "document"))
+        suggested_name, _, _ = smart_organizer.suggest_folder(
+            f["file_name"], f.get("file_type", "document"), f.get("mime_type", "")
+        )
         if suggested_name not in folder_map:
             dest = db.get_or_create_folder(user_id, suggested_name)
             folder_map[suggested_name] = dest["id"]
@@ -362,9 +364,9 @@ async def batch_smart_sort(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(
         f"✨ <b>Smart Sort Berhasil!</b>\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"Berhasil merapikan <b>{moved_count} file</b> ke dalam folder:\n"
+        f"Berhasil merapikan <b>{moved_count} file</b> ke dalam folder format:\n"
         f"{summary_lines}\n"
-        f"Semua file telah tertata rapi sesuai kategori dan tahunnya!",
+        f"Semua file telah tertata rapi sesuai format file-nya!",
         parse_mode="HTML",
         reply_markup=btn,
     )
@@ -1151,7 +1153,9 @@ async def smart_folder_suggest(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer("File tidak ditemukan.", show_alert=True)
         return
 
-    folder_name, topic, year = smart_organizer.suggest_folder(f["file_name"], f.get("file_type", "document"))
+    folder_name, topic, year = smart_organizer.suggest_folder(
+        f["file_name"], f.get("file_type", "document"), f.get("mime_type", "")
+    )
     context.user_data[f"smf_target_{file_id}"] = folder_name
 
     current_folder = db.get_folder(f["folder_id"])
@@ -1162,9 +1166,8 @@ async def smart_folder_suggest(update: Update, context: ContextTypes.DEFAULT_TYP
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"📄 File: <code>{f['file_name']}</code>\n"
         f"📂 Folder Saat Ini: <i>{curr_name}</i>\n"
-        f"🎯 <b>Folder Saran:</b> <code>{folder_name}</code>\n"
-        f"🏷 Kategori: <i>{topic}</i>\n"
-        f"📅 Periode/Tahun: <i>{year or 'Umum'}</i>\n\n"
+        f"🎯 <b>Folder Format:</b> <code>{folder_name}</code>\n"
+        f"🏷 Format/Tipe: <i>{topic}</i>\n\n"
         f"Pindahkan file ini ke folder <b>{folder_name}</b>?\n"
         f"<i>(Folder otomatis dibuat jika belum ada)</i>"
     )
@@ -1189,7 +1192,9 @@ async def smart_folder_apply(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     target_name = context.user_data.pop(f"smf_target_{file_id}", None)
     if not target_name:
-        target_name, _, _ = smart_organizer.suggest_folder(f["file_name"], f.get("file_type", "document"))
+        target_name, _, _ = smart_organizer.suggest_folder(
+            f["file_name"], f.get("file_type", "document"), f.get("mime_type", "")
+        )
 
     target_folder = db.get_or_create_folder(user_id, target_name)
     db.move_file(file_id, target_folder["id"])
