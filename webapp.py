@@ -223,6 +223,71 @@ class ApiSendToChatHandler(BaseApiHandler):
             self.write(json.dumps({"error": str(e)}))
 
 
+class ApiAllFoldersHandler(BaseApiHandler):
+    """Returns list of all user folders for destination selection."""
+    async def get(self):
+        user_id_raw = self.get_argument("user_id", None)
+        if not user_id_raw or not user_id_raw.isdigit():
+            self.set_status(400)
+            self.write(json.dumps({"error": "Invalid user_id"}))
+            return
+
+        user_id = int(user_id_raw)
+        folders = db.get_all_folders(user_id)
+        data = []
+        for f in folders:
+            cnt = db.get_file_count(f["id"])
+            data.append({
+                "id": f["id"],
+                "name": f["name"],
+                "parent_id": f.get("parent_id"),
+                "file_count": cnt,
+            })
+        self.write(json.dumps({"folders": data}))
+
+
+class ApiBatchMoveHandler(BaseApiHandler):
+    """Batch moves multiple files to target folder."""
+    async def post(self):
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            file_ids = data.get("file_ids", [])
+            target_folder_id = data.get("target_folder_id")
+            user_id = data.get("user_id")
+
+            if not file_ids or target_folder_id is None or not user_id:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Missing parameters"}))
+                return
+
+            target_folder_id = int(target_folder_id)
+            if target_folder_id == 0:
+                inbox = db.get_or_create_inbox_folder(int(user_id))
+                target_folder_id = inbox["id"]
+                folder_name = inbox["name"]
+            else:
+                tf = db.get_folder(target_folder_id)
+                if not tf:
+                    self.set_status(404)
+                    self.write(json.dumps({"error": "Folder tujuan tidak ditemukan"}))
+                    return
+                folder_name = tf["name"]
+
+            moved = 0
+            for fid in file_ids:
+                try:
+                    db.move_file(int(fid), target_folder_id)
+                    moved += 1
+                except Exception as ex:
+                    log.warning("Failed moving file %s: %s", fid, ex)
+
+            self.write(json.dumps({"ok": True, "count": moved, "folder_name": folder_name}))
+        except Exception as e:
+            log.exception("Error batch moving files: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
 def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
     """Compile all WebApp + Telegram Webhook routes."""
     import telegram.ext._utils.webhookhandler as wh
@@ -233,6 +298,8 @@ def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
         (r"/api/download/?", ApiDownloadHandler),
         (r"/api/star/?", ApiStarHandler),
         (r"/api/send_to_chat/?", ApiSendToChatHandler),
+        (r"/api/all_folders/?", ApiAllFoldersHandler),
+        (r"/api/batch_move/?", ApiBatchMoveHandler),
     ]
 
 
@@ -267,6 +334,8 @@ def start_standalone_webapp_server(port: int = 10000):
         (r"/api/download/?", ApiDownloadHandler),
         (r"/api/star/?", ApiStarHandler),
         (r"/api/send_to_chat/?", ApiSendToChatHandler),
+        (r"/api/all_folders/?", ApiAllFoldersHandler),
+        (r"/api/batch_move/?", ApiBatchMoveHandler),
     ]
     app = tornado.web.Application(routes)
     try:

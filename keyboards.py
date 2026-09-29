@@ -289,7 +289,9 @@ def confirm_delete_file(file_id: int, folder_id: int):
 
 def folder_picker(folders: list[dict], callback_prefix: str):
     """Generic folder picker for move file / quick upload."""
-    buttons = []
+    buttons = [
+        [InlineKeyboardButton("🏠 Root / Folder Utama", callback_data=f"{callback_prefix}0")]
+    ]
     for folder in folders:
         buttons.append([InlineKeyboardButton(
             f"📁 {folder['name']}",

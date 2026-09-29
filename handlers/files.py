@@ -544,11 +544,17 @@ async def move_to_folder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     folder_id = int(parts[2])
 
     f = db.get_file(file_id)
-    folder = db.get_folder(folder_id)
-    db.move_file(file_id, folder_id)
+    if folder_id == 0:
+        inbox = db.get_or_create_inbox_folder(query.from_user.id)
+        target_id = inbox["id"]
+        folder_name = inbox["name"]
+    else:
+        folder = db.get_folder(folder_id)
+        target_id = folder_id
+        folder_name = folder["name"] if folder else "?"
 
+    db.move_file(file_id, target_id)
     file_name = f["file_name"] if f else "?"
-    folder_name = folder["name"] if folder else "?"
     await query.edit_message_text(
         f"✅ <b>{file_name}</b> dipindahkan ke 📁 <b>{folder_name}</b>\n\n"
         f"<i>⏱ Pesan ini otomatis bersih dalam 4 detik...</i>",
