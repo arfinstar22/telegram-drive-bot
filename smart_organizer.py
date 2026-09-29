@@ -270,47 +270,100 @@ def smart_rename(file_name: str) -> str:
     return f"{new_stem}{ext}"
 
 
+def get_file_tags(file_obj: dict) -> set[str]:
+    """Extract all smart tags from a file (category, year, type, extension, folder, keywords)."""
+    tags: set[str] = set()
+    name = file_obj.get("file_name", "")
+    ftype = file_obj.get("file_type", "")
+    created = file_obj.get("created_at", "")
+
+    # Extension tag (e.g. 'pdf', 'jpg', 'docx', 'mp4')
+    ext = Path(name).suffix.lstrip(".").lower()
+    if ext:
+        tags.add(ext)
+
+    # Type tag & type synonyms
+    if ftype:
+        tags.add(ftype.lower())
+        if ftype == "photo":
+            tags.update(["foto", "gambar", "image", "pic", "jpg", "png", "jpeg"])
+        elif ftype == "video":
+            tags.update(["video", "vid", "film", "movie", "mp4", "mkv"])
+        elif ftype == "audio":
+            tags.update(["audio", "musik", "lagu", "sound", "mp3", "flac"])
+        elif ftype == "document":
+            tags.update(["dokumen", "doc", "berkas", "file", "pdf", "docx", "txt", "xlsx"])
+
+    # Year tag (from filename or created_at)
+    year = extract_year(name)
+    if not year and created and len(created) >= 4:
+        year = created[:4]
+    if year:
+        tags.add(year)
+
+    # Topic category tag (from TOPIC_DICTIONARY)
+    topic = detect_topic(name, ftype)
+    if topic:
+        tags.add(topic.lower())
+        for word in re.findall(r'\w+', topic.lower()):
+            if len(word) > 2:
+                tags.add(word)
+
+    # Folder tag if available
+    folder = file_obj.get("folders")
+    if isinstance(folder, dict) and folder.get("name"):
+        fname = folder["name"].lower()
+        tags.add(fname)
+        for word in re.findall(r'\w+', fname):
+            if len(word) > 2:
+                tags.add(word)
+
+    # Stem words from filename
+    stem = Path(name).stem.lower()
+    for word in re.findall(r'\w+', stem):
+        tags.add(word)
+
+    return tags
+
+
 def smart_search(query: str, files: list[dict]) -> list[dict]:
-    """Offline dictionary & keyword search with synonym and token expansion."""
+    """Smart tag & dictionary search with multi-tag filtering (e.g. 'pdf 2024', 'keuangan 2024')."""
     q_lower = query.lower().strip()
     if not q_lower or not files:
         return []
 
     tokens = [t for t in re.split(r'\s+', q_lower) if t]
-    expanded_tokens = set(tokens)
-    for tok in tokens:
-        if tok in SYNONYMS:
-            expanded_tokens.update(SYNONYMS[tok])
-        for syn_key, syn_list in SYNONYMS.items():
-            if tok in syn_list:
-                expanded_tokens.add(syn_key)
+    if not tokens:
+        return []
 
     scored: list[tuple[int, dict]] = []
+
     for f in files:
-        name = f.get("file_name", "").lower()
-        ftype = f.get("file_type", "").lower()
-        score = 0
+        tags = get_file_tags(f)
+        name_lower = f.get("file_name", "").lower()
+        exact_bonus = 100 if q_lower in name_lower else 0
 
-        # Exact match
-        if q_lower in name:
-            score += 100
+        matched_tokens = 0
+        token_score = 0
 
-        # Token matches
         for tok in tokens:
-            if tok in name:
-                score += 30
-            elif tok in ftype:
-                score += 20
+            # Direct tag or substring match
+            if tok in tags or any(tok == tag or (len(tok) >= 3 and tok in tag) for tag in tags):
+                matched_tokens += 1
+                token_score += 30
+            elif tok in SYNONYMS:
+                syns = SYNONYMS[tok]
+                if any(syn in tags or any(syn in tag for tag in tags) for syn in syns):
+                    matched_tokens += 1
+                    token_score += 20
 
-        # Synonym matches
-        for exp in expanded_tokens:
-            if exp in name:
-                score += 15
-            elif exp in ftype:
-                score += 10
+        # Multi-token queries (e.g. 'pdf 2024') require all tokens to match
+        if len(tokens) > 1 and matched_tokens < len(tokens):
+            continue
 
-        if score > 0:
-            scored.append((score, f))
+        if matched_tokens > 0 or exact_bonus > 0:
+            total_score = exact_bonus + token_score
+            scored.append((total_score, f))
 
     scored.sort(key=lambda x: x[0], reverse=True)
     return [item[1] for item in scored]

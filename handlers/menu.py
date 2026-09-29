@@ -322,17 +322,16 @@ async def _rename_file(update: Update, context: ContextTypes.DEFAULT_TYPE, name:
 
 async def _do_search(update: Update, context: ContextTypes.DEFAULT_TYPE, query: str):
     user_id = update.effective_user.id
-    results = db.search_files(user_id, query)
     _reset(context)
 
-    smart_used = False
+    import smart_organizer
+    all_files = db.get_all_user_files(user_id, limit=300)
+    results = smart_organizer.smart_search(query, all_files) if all_files else []
+    smart_used = bool(results)
+
     if not results:
-        import smart_organizer
-        all_files = db.get_all_user_files(user_id, limit=100)
-        if all_files:
-            results = smart_organizer.smart_search(query, all_files)
-            if results:
-                smart_used = True
+        results = db.search_files(user_id, query)
+        smart_used = False
 
     if not results:
         await update.message.reply_text(f"🔍 Tidak ditemukan file untuk: <b>{query}</b>",
