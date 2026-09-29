@@ -896,21 +896,23 @@
     /* Floating Multi-Select Action Bar */
     .selection-bar {
       position: fixed;
-      bottom: calc(16px + var(--safe-bottom));
+      bottom: calc(12px + var(--safe-bottom));
       left: 50%;
       transform: translateX(-50%) translateY(120px);
-      width: calc(100% - 24px);
-      max-width: 520px;
-      background: rgba(15, 23, 42, 0.95);
+      width: calc(100% - 16px);
+      max-width: 500px;
+      box-sizing: border-box;
+      background: rgba(15, 23, 42, 0.96);
       border: 1px solid rgba(56, 189, 248, 0.4);
       backdrop-filter: blur(25px);
-      border-radius: 18px;
-      padding: 10px 14px;
+      -webkit-backdrop-filter: blur(25px);
+      border-radius: 16px;
+      padding: 6px 8px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7), 0 0 20px rgba(56, 189, 248, 0.25);
+      gap: 5px;
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.75), 0 0 20px rgba(56, 189, 248, 0.25);
       z-index: 105;
       transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     }
@@ -919,70 +921,174 @@
       transform: translateX(-50%) translateY(0);
     }
 
+    .sel-info {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+      min-width: 0;
+    }
+
     .sel-count-pill {
       background: rgba(56, 189, 248, 0.18);
       color: var(--accent);
       border: 1px solid rgba(56, 189, 248, 0.3);
-      padding: 5px 10px;
-      border-radius: 12px;
-      font-size: 0.8rem;
+      padding: 4px 7px;
+      border-radius: 9px;
+      font-size: 0.74rem;
       font-weight: 700;
       white-space: nowrap;
-    }
-
-    .sel-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .btn-sel-move {
-      background: linear-gradient(135deg, #0284c7, #6366f1);
-      color: #fff;
-      font-size: 0.82rem;
-      font-weight: 700;
-      padding: 8px 14px;
-      border-radius: 10px;
-      border: none;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
-      transition: all 0.15s;
-    }
-
-    .btn-sel-move:active {
-      transform: scale(0.96);
     }
 
     .btn-sel-text {
       background: transparent;
       border: none;
       color: var(--text-muted);
-      font-size: 0.78rem;
+      font-size: 0.73rem;
       font-weight: 600;
       cursor: pointer;
-      padding: 6px 8px;
+      padding: 4px 5px;
       border-radius: 6px;
+      white-space: nowrap;
+      transition: color 0.15s;
     }
 
-    .btn-sel-text:hover {
+    .btn-sel-text:hover, .btn-sel-text:active {
       color: #fff;
+    }
+
+    .sel-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .btn-sel-send {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
+      height: 34px;
+      min-width: 34px;
+      padding: 0 8px;
+      border-radius: 9px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+
+    .btn-sel-send:active {
+      transform: scale(0.95);
+    }
+
+    .btn-sel-star {
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      color: var(--gold);
+      font-size: 0.8rem;
+      font-weight: 700;
+      height: 34px;
+      width: 34px;
+      min-width: 34px;
+      padding: 0;
+      border-radius: 9px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .btn-sel-star:active {
+      transform: scale(0.95);
+    }
+
+    .btn-sel-move {
+      background: linear-gradient(135deg, #0284c7, #6366f1);
+      color: #fff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      height: 34px;
+      min-width: 34px;
+      padding: 0 8px;
+      border-radius: 9px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-sel-move:active {
+      transform: scale(0.95);
+    }
+
+    .btn-sel-delete {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: var(--rose);
+      font-size: 0.8rem;
+      font-weight: 700;
+      height: 34px;
+      width: 34px;
+      min-width: 34px;
+      padding: 0;
+      border-radius: 9px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .btn-sel-delete:active {
+      transform: scale(0.95);
     }
 
     .btn-sel-close {
       background: rgba(255, 255, 255, 0.08);
-      border: none;
-      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #94a3b8;
       width: 28px;
       height: 28px;
+      min-width: 28px;
       border-radius: 50%;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
+      transition: all 0.15s;
+    }
+
+    .btn-sel-close:hover, .btn-sel-close:active {
+      background: rgba(255, 255, 255, 0.16);
+      color: #fff;
+    }
+
+    .sel-btn-label {
+      display: none;
+    }
+
+    @media (min-width: 360px) {
+      .sel-move-label {
+        display: inline;
+      }
+    }
+
+    @media (min-width: 480px) {
+      .sel-send-label {
+        display: inline;
+      }
     }
 
     /* Move Folder Picker Modal */
@@ -1321,63 +1427,7 @@
       background: rgba(244, 63, 94, 0.25);
     }
 
-    /* Batch Selection Extra Buttons */
-    .btn-sel-star {
-      background: rgba(251, 191, 36, 0.15);
-      border: 1px solid rgba(251, 191, 36, 0.3);
-      color: var(--gold);
-      font-size: 0.8rem;
-      font-weight: 700;
-      padding: 8px 10px;
-      border-radius: 10px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s;
-    }
 
-    .btn-sel-star:active {
-      transform: scale(0.96);
-    }
-
-    .btn-sel-delete {
-      background: rgba(244, 63, 94, 0.15);
-      border: 1px solid rgba(244, 63, 94, 0.3);
-      color: var(--rose);
-      font-size: 0.8rem;
-      font-weight: 700;
-      padding: 8px 10px;
-      border-radius: 10px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s;
-    }
-
-    .btn-sel-delete:active {
-      transform: scale(0.96);
-    }
-
-    .btn-sel-send {
-      background: rgba(56, 189, 248, 0.15);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      color: var(--accent);
-      font-size: 0.8rem;
-      font-weight: 700;
-      padding: 8px 11px;
-      border-radius: 10px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      transition: all 0.15s;
-    }
-
-    .btn-sel-send:active {
-      transform: scale(0.96);
-    }
 
     /* Media Previews */
     .media-preview-container {
@@ -1647,26 +1697,26 @@
 
   <!-- Floating Multi-Select Action Bar -->
   <div class="selection-bar" id="selectionBar">
-    <div style="display: flex; align-items: center; gap: 8px;">
+    <div class="sel-info">
       <span class="sel-count-pill" id="selCountPill">0 Dipilih</span>
-      <button class="btn-sel-text" id="btnSelectAll" onclick="selectAllFiles()">Pilih Semua</button>
+      <button class="btn-sel-text" id="btnSelectAll" onclick="selectAllFiles()" title="Pilih Semua / Batal">Semua</button>
     </div>
     <div class="sel-actions">
-      <button class="btn-sel-send" id="btnSelSend" onclick="batchSendSelected()" title="Kirim ke Chat Telegram">
+      <button class="btn-sel-send" id="btnSelSend" onclick="batchSendSelected()" title="Kirim ke Chat Telegram" aria-label="Kirim ke Chat Telegram">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        <span>Kirim</span>
+        <span class="sel-btn-label sel-send-label">Kirim</span>
       </button>
-      <button class="btn-sel-star" id="btnSelStar" onclick="batchStarSelected()" title="Bintang / Favorit">
+      <button class="btn-sel-star" id="btnSelStar" onclick="batchStarSelected()" title="Bintang / Favorit" aria-label="Bintang / Favorit">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </button>
-      <button class="btn-sel-move" id="btnSelMove" onclick="openMoveModal()">
+      <button class="btn-sel-move" id="btnSelMove" onclick="openMoveModal()" title="Pindahkan Berkas" aria-label="Pindahkan Berkas">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><polyline points="12 11 12 17 9 14"/><line x1="12" y1="17" x2="15" y2="14"/></svg>
-        Pindah
+        <span class="sel-btn-label sel-move-label">Pindah</span>
       </button>
-      <button class="btn-sel-delete" id="btnSelDelete" onclick="openDeleteConfirmModal(Array.from(selectedFileIds))" title="Hapus">
+      <button class="btn-sel-delete" id="btnSelDelete" onclick="openDeleteConfirmModal(Array.from(selectedFileIds))" title="Hapus Berkas" aria-label="Hapus Berkas">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       </button>
-      <button class="btn-sel-close" onclick="exitSelectMode()" title="Batal">✕</button>
+      <button class="btn-sel-close" onclick="exitSelectMode()" title="Batal Pilih" aria-label="Batal Pilih">✕</button>
     </div>
   </div>
 
@@ -2476,7 +2526,7 @@
 
       if (selectAllBtn && visibleFiles.length > 0) {
         const allVisibleSelected = visibleFiles.every(f => selectedFileIds.has(f.id));
-        selectAllBtn.innerText = allVisibleSelected ? 'Batal Pilih' : 'Pilih Semua';
+        selectAllBtn.innerText = allVisibleSelected ? 'Batal' : 'Semua';
       }
 
       if (count > 0) {
@@ -2488,7 +2538,7 @@
       } else {
         if (isSelectMode) {
           bar.classList.add('active');
-          countPill.innerText = `Pilih berkas...`;
+          countPill.innerText = `0 Dipilih`;
           if (moveBtn) { moveBtn.disabled = true; moveBtn.style.opacity = '0.5'; }
           if (starBtn) { starBtn.disabled = true; starBtn.style.opacity = '0.5'; }
           if (delBtn) { delBtn.disabled = true; delBtn.style.opacity = '0.5'; }
