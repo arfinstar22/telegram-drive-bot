@@ -3,13 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Darfin Storage — Cloud Drive</title>
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#090D16">
+  <title>Darfin Storage - Cloud Drive</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
+      color-scheme: dark;
       --bg: #090D16;
       --surface: rgba(17, 24, 39, 0.7);
       --surface-hover: rgba(30, 41, 59, 0.85);
@@ -1104,24 +1107,99 @@
       color: var(--text-muted);
     }
 
-    /* Sort Select */
-    .sort-select {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      font-family: inherit;
-      font-size: 0.72rem;
-      font-weight: 600;
-      padding: 5px 8px;
-      border-radius: 8px;
-      outline: none;
-      cursor: pointer;
-      transition: border-color 0.2s;
+    /* Custom Sort Dropdown */
+    .sort-dropdown-wrap {
+      position: relative;
+      display: inline-block;
     }
 
-    .sort-select:focus {
+    .sort-btn {
+      background: #111827;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: #FFFFFF;
+      font-family: inherit;
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+
+    .sort-btn:active {
+      transform: scale(0.96);
+    }
+
+    .sort-btn:hover {
       border-color: var(--accent);
-      color: #fff;
+      background: #1F2937;
+    }
+
+    .sort-btn svg {
+      color: var(--accent);
+      transition: transform 0.2s;
+    }
+
+    .sort-dropdown-wrap.open .sort-btn svg {
+      transform: rotate(180deg);
+    }
+
+    .sort-dropdown-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      min-width: 175px;
+      background: #111827;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 12px;
+      padding: 6px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 16px rgba(56, 189, 248, 0.2);
+      backdrop-filter: blur(20px);
+      z-index: 120;
+      display: none;
+      flex-direction: column;
+      gap: 3px;
+      animation: fadeIn 0.15s ease;
+    }
+
+    .sort-dropdown-wrap.open .sort-dropdown-menu {
+      display: flex;
+    }
+
+    .sort-opt {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #E2E8F0;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .sort-opt:hover, .sort-opt:active {
+      background: rgba(56, 189, 248, 0.15);
+      color: #FFFFFF;
+    }
+
+    .sort-opt.active {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .sort-opt .sort-check {
+      display: none;
+      color: var(--accent);
+    }
+
+    .sort-opt.active .sort-check {
+      display: block;
     }
 
     /* New Folder Button */
@@ -1335,14 +1413,38 @@
         </button>
       </div>
       <div style="display: flex; align-items: center; gap: 6px;">
-        <select class="sort-select" id="sortOrderSelect" onchange="changeSortOrder(this.value)">
-          <option value="date_desc">Terbaru</option>
-          <option value="date_asc">Terlama</option>
-          <option value="name_asc">A-Z</option>
-          <option value="name_desc">Z-A</option>
-          <option value="size_desc">Terbesar</option>
-          <option value="size_asc">Terkecil</option>
-        </select>
+        <div class="sort-dropdown-wrap">
+          <button class="sort-btn" id="sortDropdownBtn" onclick="toggleSortDropdown(event)">
+            <span id="sortDropdownLabel">Terbaru</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="sort-dropdown-menu" id="sortDropdownMenu">
+            <div class="sort-opt active" data-val="date_desc" onclick="selectSortOption('date_desc', 'Terbaru', event)">
+              <span>🕒 Terbaru</span>
+              <svg class="sort-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="sort-opt" data-val="date_asc" onclick="selectSortOption('date_asc', 'Terlama', event)">
+              <span>🕒 Terlama</span>
+              <svg class="sort-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="sort-opt" data-val="name_asc" onclick="selectSortOption('name_asc', 'A-Z', event)">
+              <span>🔤 Nama (A-Z)</span>
+              <svg class="sort-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="sort-opt" data-val="name_desc" onclick="selectSortOption('name_desc', 'Z-A', event)">
+              <span>🔤 Nama (Z-A)</span>
+              <svg class="sort-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="sort-opt" data-val="size_desc" onclick="selectSortOption('size_desc', 'Terbesar', event)">
+              <span>📦 Terbesar</span>
+              <svg class="sort-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="sort-opt" data-val="size_asc" onclick="selectSortOption('size_asc', 'Terkecil', event)">
+              <span>📦 Terkecil</span>
+              <svg class="sort-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+          </div>
+        </div>
         <div class="view-toggle">
           <button class="view-btn active" id="btnViewGrid" onclick="setViewMode('grid')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
@@ -1768,6 +1870,36 @@
       applyFilter(e.target.value.toLowerCase().trim());
       if (isSelectMode) {
         updateSelectionUI(false);
+      }
+    });
+
+    function toggleSortDropdown(event) {
+      if (event) event.stopPropagation();
+      triggerHaptic();
+      const wrap = document.querySelector('.sort-dropdown-wrap');
+      if (wrap) wrap.classList.toggle('open');
+    }
+
+    function selectSortOption(val, label, event) {
+      if (event) event.stopPropagation();
+      triggerHaptic();
+      currentSortOrder = val;
+      const labelEl = document.getElementById('sortDropdownLabel');
+      if (labelEl) labelEl.innerText = label;
+
+      document.querySelectorAll('.sort-opt').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.val === val);
+      });
+
+      const wrap = document.querySelector('.sort-dropdown-wrap');
+      if (wrap) wrap.classList.remove('open');
+      applyFilter();
+    }
+
+    document.addEventListener('click', (e) => {
+      const wrap = document.querySelector('.sort-dropdown-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        wrap.classList.remove('open');
       }
     });
 
