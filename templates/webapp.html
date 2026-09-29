@@ -1181,7 +1181,7 @@
   <div class="selection-bar" id="selectionBar">
     <div style="display: flex; align-items: center; gap: 8px;">
       <span class="sel-count-pill" id="selCountPill">0 Dipilih</span>
-      <button class="btn-sel-text" onclick="selectAllFiles()">Pilih Semua</button>
+      <button class="btn-sel-text" id="btnSelectAll" onclick="selectAllFiles()">Pilih Semua</button>
     </div>
     <div class="sel-actions">
       <button class="btn-sel-move" id="btnSelMove" onclick="openMoveModal()">
@@ -1441,15 +1441,21 @@
         chip.classList.add('active');
         currentCategory = chip.dataset.type;
         applyFilter();
+        if (isSelectMode) {
+          updateSelectionUI(false);
+        }
       });
     });
 
     // Search filter
     document.getElementById('searchInput').addEventListener('input', (e) => {
       applyFilter(e.target.value.toLowerCase().trim());
+      if (isSelectMode) {
+        updateSelectionUI(false);
+      }
     });
 
-    function applyFilter(query = document.getElementById('searchInput').value.toLowerCase().trim()) {
+    function getFilteredFiles(query = document.getElementById('searchInput')?.value?.toLowerCase()?.trim() || '') {
       let filtered = driveData.files || [];
       if (currentCategory !== 'all') {
         if (currentCategory === 'starred') {
@@ -1467,6 +1473,11 @@
           return matchName || matchTags || matchNote;
         });
       }
+      return filtered;
+    }
+
+    function applyFilter(query) {
+      const filtered = getFilteredFiles(query);
       renderFiles(filtered);
     }
 
@@ -1640,20 +1651,34 @@
 
     function selectAllFiles() {
       triggerHaptic();
-      const currentFiles = driveData.files || [];
-      if (selectedFileIds.size === currentFiles.length && currentFiles.length > 0) {
-        selectedFileIds.clear();
+      const visibleFiles = getFilteredFiles();
+      if (!visibleFiles.length) return;
+
+      const allVisibleSelected = visibleFiles.every(f => selectedFileIds.has(f.id));
+      if (allVisibleSelected) {
+        visibleFiles.forEach(f => selectedFileIds.delete(f.id));
       } else {
-        currentFiles.forEach(f => selectedFileIds.add(f.id));
+        const query = document.getElementById('searchInput')?.value?.toLowerCase()?.trim() || '';
+        if (currentCategory !== 'all' || query) {
+          selectedFileIds.clear();
+        }
+        visibleFiles.forEach(f => selectedFileIds.add(f.id));
       }
       updateSelectionUI();
     }
 
-    function updateSelectionUI() {
+    function updateSelectionUI(shouldReapplyFilter = true) {
       const bar = document.getElementById('selectionBar');
       const countPill = document.getElementById('selCountPill');
       const moveBtn = document.getElementById('btnSelMove');
+      const selectAllBtn = document.getElementById('btnSelectAll');
+      const visibleFiles = getFilteredFiles();
       const count = selectedFileIds.size;
+
+      if (selectAllBtn && visibleFiles.length > 0) {
+        const allVisibleSelected = visibleFiles.every(f => selectedFileIds.has(f.id));
+        selectAllBtn.innerText = allVisibleSelected ? 'Batal Pilih' : 'Pilih Semua';
+      }
 
       if (count > 0) {
         bar.classList.add('active');
@@ -1671,7 +1696,9 @@
         }
       }
 
-      applyFilter();
+      if (shouldReapplyFilter) {
+        applyFilter();
+      }
     }
 
     // Move Folder Dialog & API Handlers
