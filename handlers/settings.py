@@ -20,15 +20,18 @@ SORT_LABELS = {
 
 
 async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Reply Keyboard: ⚙️ Settings."""
+    """Reply Keyboard: ⚙️ Settings / ⚙️ Pengaturan."""
     context.user_data["state"] = "idle"
     user_id = update.effective_user.id
+    from utils import get_user_lang
+    lang = get_user_lang(context, user_id)
     info = db.get_storage_info(user_id)
 
+    title = "⚙️ <b>Settings</b>" if lang == "en" else "⚙️ <b>Pengaturan</b>"
     await update.message.reply_text(
-        "⚙️ <b>Settings</b>",
+        title,
         parse_mode="HTML",
-        reply_markup=kb.settings_menu(info["trash_count"]),
+        reply_markup=kb.settings_menu(info["trash_count"], lang=lang),
     )
 
 
@@ -65,9 +68,12 @@ async def settings_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
+    from utils import get_user_lang
+    lang = get_user_lang(context, user_id)
     info = db.get_storage_info(user_id)
-    await query.edit_message_text("⚙️ <b>Settings</b>", parse_mode="HTML",
-                                  reply_markup=kb.settings_menu(info["trash_count"]))
+    title = "⚙️ <b>Settings</b>" if lang == "en" else "⚙️ <b>Pengaturan</b>"
+    await query.edit_message_text(title, parse_mode="HTML",
+                                  reply_markup=kb.settings_menu(info["trash_count"], lang=lang))
 
 
 async def sort_cycle(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -82,9 +88,11 @@ async def sort_cycle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer(f"Sort: {label}")
 
     user_id = query.from_user.id
+    from utils import get_user_lang
+    lang = get_user_lang(context, user_id)
     info = db.get_storage_info(user_id)
 
-    await query.edit_message_reply_markup(kb.settings_menu(info["trash_count"]))
+    await query.edit_message_reply_markup(kb.settings_menu(info["trash_count"], lang=lang))
 
 
 # ── Trash ──────────────────────────────────────────────

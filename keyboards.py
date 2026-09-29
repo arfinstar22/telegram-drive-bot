@@ -5,29 +5,56 @@ from utils import file_emoji, format_size, truncate
 
 # ── Reply Keyboards (bottom-screen persistent buttons) ──
 
-def main_menu():
+def main_menu(lang: str = "id"):
+    if lang == "en":
+        return ReplyKeyboardMarkup(
+            [["📁 My Files", "📤 Upload"],
+             ["⭐ Starred", "🕒 Recent"],
+             ["🔍 Search", "⚙️ Settings"],
+             ["🏠 Home"]],
+            resize_keyboard=True,
+        )
     return ReplyKeyboardMarkup(
-        [["📁 My Files", "📤 Upload"],
-         ["⭐ Starred", "🕒 Recent"],
-         ["🔍 Search", "⚙️ Settings"],
+        [["📁 File Saya", "📤 Upload"],
+         ["⭐ Favorit", "🕒 Terbaru"],
+         ["🔍 Cari", "⚙️ Pengaturan"],
          ["🏠 Beranda"]],
         resize_keyboard=True,
     )
 
 
-def upload_mode():
+def upload_mode(lang: str = "id"):
+    if lang == "en":
+        return ReplyKeyboardMarkup(
+            [["✅ Done", "❌ Cancel"],
+             ["🏠 Home"]],
+            resize_keyboard=True,
+        )
     return ReplyKeyboardMarkup(
-        [["✅ Done", "❌ Cancel"],
+        [["✅ Selesai", "❌ Batal"],
          ["🏠 Beranda"]],
         resize_keyboard=True,
     )
 
 
-def cancel_only():
+def cancel_only(lang: str = "id"):
+    if lang == "en":
+        return ReplyKeyboardMarkup(
+            [["❌ Cancel", "🏠 Home"]],
+            resize_keyboard=True,
+        )
     return ReplyKeyboardMarkup(
-        [["❌ Cancel", "🏠 Beranda"]],
+        [["❌ Batal", "🏠 Beranda"]],
         resize_keyboard=True,
     )
+
+
+def language_picker():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🇮🇩 Bahasa Indonesia", callback_data="set_lang:id"),
+         InlineKeyboardButton("🇬🇧 English", callback_data="set_lang:en")],
+    ])
+
 
 
 # ── Inline Keyboards (under messages) ──────────────────
@@ -260,18 +287,33 @@ def confirm_empty_trash():
     ])
 
 
-def settings_menu(trash_count: int = 0):
-    trash_label = f"🗑 Trash ({trash_count})" if trash_count else "🗑 Trash"
-    buttons = [
-        [InlineKeyboardButton("📊 Storage Info", callback_data="si"),
-         InlineKeyboardButton("🩺 Storage Health", callback_data="sh:menu")],
-        [InlineKeyboardButton(trash_label, callback_data="tv"),
-         InlineKeyboardButton("📋 Sort: by Date ↓", callback_data="ss:cycle")],
-        [InlineKeyboardButton("🔑 Pemulihan Akun", callback_data="rec:menu"),
-         InlineKeyboardButton("⚠️ Reset Storage", callback_data="rst:prompt")],
-        [InlineKeyboardButton("🏠 Beranda", callback_data="home_nav")],
-    ]
+def settings_menu(trash_count: int = 0, lang: str = "id"):
+    if lang == "en":
+        trash_label = f"🗑 Trash ({trash_count})" if trash_count else "🗑 Trash"
+        buttons = [
+            [InlineKeyboardButton("📊 Storage Info", callback_data="si"),
+             InlineKeyboardButton("🩺 Storage Health", callback_data="sh:menu")],
+            [InlineKeyboardButton(trash_label, callback_data="tv"),
+             InlineKeyboardButton("📋 Sort Order", callback_data="ss:cycle")],
+            [InlineKeyboardButton("🔑 Account Recovery", callback_data="rec:menu"),
+             InlineKeyboardButton("⚠️ Reset Storage", callback_data="rst:prompt")],
+            [InlineKeyboardButton("🌐 Language: 🇬🇧 English", callback_data="set_lang:prompt")],
+            [InlineKeyboardButton("🏠 Home", callback_data="home_nav")],
+        ]
+    else:
+        trash_label = f"🗑 Sampah ({trash_count})" if trash_count else "🗑 Sampah"
+        buttons = [
+            [InlineKeyboardButton("📊 Info Penyimpanan", callback_data="si"),
+             InlineKeyboardButton("🩺 Kesehatan Drive", callback_data="sh:menu")],
+            [InlineKeyboardButton(trash_label, callback_data="tv"),
+             InlineKeyboardButton("📋 Urutan Sortir", callback_data="ss:cycle")],
+            [InlineKeyboardButton("🔑 Pemulihan Akun", callback_data="rec:menu"),
+             InlineKeyboardButton("⚠️ Reset Storage", callback_data="rst:prompt")],
+            [InlineKeyboardButton("🌐 Bahasa: 🇮🇩 Indonesia", callback_data="set_lang:prompt")],
+            [InlineKeyboardButton("🏠 Beranda", callback_data="home_nav")],
+        ]
     return InlineKeyboardMarkup(buttons)
+
 
 
 def account_recovery_detected(old_user_id: int):

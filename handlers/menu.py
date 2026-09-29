@@ -7,22 +7,35 @@ import database as db
 import keyboards as kb
 
 
-WELCOME = (
-    "🗂 <b>Telegram Drive</b>\n"
-    "\n"
-    "Cloud storage unlimited, gratis, langsung di Telegram.\n"
-    "\n"
+WELCOME_ID = (
+    "🗂 <b>Telegram Drive</b>\n\n"
+    "Cloud storage unlimited, gratis, langsung di Telegram.\n\n"
     "━━━━━━━━━━━━━━━━━━━\n"
-    "📁 <b>My Files</b> — Folder & file kamu\n"
+    "📁 <b>File Saya</b> — Folder & berkas Anda\n"
     "📤 <b>Upload</b> — Upload file baru\n"
-    "⭐ <b>Starred</b> — File & folder favorit\n"
-    "🕒 <b>Recent</b> — File terakhir diunggah\n"
-    "🔍 <b>Search</b> — Cari file\n"
-    "⚙️ <b>Settings</b> — Info & pengaturan\n"
-    "━━━━━━━━━━━━━━━━━━━\n"
-    "\n"
+    "⭐ <b>Favorit</b> — Berkas & folder favorit\n"
+    "🕒 <b>Terbaru</b> — Berkas terakhir diunggah\n"
+    "🔍 <b>Cari</b> — Cari berkas cepat\n"
+    "⚙️ <b>Pengaturan</b> — Info & pengaturan\n"
+    "━━━━━━━━━━━━━━━━━━━\n\n"
     "Mulai dengan buat folder pertama! 📁"
 )
+
+WELCOME_EN = (
+    "🗂 <b>Telegram Drive</b>\n\n"
+    "Unlimited, free cloud storage directly in Telegram.\n\n"
+    "━━━━━━━━━━━━━━━━━━━\n"
+    "📁 <b>My Files</b> — Your folders & files\n"
+    "📤 <b>Upload</b> — Upload new files\n"
+    "⭐ <b>Starred</b> — Favorite files & folders\n"
+    "🕒 <b>Recent</b> — Recently uploaded files\n"
+    "🔍 <b>Search</b> — Quick file search\n"
+    "⚙️ <b>Settings</b> — Storage & settings\n"
+    "━━━━━━━━━━━━━━━━━━━\n\n"
+    "Get started by creating your first folder! 📁"
+)
+
+WELCOME = WELCOME_ID
 
 
 def _reset(context: ContextTypes.DEFAULT_TYPE):
@@ -37,6 +50,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.get_or_create_inbox_folder(user.id)
     _reset(context)
 
+    # First time user or user without language preference set yet
+    if not existing_user or not existing_user.get("language"):
+        text = (
+            "🌐 <b>Pilih Bahasa / Choose Language:</b>\n\n"
+            "👋 Selamat datang! Silakan pilih bahasa tampilan bot:\n"
+            "👋 Welcome! Please select your preferred bot language:"
+        )
+        await update.message.reply_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=kb.language_picker(),
+        )
+        return
+
+    lang = existing_user.get("language", "id")
+    context.user_data["language"] = lang
+
     # Check for deep-link argument (e.g. /start sf_xxx or /start sd_xxx)
     if context.args:
         arg = context.args[0]
@@ -44,9 +74,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             token = arg[3:]
             f = db.get_file_by_share_token(token)
             if not f:
+                err_msg = "❌ Shared file link is invalid or expired." if lang == "en" else "❌ Link file ini sudah tidak valid atau telah dinonaktifkan."
                 await update.message.reply_text(
-                    "❌ Link file ini sudah tidak valid atau telah dinonaktifkan.",
-                    reply_markup=kb.main_menu(),
+                    err_msg,
+                    reply_markup=kb.main_menu(lang),
                 )
                 return
 
@@ -55,10 +86,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             size = format_size(f.get("file_size", 0))
             is_own_file = (f["user_id"] == user.id)
 
+            title = "🔗 <b>Shared File</b>" if lang == "en" else "🔗 <b>File Bersama</b>"
+            subtitle = "Shared with you:" if lang == "en" else "File ini dibagikan kepada kamu:"
             await update.message.reply_text(
-                f"🔗 <b>File Bersama</b>\n\n"
+                f"{title}\n\n"
                 f"{emoji} <b>{f['file_name']}</b> ({size})\n\n"
-                f"File ini dibagikan kepada kamu:",
+                f"{subtitle}",
                 parse_mode="HTML",
                 reply_markup=kb.public_shared_file(f["id"], can_save=not is_own_file),
             )
@@ -68,9 +101,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             token = arg[3:]
             folder = db.get_folder_by_share_token(token)
             if not folder:
+                err_msg = "❌ Shared folder link is invalid or expired." if lang == "en" else "❌ Link folder ini sudah tidak valid atau telah dinonaktifkan."
                 await update.message.reply_text(
-                    "❌ Link folder ini sudah tidak valid atau telah dinonaktifkan.",
-                    reply_markup=kb.main_menu(),
+                    err_msg,
+                    reply_markup=kb.main_menu(lang),
                 )
                 return
 
@@ -82,13 +116,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 size = format_size(f.get("file_size", 0))
                 name = truncate(f["file_name"], 20)
                 buttons.append([InlineKeyboardButton(f"{emoji} {name} — {size}", callback_data=f"pdl:{f['id']}")])
-            buttons.append([InlineKeyboardButton("🏠 Menu Utama", callback_data="home_nav")])
-            from telegram import InlineKeyboardMarkup
+            home_title = "🏠 Home" if lang == "en" else "🏠 Menu Utama"
+            buttons.append([InlineKeyboardButton(home_title, callback_data="home_nav")])
             markup = InlineKeyboardMarkup(buttons)
 
+            hdr = "🔗 <b>Shared Folder</b>" if lang == "en" else "🔗 <b>Folder Bersama</b>"
+            desc = f"Total {len(files)} files. Click below to download:" if lang == "en" else f"Total {len(files)} file. Klik file di bawah untuk langsung mengunduh:"
             await update.message.reply_text(
-                f"🔗 <b>Folder Bersama</b>: 📁 <b>{folder['name']}</b>\n\n"
-                f"Total {len(files)} file. Klik file di bawah untuk langsung mengunduh:",
+                f"{hdr}: 📁 <b>{folder['name']}</b>\n\n{desc}",
                 parse_mode="HTML",
                 reply_markup=markup,
             )
@@ -112,25 +147,79 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-    # Returning user greeting with storage overview
-    from utils import format_size
-    info = db.get_storage_info(user.id)
-    if info["total_files"] > 0 or info["total_folders"] > 1:
-        welcome_back = (
-            f"👋 <b>Selamat Datang Kembali, {user.first_name}!</b>\n"
-            f"Semua data Anda tersimpan aman:\n"
-            f"📁 <b>{info['total_folders']} Folder</b> • 📄 <b>{info['total_files']} File</b> ({format_size(info['total_size'])})\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"📁 <b>My Files</b> — Folder & file Anda\n"
-            f"📤 <b>Upload</b> — Upload file baru\n"
-            f"🔍 <b>Search</b> — Cari file cepat\n"
-            f"⚙️ <b>Settings</b> — Info, kesehatan & reset\n"
-            f"━━━━━━━━━━━━━━━━━━━"
-        )
-        await update.message.reply_text(welcome_back, parse_mode="HTML", reply_markup=kb.main_menu())
-        return
+    await _send_welcome_screen(update, context, user.id, lang)
 
-    await update.message.reply_text(WELCOME, parse_mode="HTML", reply_markup=kb.main_menu())
+
+async def callback_language_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """set_lang:prompt — prompt language change from settings."""
+    query = update.callback_query
+    await query.answer()
+    text = (
+        "🌐 <b>Pilih Bahasa / Choose Language:</b>\n\n"
+        "Silakan pilih bahasa yang diinginkan:\n"
+        "Please choose your preferred language:"
+    )
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb.language_picker())
+
+
+async def callback_language_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """set_lang:(id|en) — handle language selection."""
+    query = update.callback_query
+    await query.answer()
+    lang = query.data.split(":")[1]
+    user_id = query.from_user.id
+
+    db.update_user(user_id, language=lang)
+    context.user_data["language"] = lang
+
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+
+    await _send_welcome_screen(query, context, user_id, lang)
+
+
+async def _send_welcome_screen(update_or_query, context: ContextTypes.DEFAULT_TYPE, user_id: int, lang: str):
+    user = update_or_query.effective_user
+    chat_id = update_or_query.effective_chat.id
+    info = db.get_storage_info(user_id)
+
+    from utils import format_size
+    if info["total_files"] > 0 or info["total_folders"] > 1:
+        if lang == "en":
+            text = (
+                f"👋 <b>Welcome Back, {user.first_name}!</b>\n"
+                f"All your data is safely stored:\n"
+                f"📁 <b>{info['total_folders']} Folders</b> • 📄 <b>{info['total_files']} Files</b> ({format_size(info['total_size'])})\n\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"📁 <b>My Files</b> — Your folders & files\n"
+                f"📤 <b>Upload</b> — Upload new files\n"
+                f"🔍 <b>Search</b> — Quick search\n"
+                f"⚙️ <b>Settings</b> — Storage info & settings\n"
+                f"━━━━━━━━━━━━━━━━━━━"
+            )
+        else:
+            text = (
+                f"👋 <b>Selamat Datang Kembali, {user.first_name}!</b>\n"
+                f"Semua data Anda tersimpan aman:\n"
+                f"📁 <b>{info['total_folders']} Folder</b> • 📄 <b>{info['total_files']} File</b> ({format_size(info['total_size'])})\n\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"📁 <b>File Saya</b> — Folder & berkas Anda\n"
+                f"📤 <b>Upload</b> — Upload berkas baru\n"
+                f"🔍 <b>Cari</b> — Cari berkas cepat\n"
+                f"⚙️ <b>Pengaturan</b> — Info, kesehatan & reset\n"
+                f"━━━━━━━━━━━━━━━━━━━"
+            )
+    else:
+        text = WELCOME_EN if lang == "en" else WELCOME_ID
+
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode="HTML",
+        reply_markup=kb.main_menu(lang),
+    )
 
 
 
@@ -161,24 +250,32 @@ async def starred_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def go_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _reset(context)
+    user_id = update.effective_user.id
+    from utils import get_user_lang
+    lang = get_user_lang(context, user_id)
+    welcome_text = WELCOME_EN if lang == "en" else WELCOME_ID
     if update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.message.reply_text(
-            WELCOME, parse_mode="HTML", reply_markup=kb.main_menu()
+            welcome_text, parse_mode="HTML", reply_markup=kb.main_menu(lang)
         )
     elif update.message:
         await update.message.reply_text(
-            WELCOME, parse_mode="HTML", reply_markup=kb.main_menu()
+            welcome_text, parse_mode="HTML", reply_markup=kb.main_menu(lang)
         )
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _reset(context)
+    user_id = update.effective_user.id
+    from utils import get_user_lang
+    lang = get_user_lang(context, user_id)
+    msg = "❌ Cancelled." if lang == "en" else "❌ Dibatalkan."
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.message.reply_text("❌ Dibatalkan.", reply_markup=kb.main_menu())
+        await update.callback_query.message.reply_text(msg, reply_markup=kb.main_menu(lang))
     elif update.message:
-        await update.message.reply_text("❌ Dibatalkan.", reply_markup=kb.main_menu())
+        await update.message.reply_text(msg, reply_markup=kb.main_menu(lang))
 
 
 async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -200,9 +297,13 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif state == "awaiting_recovery_key":
         await _process_recovery_key(update, context, text)
     else:
+        user_id = update.effective_user.id
+        from utils import get_user_lang
+        lang = get_user_lang(context, user_id)
+        hint = "Choose a menu below, or send a file to upload." if lang == "en" else "Pilih menu di bawah, atau kirim file untuk upload."
         await update.message.reply_text(
-            "Pilih menu di bawah, atau kirim file untuk upload.",
-            reply_markup=kb.main_menu(),
+            hint,
+            reply_markup=kb.main_menu(lang),
         )
 
 

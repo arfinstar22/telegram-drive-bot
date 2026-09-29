@@ -120,3 +120,19 @@ def file_emoji(file_type: str) -> str:
 
 def truncate(text: str, length: int = 25) -> str:
     return text if len(text) <= length else text[: length - 1] + "…"
+
+
+def get_user_lang(context=None, user_id: int | None = None) -> str:
+    """Get preferred language ('id' or 'en') for user, caching in user_data."""
+    if context and hasattr(context, "user_data") and "language" in context.user_data:
+        return context.user_data["language"]
+    if user_id:
+        import database as db
+        u = db.get_user(user_id)
+        if u and u.get("language"):
+            lang = u["language"]
+            if context and hasattr(context, "user_data"):
+                context.user_data["language"] = lang
+            return lang
+    return "id"
+

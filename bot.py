@@ -24,13 +24,13 @@ def main():
     app.add_handler(CommandHandler("start", menu.start))
     app.add_handler(CommandHandler("done", files.done_uploading))
 
-    # ── Reply Keyboard buttons ─────────────────────────
-    app.add_handler(MessageHandler(filters.Regex(r"^📁 My Files$"), folders.my_files))
-    app.add_handler(MessageHandler(filters.Regex(r"^📤 Upload$"), files.upload_menu))
-    app.add_handler(MessageHandler(filters.Regex(r"^⭐ Starred$"), menu.starred_menu))
-    app.add_handler(MessageHandler(filters.Regex(r"^🕒 Recent$"), files.recent_files_menu))
-    app.add_handler(MessageHandler(filters.Regex(r"^🔍 Search$"), files.search_prompt))
-    app.add_handler(MessageHandler(filters.Regex(r"^⚙️ Settings$"), settings.settings_menu))
+    # ── Reply Keyboard buttons (ID & EN supported) ─────
+    app.add_handler(MessageHandler(filters.Regex(r"^📁 (My Files|File Saya)$"), folders.my_files))
+    app.add_handler(MessageHandler(filters.Regex(r"^📤 (Upload|Unggah)$"), files.upload_menu))
+    app.add_handler(MessageHandler(filters.Regex(r"^⭐ (Starred|Favorit)$"), menu.starred_menu))
+    app.add_handler(MessageHandler(filters.Regex(r"^🕒 (Recent|Terbaru)$"), files.recent_files_menu))
+    app.add_handler(MessageHandler(filters.Regex(r"^🔍 (Search|Cari)$"), files.search_prompt))
+    app.add_handler(MessageHandler(filters.Regex(r"^⚙️ (Settings|Pengaturan)$"), settings.settings_menu))
     app.add_handler(MessageHandler(filters.Regex(r"^(✅ Done|✅ Selesai)$"), files.done_uploading))
     app.add_handler(MessageHandler(filters.Regex(r"^(❌ Cancel|❌ Batal)$"), menu.cancel))
     app.add_handler(MessageHandler(filters.Regex(r"^🏠 (Beranda|Menu Utama|Home)$"), menu.go_home))
@@ -97,6 +97,8 @@ def main():
     app.add_handler(CallbackQueryHandler(settings.account_recovery_input_prompt, pattern=r"^rec:input_prompt$"))
     app.add_handler(CallbackQueryHandler(menu.callback_recovery_link, pattern=r"^rec:link:\d+$"))
     app.add_handler(CallbackQueryHandler(menu.callback_recovery_ignore, pattern=r"^rec:ignore$"))
+    app.add_handler(CallbackQueryHandler(menu.callback_language_select, pattern=r"^set_lang:(id|en)$"))
+    app.add_handler(CallbackQueryHandler(menu.callback_language_prompt, pattern=r"^set_lang:prompt$"))
 
     # ── No-op ──────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(noop, pattern=r"^noop$"))
