@@ -440,7 +440,7 @@ def find_duplicate_file(user_id: int, file_unique_id: str) -> dict | None:
 def get_all_user_files(user_id: int, limit: int = 100) -> list[dict]:
     """Retrieve user files for semantic search and AI index."""
     return (db.table("files")
-            .select("id, file_name, file_type, file_size, created_at, folders(name)")
+            .select("*, folders(name)")
             .eq("user_id", user_id)
             .eq("is_trashed", False)
             .order("created_at", desc=True)
