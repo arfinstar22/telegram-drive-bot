@@ -1977,8 +1977,10 @@
       return `
         <div class="file-card ${isSelected ? 'selected' : ''}" 
              onclick="handleFileClick(event, ${f.id})"
-             ontouchstart="handleTouchStart(${f.id})" 
-             ontouchend="handleTouchEnd()">
+             ontouchstart="handleTouchStart(event, ${f.id})"
+             ontouchmove="handleTouchMove(event)"
+             ontouchend="handleTouchEnd()"
+             ontouchcancel="handleTouchCancel()">
           <div class="select-checkbox ${isSelected ? 'checked' : ''}" onclick="event.stopPropagation(); toggleSelectFile(${f.id})">
             ${isSelected ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
           </div>
@@ -2011,8 +2013,10 @@
       return `
         <div class="file-row ${isSelected ? 'selected' : ''}" 
              onclick="handleFileClick(event, ${f.id})"
-             ontouchstart="handleTouchStart(${f.id})" 
-             ontouchend="handleTouchEnd()">
+             ontouchstart="handleTouchStart(event, ${f.id})"
+             ontouchmove="handleTouchMove(event)"
+             ontouchend="handleTouchEnd()"
+             ontouchcancel="handleTouchCancel()">
           <div class="select-checkbox ${isSelected ? 'checked' : ''}" onclick="event.stopPropagation(); toggleSelectFile(${f.id})">
             ${isSelected ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
           </div>
@@ -2336,8 +2340,17 @@
       }
     }
 
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let isLongPressTriggered = false;
+
     // Multi-Select & Selection Handlers
     function handleFileClick(event, fileId) {
+      if (isLongPressTriggered) {
+        isLongPressTriggered = false;
+        event.stopPropagation();
+        return;
+      }
       if (isSelectMode) {
         event.stopPropagation();
         toggleSelectFile(fileId);
@@ -2356,19 +2369,50 @@
       updateSelectionUI();
     }
 
-    function handleTouchStart(fileId) {
+    function handleTouchStart(event, fileId) {
       if (isSelectMode) return;
+      if (event.touches && event.touches.length > 0) {
+        touchStartX = event.touches[0].clientX;
+        touchStartY = event.touches[0].clientY;
+      }
+      isLongPressTriggered = false;
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      // Tahan 1.5 detik (1500ms) untuk memilih file
       longPressTimer = setTimeout(() => {
+        isLongPressTriggered = true;
         triggerHaptic();
         if (!isSelectMode) {
           toggleSelectMode();
         }
         selectedFileIds.add(fileId);
         updateSelectionUI();
-      }, 500);
+      }, 1500);
+    }
+
+    function handleTouchMove(event) {
+      if (!longPressTimer) return;
+      if (event.touches && event.touches.length > 0) {
+        const moveX = Math.abs(event.touches[0].clientX - touchStartX);
+        const moveY = Math.abs(event.touches[0].clientY - touchStartY);
+        // Jika jari bergeser lebih dari 8px (sedang scroll halaman), batalkan pemilihan
+        if (moveX > 8 || moveY > 8) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
     }
 
     function handleTouchEnd() {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    }
+
+    function handleTouchCancel() {
       if (longPressTimer) {
         clearTimeout(longPressTimer);
         longPressTimer = null;
