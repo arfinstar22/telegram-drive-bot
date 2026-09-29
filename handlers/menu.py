@@ -11,6 +11,7 @@ WELCOME_ID = (
     "🗂 <b>Telegram Drive</b>\n\n"
     "Cloud storage unlimited, gratis, langsung di Telegram.\n\n"
     "━━━━━━━━━━━━━━━━━━━\n"
+    "📱 <b>Buka WebApp Drive</b> — Tampilan visual web modern\n"
     "📁 <b>File Saya</b> — Folder & berkas Anda\n"
     "📤 <b>Upload</b> — Upload file baru\n"
     "⭐ <b>Favorit</b> — Berkas & folder favorit\n"
@@ -18,13 +19,14 @@ WELCOME_ID = (
     "🔍 <b>Cari</b> — Cari berkas cepat\n"
     "⚙️ <b>Pengaturan</b> — Info & pengaturan\n"
     "━━━━━━━━━━━━━━━━━━━\n\n"
-    "Mulai dengan buat folder pertama! 📁"
+    "Mulai dengan buat folder atau klik Buka WebApp! 📱"
 )
 
 WELCOME_EN = (
     "🗂 <b>Telegram Drive</b>\n\n"
     "Unlimited, free cloud storage directly in Telegram.\n\n"
     "━━━━━━━━━━━━━━━━━━━\n"
+    "📱 <b>Open WebApp Drive</b> — Modern visual web UI\n"
     "📁 <b>My Files</b> — Your folders & files\n"
     "📤 <b>Upload</b> — Upload new files\n"
     "⭐ <b>Starred</b> — Favorite files & folders\n"
@@ -32,7 +34,7 @@ WELCOME_EN = (
     "🔍 <b>Search</b> — Quick file search\n"
     "⚙️ <b>Settings</b> — Storage & settings\n"
     "━━━━━━━━━━━━━━━━━━━\n\n"
-    "Get started by creating your first folder! 📁"
+    "Get started by creating a folder or launch WebApp! 📱"
 )
 
 WELCOME = WELCOME_ID

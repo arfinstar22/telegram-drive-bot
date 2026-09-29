@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Darfin Storage — Cloud Drive</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090D16;
+      --surface: rgba(17, 24, 39, 0.7);
+      --surface-hover: rgba(30, 41, 59, 0.85);
+      --surface-card: #111827;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(56, 189, 248, 0.4);
+      --accent: #38BDF8;
+      --accent-glow: rgba(56, 189, 248, 0.15);
+      --accent-purple: #A855F7;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --gold: #FBBF24;
+      --emerald: #10B981;
+      --rose: #F43F5E;
+      --radius: 14px;
+      --safe-bottom: env(safe-area-inset-bottom, 16px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding-bottom: calc(90px + var(--safe-bottom));
+      line-height: 1.5;
+    }
+
+    /* Ambient background mesh */
+    .ambient-bg {
+      position: fixed;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 450px;
+      height: 350px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.12) 0%, rgba(168, 85, 247, 0.06) 50%, transparent 70%);
+      filter: blur(60px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-top: 4px;
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-badge {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #0284C7, #6366F1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .brand-sub {
+      font-size: 0.75rem;
+      color: var(--accent);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .brand-sub::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--emerald);
+      display: inline-block;
+      box-shadow: 0 0 8px var(--emerald);
+    }
+
+    .user-pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .storage-bar-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 18px;
+    }
+
+    .storage-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .storage-used {
+      color: #fff;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .storage-progress {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .storage-fill {
+      height: 100%;
+      width: 18%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-purple));
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+
+    /* Search & Filter */
+    .search-box {
+      position: relative;
+      margin-bottom: 14px;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      padding: 12px 14px 12px 42px;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      color: #fff;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .search-input::placeholder {
+      color: #64748B;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #64748B;
+      pointer-events: none;
+    }
+
+    .filter-chips {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 18px;
+      scrollbar-width: none;
+    }
+
+    .filter-chips::-webkit-scrollbar {
+      display: none;
+    }
+
+    .chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .chip.active {
+      background: var(--accent);
+      color: #030712;
+      border-color: var(--accent);
+      box-shadow: 0 2px 12px var(--accent-glow);
+    }
+
+    /* Breadcrumbs */
+    .breadcrumb-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 14px;
+      overflow-x: auto;
+      white-space: nowrap;
+      scrollbar-width: none;
+    }
+
+    .crumb-item {
+      color: var(--accent);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .crumb-sep {
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+
+    .crumb-current {
+      color: #fff;
+    }
+
+    /* Section Title */
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Folders Grid */
+    .folders-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .folder-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: transform 0.15s, background 0.15s, border-color 0.15s;
+    }
+
+    .folder-card:active {
+      transform: scale(0.97);
+    }
+
+    .folder-card:hover {
+      background: var(--surface-hover);
+      border-color: var(--border-focus);
+    }
+
+    .folder-icon {
+      color: #38BDF8;
+      flex-shrink: 0;
+    }
+
+    .folder-info {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .folder-name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #fff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .folder-count {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* Files View Toggle */
+    .view-toggle {
+      display: flex;
+      gap: 4px;
+      background: var(--surface);
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .view-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      padding: 4px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+
+    .view-btn.active {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+
+    /* Files Grid (Bento Style) */
+    .files-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 12px;
+    }
+
+    .file-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s;
+    }
+
+    .file-card:active {
+      transform: scale(0.97);
+    }
+
+    .file-card:hover {
+      border-color: var(--border-focus);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .file-thumb-wrap {
+      width: 100%;
+      height: 96px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .file-thumb-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .file-type-badge {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      color: #fff;
+    }
+
+    .star-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.5);
+      border: none;
+      color: #94A3B8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: color 0.15s, transform 0.15s;
+    }
+
+    .star-btn.starred {
+      color: var(--gold);
+    }
+
+    .star-btn:active {
+      transform: scale(1.2);
+    }
+
+    .file-name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      word-break: break-all;
+    }
+
+    .file-meta {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: auto;
+      padding-top: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .file-tags {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    .tag-pill {
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+
+    /* List View Mode */
+    .files-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .file-row {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .file-row:hover {
+      background: var(--surface-hover);
+      border-color: var(--border-focus);
+    }
+
+    .file-row-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .file-row-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .file-row-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #fff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-row-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Floating Audio Player */
+    .audio-player-bar {
+      position: fixed;
+      bottom: calc(16px + var(--safe-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 32px);
+      max-width: 600px;
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      backdrop-filter: blur(20px);
+      border-radius: 16px;
+      padding: 12px 16px;
+      display: none;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      z-index: 100;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translate(-50%, 50px); opacity: 0; }
+      to { transform: translate(-50%, 0); opacity: 1; }
+    }
+
+    .play-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      color: #030712;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .audio-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .audio-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #fff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .audio-progress-bar {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      margin-top: 6px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .audio-progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      width: 0%;
+    }
+
+    .audio-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    /* Modal Sheet */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(10px);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .modal-sheet {
+      width: 100%;
+      max-width: 600px;
+      background: #111827;
+      border: 1px solid var(--border);
+      border-radius: 24px 24px 0 0;
+      padding: 20px 20px calc(24px + var(--safe-bottom));
+      transform: translateY(100%);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .modal-overlay.active .modal-sheet {
+      transform: translateY(0);
+    }
+
+    .sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      margin: 0 auto 16px;
+    }
+
+    .sheet-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+      word-break: break-all;
+    }
+
+    .sheet-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: none;
+      transition: all 0.15s;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #030712;
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      border: 1px solid var(--border);
+    }
+
+    /* Skeleton Loading */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 8px;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-bg"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="brand-wrap">
+        <div class="logo-badge">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">Darfin Storage</h1>
+          <div class="brand-sub">Cloud Unlimited • Terhubung</div>
+        </div>
+      </div>
+      <div class="user-pill" id="userPill">
+        <span id="userName">User</span>
+      </div>
+    </header>
+
+    <!-- Storage Diagnostics Card -->
+    <div class="storage-bar-card">
+      <div class="storage-header">
+        <span>Penggunaan Kapasitas</span>
+        <span class="storage-used" id="storageSummary">0 MB • 0 File</span>
+      </div>
+      <div class="storage-progress">
+        <div class="storage-fill" id="storageFill" style="width: 15%"></div>
+      </div>
+    </div>
+
+    <!-- Search Input -->
+    <div class="search-box">
+      <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" class="search-input" id="searchInput" placeholder="Cari nama berkas, tag (#kantor), tahun..." autocomplete="off">
+    </div>
+
+    <!-- Category Filter Chips -->
+    <div class="filter-chips">
+      <div class="chip active" data-type="all">Semua</div>
+      <div class="chip" data-type="photo">🖼 Foto</div>
+      <div class="chip" data-type="document">📄 Dokumen</div>
+      <div class="chip" data-type="video">🎬 Video</div>
+      <div class="chip" data-type="audio">🎵 Audio</div>
+      <div class="chip" data-type="starred">⭐ Favorit</div>
+    </div>
+
+    <!-- Breadcrumb Path -->
+    <div class="breadcrumb-nav" id="breadcrumbs">
+      <span class="crumb-item" onclick="navigateToFolder(null)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        </svg>
+        My Drive
+      </span>
+    </div>
+
+    <!-- Folders Section -->
+    <div id="foldersSection">
+      <div class="section-title">
+        <span>Folder</span>
+        <span id="folderCountLabel"></span>
+      </div>
+      <div class="folders-grid" id="foldersContainer">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Files Section -->
+    <div class="section-title" style="margin-top: 10px;">
+      <span>Berkas</span>
+      <div class="view-toggle">
+        <button class="view-btn active" id="btnViewGrid" onclick="setViewMode('grid')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+        </button>
+        <button class="view-btn" id="btnViewList" onclick="setViewMode('list')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="files-grid" id="filesContainer">
+      <!-- Skeleton Loaders -->
+      <div class="file-card skeleton" style="height: 180px;"></div>
+      <div class="file-card skeleton" style="height: 180px;"></div>
+      <div class="file-card skeleton" style="height: 180px;"></div>
+    </div>
+  </div>
+
+  <!-- Floating Audio Player Bar -->
+  <div class="audio-player-bar" id="audioPlayerBar">
+    <button class="play-btn" id="audioPlayBtn" onclick="togglePlayAudio()">
+      <svg id="playIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      <svg id="pauseIcon" style="display:none" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+    </button>
+    <div class="audio-info">
+      <div class="audio-title" id="audioTitle">Memutar lagu...</div>
+      <div class="audio-progress-bar" id="audioProgressWrap" onclick="seekAudio(event)">
+        <div class="audio-progress-fill" id="audioProgressFill"></div>
+      </div>
+    </div>
+    <button class="audio-close" onclick="closeAudioPlayer()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <audio id="globalAudioPlayer" style="display:none"></audio>
+  </div>
+
+  <!-- File Detail & Preview Modal Sheet -->
+  <div class="modal-overlay" id="fileModal" onclick="closeModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div id="modalPreviewMedia" style="margin-bottom: 16px; border-radius: 12px; overflow: hidden; max-height: 240px; display: none;"></div>
+      <h3 class="sheet-title" id="modalFileName">Nama File</h3>
+      <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 12px;" id="modalFileMeta">Ukuran • Tanggal</p>
+      
+      <div id="modalNoteWrap" style="background: rgba(255,255,255,0.04); padding: 10px 12px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 12px; display: none;">
+        <span style="color: var(--text-muted);">📝 Catatan:</span> <span id="modalNoteText" style="color: #fff;"></span>
+      </div>
+
+      <div id="modalTagsWrap" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;"></div>
+
+      <div class="sheet-actions">
+        <button class="btn btn-primary" id="modalDownloadBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Unduh File
+        </button>
+        <button class="btn btn-secondary" id="modalShareBtn" onclick="copyShareLink()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          Salin Link
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      try {
+        tg.setHeaderColor('#090D16');
+        tg.setBackgroundColor('#090D16');
+      } catch (e) {}
+    }
+
+    // Determine current user ID
+    const urlParams = new URLSearchParams(window.location.search);
+    let userId = tg?.initDataUnsafe?.user?.id || urlParams.get('user_id') || 1166479771;
+    let userName = tg?.initDataUnsafe?.user?.first_name || 'My Drive';
+    document.getElementById('userName').innerText = userName;
+
+    let currentFolderId = null;
+    let currentCategory = 'all';
+    let currentViewMode = 'grid';
+    let driveData = { folders: [], files: [] };
+    let activeModalFile = null;
+
+    const audioEl = document.getElementById('globalAudioPlayer');
+
+    function triggerHaptic() {
+      if (tg?.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('light');
+      }
+    }
+
+    async function loadDriveData() {
+      try {
+        let url = `/api/drive?user_id=${userId}`;
+        if (currentFolderId) url += `&folder_id=${currentFolderId}`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Network error');
+        driveData = await res.json();
+        
+        renderStorage(driveData.storage);
+        renderBreadcrumbs(driveData.breadcrumbs || []);
+        renderFolders(driveData.folders || []);
+        renderFiles(driveData.files || []);
+      } catch (err) {
+        console.error('Failed to load drive:', err);
+        document.getElementById('filesContainer').innerHTML = `
+          <div class="empty-state" style="grid-column: 1/-1;">
+            <div class="empty-icon">⚠️</div>
+            <p>Gagal memuat berkas. Pastikan server aktif.</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderStorage(storage) {
+      if (!storage) return;
+      document.getElementById('storageSummary').innerText = `${storage.total_size} • ${storage.total_files} File`;
+    }
+
+    function renderBreadcrumbs(crumbs) {
+      const el = document.getElementById('breadcrumbs');
+      let html = `
+        <span class="crumb-item" onclick="navigateToFolder(null)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          </svg>
+          My Drive
+        </span>
+      `;
+      crumbs.forEach((c, idx) => {
+        const isLast = idx === crumbs.length - 1;
+        html += `<span class="crumb-sep">/</span>`;
+        if (isLast) {
+          html += `<span class="crumb-current">${escapeHtml(c.name)}</span>`;
+        } else {
+          html += `<span class="crumb-item" onclick="navigateToFolder(${c.id})">${escapeHtml(c.name)}</span>`;
+        }
+      });
+      el.innerHTML = html;
+    }
+
+    function renderFolders(folders) {
+      const container = document.getElementById('foldersContainer');
+      const section = document.getElementById('foldersSection');
+      if (!folders || folders.length === 0) {
+        section.style.display = 'none';
+        return;
+      }
+      section.style.display = 'block';
+      document.getElementById('folderCountLabel').innerText = `${folders.length} folder`;
+
+      container.innerHTML = folders.map(f => `
+        <div class="folder-card" onclick="navigateToFolder(${f.id})">
+          <svg class="folder-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20 18H4V8h16v10zm0-12h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/>
+          </svg>
+          <div class="folder-info">
+            <div class="folder-name">${escapeHtml(f.name)}</div>
+            <div class="folder-count">${f.file_count || 0} berkas</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderFiles(files) {
+      const container = document.getElementById('filesContainer');
+      if (!files || files.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="grid-column: 1/-1;">
+            <div class="empty-icon">📂</div>
+            <p>Folder ini belum memiliki berkas.</p>
+          </div>
+        `;
+        return;
+      }
+
+      if (currentViewMode === 'grid') {
+        container.className = 'files-grid';
+        container.innerHTML = files.map(f => renderFileGridCard(f)).join('');
+      } else {
+        container.className = 'files-list';
+        container.innerHTML = files.map(f => renderFileListRow(f)).join('');
+      }
+    }
+
+    function renderFileGridCard(f) {
+      const typeBadgeColor = getTypeColor(f.file_type);
+      const isStarred = f.is_starred ? 'starred' : '';
+      const tagsHtml = (f.tags || []).slice(0, 2).map(t => `<span class="tag-pill">#${escapeHtml(t)}</span>`).join('');
+      
+      let thumbContent = getFileIconSvg(f.file_type);
+      if (f.file_type === 'photo' && f.stream_url) {
+        thumbContent = `<img class="file-thumb-img" src="${f.stream_url}" loading="lazy" alt="${escapeHtml(f.file_name)}">`;
+      }
+
+      return `
+        <div class="file-card" onclick="openFileModal(${f.id})">
+          <button class="star-btn ${isStarred}" onclick="toggleStar(event, ${f.id})">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </button>
+          <div class="file-thumb-wrap">
+            ${thumbContent}
+            <span class="file-type-badge" style="background:${typeBadgeColor}cc">${f.file_type}</span>
+          </div>
+          <div class="file-name" title="${escapeHtml(f.file_name)}">${escapeHtml(f.file_name)}</div>
+          <div class="file-tags">${tagsHtml}</div>
+          <div class="file-meta">
+            <span>${f.file_size_formatted}</span>
+            <span>${f.created_at ? f.created_at.substring(0, 10) : ''}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderFileListRow(f) {
+      const isStarred = f.is_starred ? 'starred' : '';
+      const icon = getFileIconSvg(f.file_type, 20);
+      return `
+        <div class="file-row" onclick="openFileModal(${f.id})">
+          <div class="file-row-icon" style="background: rgba(255,255,255,0.05);">
+            ${icon}
+          </div>
+          <div class="file-row-main">
+            <div class="file-row-name">${escapeHtml(f.file_name)}</div>
+            <div class="file-row-sub">
+              <span>${f.file_size_formatted}</span>
+              <span>•</span>
+              <span>${f.created_at ? f.created_at.substring(0, 10) : ''}</span>
+            </div>
+          </div>
+          <button class="star-btn ${isStarred}" style="position:static" onclick="toggleStar(event, ${f.id})">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </button>
+        </div>
+      `;
+    }
+
+    function navigateToFolder(folderId) {
+      triggerHaptic();
+      currentFolderId = folderId;
+      document.getElementById('searchInput').value = '';
+      loadDriveData();
+    }
+
+    function setViewMode(mode) {
+      triggerHaptic();
+      currentViewMode = mode;
+      document.getElementById('btnViewGrid').classList.toggle('active', mode === 'grid');
+      document.getElementById('btnViewList').classList.toggle('active', mode === 'list');
+      renderFiles(driveData.files || []);
+    }
+
+    // Filter Chips
+    document.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        triggerHaptic();
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentCategory = chip.dataset.type;
+        applyFilter();
+      });
+    });
+
+    // Search filter
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      applyFilter(e.target.value.toLowerCase().trim());
+    });
+
+    function applyFilter(query = document.getElementById('searchInput').value.toLowerCase().trim()) {
+      let filtered = driveData.files || [];
+      if (currentCategory !== 'all') {
+        if (currentCategory === 'starred') {
+          filtered = filtered.filter(f => f.is_starred);
+        } else {
+          filtered = filtered.filter(f => f.file_type === currentCategory);
+        }
+      }
+
+      if (query) {
+        filtered = filtered.filter(f => {
+          const matchName = f.file_name.toLowerCase().includes(query);
+          const matchTags = (f.tags || []).some(t => t.toLowerCase().includes(query.replace('#', '')));
+          const matchNote = (f.note || '').toLowerCase().includes(query);
+          return matchName || matchTags || matchNote;
+        });
+      }
+      renderFiles(filtered);
+    }
+
+    async function toggleStar(event, fileId) {
+      event.stopPropagation();
+      triggerHaptic();
+      const f = (driveData.files || []).find(x => x.id === fileId);
+      if (f) {
+        f.is_starred = !f.is_starred;
+        applyFilter();
+      }
+      try {
+        await fetch('/api/star', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_id: fileId, user_id: userId })
+        });
+      } catch (err) {
+        console.error('Star failed', err);
+      }
+    }
+
+    // Modal Actions
+    async function openFileModal(fileId) {
+      triggerHaptic();
+      const f = (driveData.files || []).find(x => x.id === fileId);
+      if (!f) return;
+      activeModalFile = f;
+
+      document.getElementById('modalFileName').innerText = f.file_name;
+      document.getElementById('modalFileMeta').innerText = `${f.file_size_formatted} • Diunggah: ${f.created_at ? f.created_at.substring(0,10) : ''}`;
+      
+      const noteWrap = document.getElementById('modalNoteWrap');
+      if (f.note) {
+        noteWrap.style.display = 'block';
+        document.getElementById('modalNoteText').innerText = f.note;
+      } else {
+        noteWrap.style.display = 'none';
+      }
+
+      const tagsWrap = document.getElementById('modalTagsWrap');
+      if (f.tags && f.tags.length > 0) {
+        tagsWrap.innerHTML = f.tags.map(t => `<span class="tag-pill">#${escapeHtml(t)}</span>`).join('');
+      } else {
+        tagsWrap.innerHTML = '';
+      }
+
+      // Check stream / preview
+      const previewEl = document.getElementById('modalPreviewMedia');
+      previewEl.style.display = 'none';
+      previewEl.innerHTML = '';
+
+      // Direct download link
+      const dlBtn = document.getElementById('modalDownloadBtn');
+      dlBtn.onclick = () => {
+        triggerHaptic();
+        window.open(`/api/download?file_id=${f.id}&user_id=${userId}`, '_blank');
+      };
+
+      if (f.file_type === 'audio') {
+        playAudio(f);
+      }
+
+      document.getElementById('fileModal').classList.add('active');
+    }
+
+    function closeModal(e) {
+      if (e.target.id === 'fileModal' || e.target.classList.contains('sheet-handle')) {
+        document.getElementById('fileModal').classList.remove('active');
+      }
+    }
+
+    function copyShareLink() {
+      triggerHaptic();
+      if (!activeModalFile) return;
+      const shareUrl = `https://t.me/darfinstoragebot?start=fi_${activeModalFile.id}`;
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        if (tg?.showPopup) {
+          tg.showPopup({ message: 'Tautan file berhasil disalin ke clipboard!' });
+        } else {
+          alert('Tautan disalin ke clipboard!');
+        }
+      });
+    }
+
+    // Audio Player Bar Logic
+    function playAudio(f) {
+      const bar = document.getElementById('audioPlayerBar');
+      const title = document.getElementById('audioTitle');
+      title.innerText = f.file_name;
+      audioEl.src = `/api/download?file_id=${f.id}&user_id=${userId}`;
+      audioEl.play();
+      bar.style.display = 'flex';
+      updatePlayIcons(true);
+
+      audioEl.ontimeupdate = () => {
+        if (audioEl.duration) {
+          const pct = (audioEl.currentTime / audioEl.duration) * 100;
+          document.getElementById('audioProgressFill').style.width = pct + '%';
+        }
+      };
+    }
+
+    function togglePlayAudio() {
+      triggerHaptic();
+      if (audioEl.paused) {
+        audioEl.play();
+        updatePlayIcons(true);
+      } else {
+        audioEl.pause();
+        updatePlayIcons(false);
+      }
+    }
+
+    function updatePlayIcons(isPlaying) {
+      document.getElementById('playIcon').style.display = isPlaying ? 'none' : 'block';
+      document.getElementById('pauseIcon').style.display = isPlaying ? 'block' : 'none';
+    }
+
+    function seekAudio(e) {
+      const wrap = document.getElementById('audioProgressWrap');
+      const rect = wrap.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const pct = clickX / rect.width;
+      if (audioEl.duration) {
+        audioEl.currentTime = pct * audioEl.duration;
+      }
+    }
+
+    function closeAudioPlayer() {
+      audioEl.pause();
+      document.getElementById('audioPlayerBar').style.display = 'none';
+    }
+
+    // Utility Helpers
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s]);
+    }
+
+    function getTypeColor(type) {
+      switch(type) {
+        case 'photo': return '#06B6D4';
+        case 'video': return '#F59E0B';
+        case 'audio': return '#A855F7';
+        case 'document': return '#3B82F6';
+        default: return '#64748B';
+      }
+    }
+
+    function getFileIconSvg(type, size = 32) {
+      switch(type) {
+        case 'photo':
+          return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="#06B6D4" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`;
+        case 'video':
+          return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect width="14" height="14" x="1" y="5" rx="2"/></svg>`;
+        case 'audio':
+          return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+        default:
+          return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`;
+      }
+    }
+
+    // Initial load
+    loadDriveData();
+  </script>
+</body>
+</html>

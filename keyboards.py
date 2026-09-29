@@ -1,21 +1,26 @@
-from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, WebAppInfo
 
+from config import WEBAPP_URL
 from utils import file_emoji, format_size, truncate
 
 
 # ── Reply Keyboards (bottom-screen persistent buttons) ──
 
 def main_menu(lang: str = "id"):
+    webapp_label = "📱 Open WebApp Drive" if lang == "en" else "📱 Buka WebApp Drive"
+    webapp_btn = KeyboardButton(webapp_label, web_app=WebAppInfo(url=WEBAPP_URL))
     if lang == "en":
         return ReplyKeyboardMarkup(
-            [["📁 My Files", "📤 Upload"],
+            [[webapp_btn],
+             ["📁 My Files", "📤 Upload"],
              ["⭐ Starred", "🕒 Recent"],
              ["🔍 Search", "⚙️ Settings"],
              ["🏠 Home"]],
             resize_keyboard=True,
         )
     return ReplyKeyboardMarkup(
-        [["📁 File Saya", "📤 Upload"],
+        [[webapp_btn],
+         ["📁 File Saya", "📤 Upload"],
          ["⭐ Favorit", "🕒 Terbaru"],
          ["🔍 Cari", "⚙️ Pengaturan"],
          ["🏠 Beranda"]],
@@ -154,10 +159,13 @@ def folder_contents(folder_id: int, files: list[dict], subfolders: list[dict],
     row_actions.append(InlineKeyboardButton("✏️ Rename", callback_data=f"dr:{folder_id}"))
     buttons.append(row_actions)
 
-    # Row 4: Delete, Back & Home
+    # Row 4: WebApp, Delete, Back & Home
     from database import get_folder
     folder = get_folder(folder_id)
     back_target = folder["parent_id"] if folder and folder.get("parent_id") else 0
+    buttons.append([
+        InlineKeyboardButton("📱 Buka di WebApp Drive", web_app=WebAppInfo(url=f"{WEBAPP_URL}?folder_id={folder_id}")),
+    ])
     buttons.append([
         InlineKeyboardButton("🗑 Delete", callback_data=f"dx:{folder_id}"),
         InlineKeyboardButton("⬅️ Back", callback_data=f"f:{back_target}"),

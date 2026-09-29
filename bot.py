@@ -127,6 +127,8 @@ def main():
 
     # ── Run ────────────────────────────────────────────
     if WEBHOOK_URL:
+        from webapp import patch_ptb_webhook_app
+        patch_ptb_webhook_app()
         url = WEBHOOK_URL.rstrip("/")
         log.info("Starting webhook mode at %s", url)
         app.run_webhook(
@@ -136,6 +138,8 @@ def main():
             url_path="/webhook",
         )
     else:
+        from webapp import start_standalone_webapp_server
+        start_standalone_webapp_server(port=PORT)
         log.info("Starting polling mode")
         app.run_polling(drop_pending_updates=True)
 
