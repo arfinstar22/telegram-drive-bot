@@ -49,6 +49,10 @@ class WebAppPageHandler(tornado.web.RequestHandler):
             self.set_status(500)
             self.write(f"Error loading WebApp: {e}")
 
+    def head(self):
+        self.set_header("Content-Type", "text/html; charset=utf-8")
+        self.set_status(200)
+
 
 class ApiDriveHandler(BaseApiHandler):
     async def get(self):
@@ -293,6 +297,7 @@ def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
     import telegram.ext._utils.webhookhandler as wh
     return [
         (rf"{webhook_path}/?", wh.TelegramHandler, shared_objects),
+        (r"/", WebAppPageHandler),
         (r"/webapp/?", WebAppPageHandler),
         (r"/api/drive/?", ApiDriveHandler),
         (r"/api/download/?", ApiDownloadHandler),
@@ -329,6 +334,7 @@ def patch_ptb_webhook_app():
 def start_standalone_webapp_server(port: int = 10000):
     """Run standalone WebApp server for local development or polling mode."""
     routes = [
+        (r"/", WebAppPageHandler),
         (r"/webapp/?", WebAppPageHandler),
         (r"/api/drive/?", ApiDriveHandler),
         (r"/api/download/?", ApiDownloadHandler),
