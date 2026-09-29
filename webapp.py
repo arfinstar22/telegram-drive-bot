@@ -167,6 +167,62 @@ class ApiStarHandler(BaseApiHandler):
             self.write(json.dumps({"error": str(e)}))
 
 
+class ApiSendToChatHandler(BaseApiHandler):
+    """Sends file directly into user's Telegram chat with full interactive buttons."""
+    async def post(self):
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            file_id = data.get("file_id")
+            user_id = data.get("user_id")
+            if not file_id or not user_id:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Missing file_id or user_id"}))
+                return
+
+            f = db.get_file(file_id)
+            if not f:
+                self.set_status(404)
+                self.write(json.dumps({"error": "File not found"}))
+                return
+
+            bot = Bot(BOT_TOKEN)
+            import keyboards as kb
+            from utils import file_emoji, format_size, parse_file_metadata
+            emoji = file_emoji(f["file_type"])
+            size = format_size(f.get("file_size", 0))
+            created = f.get("created_at", "")[:10]
+            _, note, tags = parse_file_metadata(f.get("mime_type"))
+            note_line = f"\n📝 <i>{note}</i>" if note else ""
+            tags_line = f"\n🏷 " + " ".join(f"#{t}" for t in tags) if tags else ""
+            caption = f"{emoji} <b>{f['file_name']}</b>\n📊 {size} • 📅 {created}{note_line}{tags_line}"
+            markup = kb.file_actions(f)
+
+            ftype = f.get("file_type", "document")
+            fid = f["file_id"]
+
+            if ftype == "photo":
+                await bot.send_photo(chat_id=user_id, photo=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+            elif ftype == "video":
+                await bot.send_video(chat_id=user_id, video=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+            elif ftype == "audio":
+                await bot.send_audio(chat_id=user_id, audio=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+            elif ftype == "voice":
+                await bot.send_voice(chat_id=user_id, voice=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+            elif ftype == "animation":
+                await bot.send_animation(chat_id=user_id, animation=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+            elif ftype == "video_note":
+                await bot.send_video_note(chat_id=user_id, video_note=fid, reply_markup=markup)
+                await bot.send_message(chat_id=user_id, text=caption, parse_mode="HTML")
+            else:
+                await bot.send_document(chat_id=user_id, document=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+
+            self.write(json.dumps({"ok": True}))
+        except Exception as e:
+            log.exception("Failed to send file to chat: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
 def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
     """Compile all WebApp + Telegram Webhook routes."""
     import telegram.ext._utils.webhookhandler as wh
@@ -176,6 +232,7 @@ def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
         (r"/api/drive/?", ApiDriveHandler),
         (r"/api/download/?", ApiDownloadHandler),
         (r"/api/star/?", ApiStarHandler),
+        (r"/api/send_to_chat/?", ApiSendToChatHandler),
     ]
 
 
@@ -209,6 +266,7 @@ def start_standalone_webapp_server(port: int = 10000):
         (r"/api/drive/?", ApiDriveHandler),
         (r"/api/download/?", ApiDownloadHandler),
         (r"/api/star/?", ApiStarHandler),
+        (r"/api/send_to_chat/?", ApiSendToChatHandler),
     ]
     app = tornado.web.Application(routes)
     try:

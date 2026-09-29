@@ -684,10 +684,27 @@
     }
 
     .sheet-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .sheet-action-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
-      margin-top: 20px;
+      width: 100%;
+    }
+
+    .btn-send-chat {
+      background: linear-gradient(135deg, #0284C7, #6366F1);
+      color: #fff;
+      font-weight: 700;
+      padding: 13px 18px;
+      border-radius: 12px;
+      box-shadow: 0 4px 18px rgba(99, 102, 241, 0.35);
+      width: 100%;
     }
 
     .btn {
@@ -873,14 +890,23 @@
       <div id="modalTagsWrap" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;"></div>
 
       <div class="sheet-actions">
-        <button class="btn btn-primary" id="modalDownloadBtn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Unduh File
+        <button class="btn btn-send-chat" id="modalSendChatBtn" onclick="sendFileToChat()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+          Kirim ke Chat Telegram
         </button>
-        <button class="btn btn-secondary" id="modalShareBtn" onclick="copyShareLink()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-          Salin Link
-        </button>
+        <div class="sheet-action-row">
+          <button class="btn btn-primary" id="modalDownloadBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Unduh File
+          </button>
+          <button class="btn btn-secondary" id="modalShareBtn" onclick="copyShareLink()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            Salin Link
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1176,6 +1202,39 @@
       }
 
       document.getElementById('fileModal').classList.add('active');
+    }
+
+    async function sendFileToChat() {
+      if (!activeModalFile) return;
+      triggerHaptic();
+      const btn = document.getElementById('modalSendChatBtn');
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = `<span style="opacity:0.85">Mengirim ke chat...</span>`;
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/send_to_chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_id: activeModalFile.id, user_id: userId })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          if (tg && tg.close) {
+            tg.close();
+          } else {
+            alert('File berhasil dikirim ke chat bot Telegram Anda!');
+            document.getElementById('fileModal').classList.remove('active');
+          }
+        } else {
+          alert('Gagal mengirim file: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Gagal mengirim file: ' + err);
+      } finally {
+        btn.innerHTML = origHtml;
+        btn.disabled = false;
+      }
     }
 
     function closeModal(e) {
