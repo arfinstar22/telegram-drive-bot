@@ -244,6 +244,39 @@ class ApiStarHandler(BaseApiHandler):
             self.write(json.dumps({"error": str(e)}))
 
 
+async def _send_single_file_to_chat(bot: Bot, user_id: int, f: dict):
+    """Sends a single media or document file with actions markup to Telegram chat."""
+    import keyboards as kb
+    from utils import file_emoji, format_size, parse_file_metadata
+    emoji = file_emoji(f["file_type"])
+    size = format_size(f.get("file_size", 0))
+    created = f.get("created_at", "")[:10]
+    _, note, tags = parse_file_metadata(f.get("mime_type"))
+    note_line = f"\n📝 <i>{note}</i>" if note else ""
+    tags_line = f"\n🏷 " + " ".join(f"#{t}" for t in tags) if tags else ""
+    caption = f"{emoji} <b>{f['file_name']}</b>\n📊 {size} • 📅 {created}{note_line}{tags_line}"
+    markup = kb.file_actions(f)
+
+    ftype = f.get("file_type", "document")
+    fid = f["file_id"]
+
+    if ftype == "photo":
+        await bot.send_photo(chat_id=user_id, photo=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+    elif ftype == "video":
+        await bot.send_video(chat_id=user_id, video=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+    elif ftype == "audio":
+        await bot.send_audio(chat_id=user_id, audio=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+    elif ftype == "voice":
+        await bot.send_voice(chat_id=user_id, voice=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+    elif ftype == "animation":
+        await bot.send_animation(chat_id=user_id, animation=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+    elif ftype == "video_note":
+        await bot.send_video_note(chat_id=user_id, video_note=fid, reply_markup=markup)
+        await bot.send_message(chat_id=user_id, text=caption, parse_mode="HTML")
+    else:
+        await bot.send_document(chat_id=user_id, document=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+
+
 class ApiSendToChatHandler(BaseApiHandler):
     """Sends file directly into user's Telegram chat with full interactive buttons."""
     async def post(self):
@@ -263,39 +296,42 @@ class ApiSendToChatHandler(BaseApiHandler):
                 return
 
             bot = get_shared_bot()
-            import keyboards as kb
-            from utils import file_emoji, format_size, parse_file_metadata
-            emoji = file_emoji(f["file_type"])
-            size = format_size(f.get("file_size", 0))
-            created = f.get("created_at", "")[:10]
-            _, note, tags = parse_file_metadata(f.get("mime_type"))
-            note_line = f"\n📝 <i>{note}</i>" if note else ""
-            tags_line = f"\n🏷 " + " ".join(f"#{t}" for t in tags) if tags else ""
-            caption = f"{emoji} <b>{f['file_name']}</b>\n📊 {size} • 📅 {created}{note_line}{tags_line}"
-            markup = kb.file_actions(f)
-
-            ftype = f.get("file_type", "document")
-            fid = f["file_id"]
-
-            if ftype == "photo":
-                await bot.send_photo(chat_id=user_id, photo=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
-            elif ftype == "video":
-                await bot.send_video(chat_id=user_id, video=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
-            elif ftype == "audio":
-                await bot.send_audio(chat_id=user_id, audio=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
-            elif ftype == "voice":
-                await bot.send_voice(chat_id=user_id, voice=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
-            elif ftype == "animation":
-                await bot.send_animation(chat_id=user_id, animation=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
-            elif ftype == "video_note":
-                await bot.send_video_note(chat_id=user_id, video_note=fid, reply_markup=markup)
-                await bot.send_message(chat_id=user_id, text=caption, parse_mode="HTML")
-            else:
-                await bot.send_document(chat_id=user_id, document=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
-
+            await _send_single_file_to_chat(bot, int(user_id), f)
             self.write(json.dumps({"ok": True}))
         except Exception as e:
             log.exception("Failed to send file to chat: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
+class ApiBatchSendToChatHandler(BaseApiHandler):
+    """Batch sends multiple files into user's Telegram chat."""
+    async def post(self):
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            file_ids = data.get("file_ids", [])
+            user_id = data.get("user_id")
+            if not file_ids or not user_id:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Missing file_ids or user_id"}))
+                return
+
+            bot = get_shared_bot()
+            sent = 0
+            for fid in file_ids:
+                try:
+                    f = db.get_file(int(fid))
+                    if not f:
+                        continue
+                    await _send_single_file_to_chat(bot, int(user_id), f)
+                    sent += 1
+                    await asyncio.sleep(0.3)
+                except Exception as ex:
+                    log.warning("Failed sending batch file %s to chat: %s", fid, ex)
+
+            self.write(json.dumps({"ok": True, "sent_count": sent}))
+        except Exception as e:
+            log.exception("Error batch sending files to chat: %s", e)
             self.set_status(500)
             self.write(json.dumps({"error": str(e)}))
 
@@ -609,6 +645,7 @@ def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
         (r"/api/rename/?", ApiRenameHandler),
         (r"/api/batch_delete/?", ApiBatchDeleteHandler),
         (r"/api/batch_star/?", ApiBatchStarHandler),
+        (r"/api/batch_send_to_chat/?", ApiBatchSendToChatHandler),
         (r"/api/upload/?", ApiUploadHandler),
         (r"/api/file_content/?", ApiFileContentHandler),
     ]
@@ -653,6 +690,7 @@ def start_standalone_webapp_server(port: int = 10000):
         (r"/api/rename/?", ApiRenameHandler),
         (r"/api/batch_delete/?", ApiBatchDeleteHandler),
         (r"/api/batch_star/?", ApiBatchStarHandler),
+        (r"/api/batch_send_to_chat/?", ApiBatchSendToChatHandler),
         (r"/api/upload/?", ApiUploadHandler),
         (r"/api/file_content/?", ApiFileContentHandler),
     ]

@@ -1320,6 +1320,25 @@
       transform: scale(0.96);
     }
 
+    .btn-sel-send {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: var(--accent);
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 8px 11px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+
+    .btn-sel-send:active {
+      transform: scale(0.96);
+    }
+
     /* Media Previews */
     .media-preview-container {
       margin-bottom: 16px;
@@ -1586,7 +1605,11 @@
       <button class="btn-sel-text" id="btnSelectAll" onclick="selectAllFiles()">Pilih Semua</button>
     </div>
     <div class="sel-actions">
-      <button class="btn-sel-star" id="btnSelStar" onclick="batchStarSelected()" title="Bintang">
+      <button class="btn-sel-send" id="btnSelSend" onclick="batchSendSelected()" title="Kirim ke Chat Telegram">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        <span>Kirim</span>
+      </button>
+      <button class="btn-sel-star" id="btnSelStar" onclick="batchStarSelected()" title="Bintang / Favorit">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </button>
       <button class="btn-sel-move" id="btnSelMove" onclick="openMoveModal()">
@@ -2495,11 +2518,18 @@
       }
     }
 
-    // Batch Star Action
+    // Batch Star / Unstar Action
     async function batchStarSelected() {
       const fileIds = Array.from(selectedFileIds);
       if (!fileIds.length) return;
       triggerHaptic();
+
+      // If all selected are starred -> unstar them, otherwise star them
+      const allStarred = fileIds.every(id => {
+        const f = (driveData.files || []).find(item => item.id === id);
+        return f && f.is_starred;
+      });
+      const newStarState = !allStarred;
 
       try {
         const res = await fetch('/api/batch_star', {
@@ -2507,25 +2537,65 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             file_ids: fileIds,
-            is_starred: true,
+            is_starred: newStarState,
             user_id: userId
           })
         });
         const data = await res.json();
         if (data.ok) {
-          showToast(`⭐ ${fileIds.length} berkas ditambahkan ke favorit!`);
+          showToast(newStarState ? `⭐ ${fileIds.length} berkas ditambahkan ke favorit!` : `⭐ ${fileIds.length} berkas dihapus dari favorit!`);
           (driveData.files || []).forEach(f => {
             if (selectedFileIds.has(f.id)) {
-              f.is_starred = true;
+              f.is_starred = newStarState;
             }
           });
           exitSelectMode();
           applyFilter();
         } else {
-          alert('Gagal menambahkan bintang: ' + (data.error || 'Unknown error'));
+          alert('Gagal mengubah favorit: ' + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('Gagal membintangi berkas: ' + err);
+        alert('Gagal mengubah favorit berkas: ' + err);
+      }
+    }
+
+    // Batch Send to Telegram Chat Action
+    async function batchSendSelected() {
+      const fileIds = Array.from(selectedFileIds);
+      if (!fileIds.length) return;
+      triggerHaptic();
+
+      const btn = document.getElementById('btnSelSend');
+      const origHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.innerHTML = `<span style="opacity:0.85">Mengirim...</span>`;
+        btn.disabled = true;
+      }
+      showToast(`Mengirim ${fileIds.length} berkas ke chat Telegram...`);
+
+      try {
+        const res = await fetch('/api/batch_send_to_chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file_ids: fileIds,
+            user_id: userId
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`✅ ${data.sent_count || fileIds.length} berkas terkirim ke chat Telegram!`);
+          exitSelectMode();
+        } else {
+          alert('Gagal mengirim berkas: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Gagal mengirim ke chat: ' + err);
+      } finally {
+        if (btn) {
+          btn.innerHTML = origHtml;
+          btn.disabled = false;
+        }
       }
     }
 
