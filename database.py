@@ -99,10 +99,18 @@ def rename_folder(folder_id: int, name: str):
 
 
 def delete_folder(folder_id: int):
-    db.table("files").update({
-        "is_trashed": True,
-        "trashed_at": _now(),
-    }).eq("folder_id", folder_id).eq("is_trashed", False).execute()
+    folder = get_folder(folder_id)
+    if folder:
+        inbox = get_or_create_inbox_folder(folder["user_id"])
+        inbox_id = inbox["id"] if inbox and inbox["id"] != folder_id else None
+        update_payload = {
+            "is_trashed": True,
+            "trashed_at": _now(),
+        }
+        if inbox_id:
+            update_payload["folder_id"] = inbox_id
+        db.table("files").update(update_payload).eq("folder_id", folder_id).execute()
+        db.table("folders").update({"parent_id": folder.get("parent_id")}).eq("parent_id", folder_id).execute()
     return db.table("folders").delete().eq("id", folder_id).execute()
 
 

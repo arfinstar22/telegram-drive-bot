@@ -592,6 +592,9 @@
       align-items: center;
       gap: 10px;
       transition: transform 0.15s, background 0.15s, border-color 0.15s;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     .folder-card:active {
@@ -2027,6 +2030,50 @@
     </div>
   </div>
 
+  <!-- Folder Action Modal Sheet (Long Press / Options) -->
+  <div class="modal-overlay" id="folderActionModal" onclick="closeFolderActionModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.25); display: flex; align-items: center; justify-content: center; color: #38bdf8; flex-shrink: 0;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20 18H4V8h16v10zm0-12h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/>
+          </svg>
+        </div>
+        <div style="min-width: 0; flex: 1;">
+          <h3 class="sheet-title" id="folderActionName" style="margin-bottom: 3px; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nama Folder</h3>
+          <div style="font-size: 0.78rem; color: var(--text-muted);" id="folderActionMeta">0 berkas</div>
+        </div>
+      </div>
+
+      <div class="sheet-actions" style="gap: 10px;">
+        <button class="btn btn-secondary" onclick="actionOpenFolderFromModal()" style="width: 100%; justify-content: flex-start; gap: 10px; padding: 12px 16px; font-size: 0.88rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+          </svg>
+          Buka Folder
+        </button>
+        <button class="btn btn-secondary" onclick="actionRenameFolderFromModal()" style="width: 100%; justify-content: flex-start; gap: 10px; padding: 12px 16px; font-size: 0.88rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+          Ubah Nama Folder
+        </button>
+        <button class="btn btn-danger" onclick="actionDeleteFolderFromModal()" style="width: 100%; justify-content: flex-start; gap: 10px; padding: 12px 16px; font-size: 0.88rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          Hapus Folder
+        </button>
+        <div style="margin-top: 4px;">
+          <button class="btn btn-secondary" style="width: 100%; justify-content: center; padding: 11px;" onclick="closeFolderActionModal()">Batal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Folder Dropzone Modal Sheet -->
   <div class="modal-overlay" id="dropzoneModal" onclick="closeDropzoneModal(event)">
     <div class="modal-sheet" onclick="event.stopPropagation()">
@@ -2329,7 +2376,13 @@
       document.getElementById('folderCountLabel').innerText = `${folders.length} folder`;
 
       container.innerHTML = folders.map(f => `
-        <div class="folder-card" onclick="navigateToFolder(${f.id})">
+        <div class="folder-card" 
+             onclick="handleFolderClick(event, ${f.id})"
+             ontouchstart="handleFolderTouchStart(event, ${f.id})"
+             ontouchmove="handleFolderTouchMove(event)"
+             ontouchend="handleFolderTouchEnd()"
+             ontouchcancel="handleFolderTouchCancel()"
+             oncontextmenu="event.preventDefault(); openFolderActionModal(${f.id})">
           <svg class="folder-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
             <path d="M20 18H4V8h16v10zm0-12h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/>
           </svg>
@@ -2826,6 +2879,165 @@
       }
     }
 
+    // Folder Touch & Action Handlers (Long-Press to Delete/Manage Folder)
+    let folderTouchStartX = 0;
+    let folderTouchStartY = 0;
+    let folderLongPressTimer = null;
+    let isFolderLongPressTriggered = false;
+    let activeModalFolder = null;
+
+    function handleFolderClick(event, folderId) {
+      if (isFolderLongPressTriggered) {
+        isFolderLongPressTriggered = false;
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      navigateToFolder(folderId);
+    }
+
+    function handleFolderTouchStart(event, folderId) {
+      if (event.touches && event.touches.length > 0) {
+        folderTouchStartX = event.touches[0].clientX;
+        folderTouchStartY = event.touches[0].clientY;
+      }
+      isFolderLongPressTriggered = false;
+      if (folderLongPressTimer) {
+        clearTimeout(folderLongPressTimer);
+        folderLongPressTimer = null;
+      }
+      // Tahan 1.5 detik (1500ms) sama dengan seleksi berkas
+      folderLongPressTimer = setTimeout(() => {
+        isFolderLongPressTriggered = true;
+        triggerHaptic();
+        openFolderActionModal(folderId);
+        setTimeout(() => { isFolderLongPressTriggered = false; }, 400);
+      }, 1500);
+    }
+
+    function handleFolderTouchMove(event) {
+      if (!folderLongPressTimer) return;
+      if (event.touches && event.touches.length > 0) {
+        const moveX = Math.abs(event.touches[0].clientX - folderTouchStartX);
+        const moveY = Math.abs(event.touches[0].clientY - folderTouchStartY);
+        // Batalkan jika jari bergeser (scroll) lebih dari 8px
+        if (moveX > 8 || moveY > 8) {
+          clearTimeout(folderLongPressTimer);
+          folderLongPressTimer = null;
+        }
+      }
+    }
+
+    function handleFolderTouchEnd() {
+      if (folderLongPressTimer) {
+        clearTimeout(folderLongPressTimer);
+        folderLongPressTimer = null;
+      }
+    }
+
+    function handleFolderTouchCancel() {
+      if (folderLongPressTimer) {
+        clearTimeout(folderLongPressTimer);
+        folderLongPressTimer = null;
+      }
+    }
+
+    function openFolderActionModal(folderId) {
+      triggerHaptic();
+      const fld = (driveData.folders || []).find(x => x.id === folderId);
+      if (!fld) return;
+      activeModalFolder = fld;
+      document.getElementById('folderActionName').innerText = fld.name || 'Folder';
+      document.getElementById('folderActionMeta').innerText = `${fld.file_count || 0} berkas di dalam folder ini`;
+      document.getElementById('folderActionModal').classList.add('active');
+    }
+
+    function closeFolderActionModal(e) {
+      if (!e || e.target?.id === 'folderActionModal' || e.target?.classList?.contains('sheet-handle') || !e.target) {
+        document.getElementById('folderActionModal').classList.remove('active');
+        activeModalFolder = null;
+      }
+    }
+
+    function actionOpenFolderFromModal() {
+      if (!activeModalFolder) return;
+      const fldId = activeModalFolder.id;
+      closeFolderActionModal();
+      navigateToFolder(fldId);
+    }
+
+    function actionRenameFolderFromModal() {
+      if (!activeModalFolder) return;
+      const fld = activeModalFolder;
+      closeFolderActionModal();
+      openPromptModal({
+        title: '✏️ Ubah Nama Folder',
+        sub: 'Ketik nama folder baru:',
+        placeholder: 'Nama folder...',
+        defaultValue: fld.name,
+        onConfirm: async (newName) => {
+          if (!newName || !newName.trim()) return;
+          try {
+            const res = await fetch('/api/rename', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: fld.id,
+                new_name: newName.trim(),
+                type: 'folder',
+                user_id: userId
+              })
+            });
+            const data = await res.json();
+            if (data.ok) {
+              showToast(`✅ Nama folder berhasil diubah!`);
+              await loadDriveData();
+            } else {
+              alert('Gagal mengubah nama folder: ' + (data.error || 'Unknown error'));
+            }
+          } catch (err) {
+            alert('Gagal mengubah nama folder: ' + err);
+          }
+        }
+      });
+    }
+
+    function actionDeleteFolderFromModal() {
+      if (!activeModalFolder) return;
+      const fld = activeModalFolder;
+      if (fld.name === '📥 File Masuk' || fld.name === 'File Masuk') {
+        alert('Folder sistem "📥 File Masuk" tidak dapat dihapus.');
+        return;
+      }
+      closeFolderActionModal();
+      openConfirmModal({
+        title: `📁 Hapus Folder "${fld.name}"?`,
+        msg: `Folder ini berisi ${fld.file_count || 0} berkas. Menghapus folder akan memindahkan seluruh berkas di dalamnya ke Tempat Sampah.`,
+        confirmText: 'Ya, Hapus Folder',
+        onConfirm: async () => {
+          try {
+            const res = await fetch('/api/batch_delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                folder_ids: [fld.id],
+                user_id: userId
+              })
+            });
+            const data = await res.json();
+            if (data.ok) {
+              showToast(`✅ Folder "${fld.name}" berhasil dihapus!`);
+              await loadDriveData();
+            } else {
+              alert('Gagal menghapus folder: ' + (data.error || 'Unknown error'));
+            }
+          } catch (err) {
+            alert('Gagal menghapus folder: ' + err);
+          }
+        }
+      });
+    }
+
     function toggleSelectMode() {
       triggerHaptic();
       isSelectMode = !isSelectMode;
@@ -3277,10 +3489,12 @@
     }
 
     // Generic Confirm Modal Logic (Deletion)
-    function openConfirmModal({ title, msg, onConfirm }) {
+    function openConfirmModal({ title, msg, confirmText = 'Hapus Permanen', onConfirm }) {
       triggerHaptic();
       document.getElementById('confirmModalTitle').innerText = title;
       document.getElementById('confirmModalMsg').innerText = msg;
+      const confirmBtn = document.getElementById('btnExecuteConfirm');
+      if (confirmBtn) confirmBtn.innerText = confirmText;
       confirmCallback = onConfirm;
       document.getElementById('genericConfirmModal').classList.add('active');
     }
@@ -3289,6 +3503,8 @@
       if (!e || e.target?.id === 'genericConfirmModal' || e.target?.classList?.contains('sheet-handle') || !e.target) {
         document.getElementById('genericConfirmModal').classList.remove('active');
         confirmCallback = null;
+        const confirmBtn = document.getElementById('btnExecuteConfirm');
+        if (confirmBtn) confirmBtn.innerText = 'Hapus Permanen';
       }
     }
 
