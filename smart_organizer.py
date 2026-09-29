@@ -328,7 +328,9 @@ def get_file_tags(file_obj: dict) -> set[str]:
     _, custom_note, custom_tags = parse_file_metadata(file_obj.get("mime_type"))
     if custom_tags:
         for t in custom_tags:
-            tags.add(t.lower())
+            clean_t = t.lower().lstrip("#")
+            tags.add(clean_t)
+            tags.add(f"#{clean_t}")
     if custom_note:
         for word in re.findall(r'\w+', custom_note.lower()):
             if len(word) > 2:
@@ -357,9 +359,10 @@ def smart_search(query: str, files: list[dict]) -> list[dict]:
         matched_tokens = 0
         token_score = 0
 
-        for tok in tokens:
+        for raw_tok in tokens:
+            tok = raw_tok.lstrip("#")
             # Direct tag or substring match
-            if tok in tags or any(tok == tag or (len(tok) >= 3 and tok in tag) for tag in tags):
+            if tok in tags or raw_tok in tags or any(tok == tag or (len(tok) >= 3 and tok in tag) for tag in tags):
                 matched_tokens += 1
                 token_score += 30
             elif tok in SYNONYMS:
