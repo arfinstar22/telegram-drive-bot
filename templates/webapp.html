@@ -1929,9 +1929,9 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Unduh
           </button>
-          <button class="btn btn-secondary" id="modalShareBtn" onclick="copyShareLink()">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-            Salin Link
+          <button class="btn btn-secondary" id="modalShareBtn" onclick="openFileShareModal()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Bagikan Link
           </button>
         </div>
         <div class="sheet-action-row" style="grid-template-columns: 1fr 1fr;">
@@ -2070,6 +2070,48 @@
         <div style="margin-top: 4px;">
           <button class="btn btn-secondary" style="width: 100%; justify-content: center; padding: 11px;" onclick="closeFolderActionModal()">Batal</button>
         </div>
+      </div>
+    </div>
+  <!-- File Public Share Modal Sheet -->
+  <div class="modal-overlay" id="fileShareModal" onclick="closeFileShareModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <h3 class="sheet-title" style="margin-bottom: 0;">🔗 Link Berbagi Publik</h3>
+        <span class="tag-pill" id="fileShareStatusPill" style="color: var(--emerald); border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.1);">Aktif</span>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 14px;" id="fileShareSubText">
+        Siapapun yang memiliki link ini dapat melihat pratinjau & mengunduh berkas secara langsung tanpa perlu akun Telegram atau membuka bot.
+      </p>
+
+      <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; margin-bottom: 6px; text-transform: uppercase;">Link Halaman Web (Pratinjau & Download):</div>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="fileShareWebUrlInput" readonly style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--accent); outline: none;">
+          <button class="btn btn-secondary" onclick="copyFileShareLink('web')" style="padding: 0 12px; font-size: 0.76rem; flex-shrink: 0;">Salin</button>
+        </div>
+      </div>
+
+      <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 16px;">
+        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; margin-bottom: 6px; text-transform: uppercase;">Direct Download Link (Langsung Unduh Otomatis):</div>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="fileShareDirectUrlInput" readonly style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--emerald); outline: none;">
+          <button class="btn btn-secondary" onclick="copyFileShareLink('direct')" style="padding: 0 12px; font-size: 0.76rem; flex-shrink: 0;">Salin</button>
+        </div>
+      </div>
+
+      <div class="sheet-actions" style="gap: 8px;">
+        <div class="sheet-action-row">
+          <button class="btn btn-primary" onclick="openSharedFileInNewTab()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Buka Halaman Web
+          </button>
+          <button class="btn btn-danger" onclick="revokeCurrentFileShare()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Cabut Link
+          </button>
+        </div>
+        <button class="btn btn-secondary" style="width: 100%; margin-top: 2px;" onclick="closeFileShareModal()">Tutup</button>
       </div>
     </div>
   </div>
@@ -3245,17 +3287,87 @@
       }, 3500);
     }
 
-    function copyShareLink() {
+    let currentShareData = null;
+
+    async function openFileShareModal() {
       triggerHaptic();
       if (!activeModalFile) return;
-      const shareUrl = `https://t.me/darfinstoragebot?start=fi_${activeModalFile.id}`;
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        if (tg?.showPopup) {
-          tg.showPopup({ message: 'Tautan file berhasil disalin ke clipboard!' });
+      const fileId = activeModalFile.id;
+
+      try {
+        const res = await fetch('/api/file_share_link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_id: fileId, user_id: userId, action: 'get' })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          currentShareData = data;
+          document.getElementById('fileShareWebUrlInput').value = data.share_url;
+          document.getElementById('fileShareDirectUrlInput').value = data.direct_download_url;
+          const statusPill = document.getElementById('fileShareStatusPill');
+          statusPill.innerText = 'Aktif';
+          statusPill.style.color = 'var(--emerald)';
+          document.getElementById('fileShareModal').classList.add('active');
         } else {
-          alert('Tautan disalin ke clipboard!');
+          alert('Gagal membuat tautan berbagi: ' + (data.error || 'Unknown error'));
         }
+      } catch (err) {
+        alert('Gagal membuat tautan berbagi: ' + err);
+      }
+    }
+
+    function closeFileShareModal(e) {
+      if (!e || e.target?.id === 'fileShareModal' || e.target?.classList?.contains('sheet-handle') || !e.target) {
+        document.getElementById('fileShareModal').classList.remove('active');
+      }
+    }
+
+    function copyFileShareLink(type) {
+      triggerHaptic();
+      if (!currentShareData) return;
+      const url = type === 'direct' ? currentShareData.direct_download_url : currentShareData.share_url;
+      navigator.clipboard.writeText(url).then(() => {
+        showToast(type === 'direct' ? '✅ Direct download link disalin!' : '✅ Link berbagi web disalin!');
+      }).catch(() => {
+        prompt('Salin tautan berikut:', url);
       });
+    }
+
+    function openSharedFileInNewTab() {
+      triggerHaptic();
+      if (!currentShareData?.share_url) return;
+      window.open(currentShareData.share_url, '_blank');
+    }
+
+    async function revokeCurrentFileShare() {
+      triggerHaptic();
+      if (!activeModalFile) return;
+      if (!confirm('Apakah Anda yakin ingin menonaktifkan tautan publik berkas ini?')) return;
+
+      try {
+        const res = await fetch('/api/file_share_link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_id: activeModalFile.id, user_id: userId, action: 'revoke' })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('❌ Tautan publik berhasil dicabut!');
+          document.getElementById('fileShareWebUrlInput').value = 'Tautan telah dinonaktifkan';
+          document.getElementById('fileShareDirectUrlInput').value = 'Tautan telah dinonaktifkan';
+          const statusPill = document.getElementById('fileShareStatusPill');
+          statusPill.innerText = 'Nonaktif';
+          statusPill.style.color = 'var(--rose)';
+          setTimeout(() => {
+            closeFileShareModal();
+          }, 1200);
+        } else {
+          alert('Gagal mencabut tautan: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Gagal mencabut tautan: ' + err);
+      }
     }
 
     // Direct Web Upload Logic

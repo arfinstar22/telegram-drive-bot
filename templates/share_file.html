@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Unduh Berkas - Darfin Storage</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070B14;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(255, 255, 255, 0.09);
+      --card-hover: rgba(30, 41, 59, 0.85);
+      --accent: #38BDF8;
+      --accent-glow: rgba(56, 189, 248, 0.35);
+      --emerald: #10B981;
+      --emerald-glow: rgba(16, 185, 129, 0.35);
+      --rose: #F43F5E;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --border: rgba(255, 255, 255, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 15% 10%, rgba(56, 189, 248, 0.12), transparent 40%),
+        radial-gradient(circle at 85% 90%, rgba(99, 102, 241, 0.12), transparent 45%);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    .share-container {
+      width: 100%;
+      max-width: 520px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border-radius: 24px;
+      padding: 30px 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 35px rgba(56, 189, 248, 0.12);
+      animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .share-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-title span {
+      background: linear-gradient(135deg, #38BDF8, #818CF8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      color: var(--emerald);
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+    }
+
+    .preview-card {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 180px;
+    }
+
+    .preview-media-img {
+      width: 100%;
+      max-height: 320px;
+      object-fit: contain;
+      display: block;
+      background: #000;
+    }
+
+    .preview-media-video {
+      width: 100%;
+      max-height: 320px;
+      background: #000;
+      display: block;
+    }
+
+    .preview-media-audio {
+      width: 100%;
+      padding: 20px;
+    }
+
+    .preview-doc-box {
+      padding: 32px 20px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .preview-doc-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+    }
+
+    .file-details {
+      margin-bottom: 24px;
+    }
+
+    .file-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.4;
+      margin-bottom: 8px;
+      word-break: break-word;
+    }
+
+    .file-meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .meta-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 500;
+      color: #e2e8f0;
+    }
+
+    .actions-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 13px 18px;
+      border-radius: 12px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+      color: #fff;
+      box-shadow: 0 4px 18px rgba(56, 189, 248, 0.35);
+    }
+
+    .btn-primary:hover, .btn-primary:active {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 22px rgba(56, 189, 248, 0.45);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: #fff;
+    }
+
+    .btn-secondary:hover, .btn-secondary:active {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-telegram {
+      background: rgba(41, 182, 246, 0.12);
+      border: 1px solid rgba(41, 182, 246, 0.25);
+      color: #38bdf8;
+    }
+
+    .btn-telegram:hover, .btn-telegram:active {
+      background: rgba(41, 182, 246, 0.2);
+    }
+
+    .share-footer {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Toast Notification */
+    .toast-pill {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(50px);
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--accent);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 30px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 15px var(--accent-glow);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s ease;
+      z-index: 1000;
+    }
+
+    .toast-pill.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* Skeleton Loading State */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+      background-size: 200% 100%;
+      animation: skeletonLoading 1.5s infinite;
+      border-radius: 8px;
+    }
+
+    @keyframes skeletonLoading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="share-container" id="mainContainer">
+    <!-- Header -->
+    <div class="share-header">
+      <div class="brand-title">
+        ⚡ <span>Darfin Storage</span>
+      </div>
+      <div class="status-badge" id="statusBadge">
+        <div class="status-dot"></div>
+        <span>Publik Direct</span>
+      </div>
+    </div>
+
+    <!-- Media Preview -->
+    <div class="preview-card" id="previewArea">
+      <div class="preview-doc-box" id="loadingState">
+        <div class="skeleton" style="width: 54px; height: 54px; border-radius: 14px; margin-bottom: 12px;"></div>
+        <div class="skeleton" style="width: 180px; height: 16px; margin-bottom: 8px;"></div>
+        <div class="skeleton" style="width: 100px; height: 12px;"></div>
+      </div>
+    </div>
+
+    <!-- Details -->
+    <div class="file-details">
+      <h1 class="file-title" id="fileTitle">Memuat informasi berkas...</h1>
+      <div class="file-meta-row" id="fileMetaRow">
+        <span class="meta-pill" id="fileSizePill">-</span>
+        <span class="meta-pill" id="fileTypePill">-</span>
+        <span id="fileDateText" style="font-size: 0.76rem;">-</span>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions-wrap">
+      <a href="#" id="btnDownload" class="btn btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Unduh Berkas Langsung
+      </a>
+
+      <button id="btnCopyDirect" class="btn btn-secondary" onclick="copyDirectLink()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        Salin Link Unduh Direct
+      </button>
+
+      <a href="#" id="btnTelegram" class="btn btn-telegram" style="display: none;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Buka di Telegram Bot
+      </a>
+    </div>
+
+    <!-- Footer -->
+    <div class="share-footer">
+      Disimpan secara aman via <strong>Darfin Cloud Storage</strong>.<br>
+      Dapat diunduh langsung tanpa perlu login akun atau bot.
+    </div>
+  </div>
+
+  <div class="toast-pill" id="toastPill">✅ Link berhasil disalin!</div>
+
+  <script>
+    let fileData = null;
+    let shareToken = '';
+
+    // Extract token from URL path (/s/{token})
+    function getTokenFromUrl() {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      const sIdx = parts.indexOf('s');
+      if (sIdx !== -1 && parts[sIdx + 1]) {
+        return parts[sIdx + 1];
+      }
+      const params = new URLSearchParams(window.location.search);
+      return params.get('token') || '';
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastPill');
+      toast.innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function copyDirectLink() {
+      if (!shareToken) return;
+      const dlUrl = `${window.location.origin}/s/${shareToken}?download=1`;
+      navigator.clipboard.writeText(dlUrl).then(() => {
+        showToast('✅ Link unduh direct berhasil disalin!');
+      }).catch(() => {
+        showToast('Link: ' + dlUrl);
+      });
+    }
+
+    async function loadFileInfo() {
+      shareToken = getTokenFromUrl();
+      if (!shareToken) {
+        showError('Token link tidak valid.');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/share_file_info?token=${shareToken}`);
+        const data = await res.json();
+        if (!data.ok || !data.file) {
+          showError(data.error || 'Berkas tidak ditemukan atau telah dihapus.');
+          return;
+        }
+
+        fileData = data.file;
+        renderFile(fileData);
+      } catch (err) {
+        showError('Gagal memuat data berkas: ' + err.message);
+      }
+    }
+
+    function renderFile(f) {
+      document.title = `${f.name} - Unduh Berkas`;
+      document.getElementById('fileTitle').innerText = f.name;
+      document.getElementById('fileSizePill').innerText = f.size_formatted;
+      document.getElementById('fileTypePill').innerText = (f.type || 'Dokumen').toUpperCase();
+      document.getElementById('fileDateText').innerText = f.created_at ? `Diunggah ${f.created_at}` : '';
+
+      const dlBtn = document.getElementById('btnDownload');
+      const directDlUrl = `/s/${shareToken}?download=1`;
+      dlBtn.href = directDlUrl;
+      dlBtn.setAttribute('download', f.name);
+
+      if (f.bot_url) {
+        const tgBtn = document.getElementById('btnTelegram');
+        tgBtn.href = f.bot_url;
+        tgBtn.style.display = 'flex';
+      }
+
+      const previewArea = document.getElementById('previewArea');
+      const type = (f.type || '').toLowerCase();
+      const previewUrl = f.preview_url || directDlUrl;
+
+      if (type === 'photo') {
+        previewArea.innerHTML = `<img class="preview-media-img" src="${previewUrl}" alt="${f.name}" onerror="renderDocFallback()">`;
+      } else if (type === 'video') {
+        previewArea.innerHTML = `
+          <video class="preview-media-video" controls playsinline preload="metadata">
+            <source src="${directDlUrl}" type="${f.mime_type || 'video/mp4'}">
+            Browser Anda tidak mendukung pemutar video.
+          </video>
+        `;
+      } else if (type === 'audio') {
+        previewArea.innerHTML = `
+          <div class="preview-doc-box" style="padding-bottom: 10px;">
+            <div class="preview-doc-icon" style="color: #a855f7;">🎵</div>
+            <div style="font-size: 0.85rem; font-weight: 600; color: #fff;">Pemutar Audio</div>
+          </div>
+          <audio class="preview-media-audio" controls style="width: 90%; margin-bottom: 14px;">
+            <source src="${directDlUrl}" type="${f.mime_type || 'audio/mpeg'}">
+          </audio>
+        `;
+      } else {
+        renderDocFallback();
+      }
+    }
+
+    function renderDocFallback() {
+      const type = fileData?.type || 'dokumen';
+      let icon = '📄';
+      if (type.includes('pdf')) icon = '📑';
+      else if (type.includes('zip') || type.includes('rar') || type.includes('7z')) icon = '📦';
+      else if (type.includes('code') || type.includes('text')) icon = '💻';
+
+      document.getElementById('previewArea').innerHTML = `
+        <div class="preview-doc-box">
+          <div class="preview-doc-icon">${icon}</div>
+          <div style="font-size: 0.85rem; font-weight: 600; color: #cbd5e1;">Berkas Siap Diunduh</div>
+          <div style="font-size: 0.74rem; color: var(--text-muted); max-width: 320px;">
+            Klik tombol di bawah untuk mengunduh langsung ke perangkat Anda.
+          </div>
+        </div>
+      `;
+    }
+
+    function showError(msg) {
+      document.getElementById('mainContainer').innerHTML = `
+        <div style="text-align: center; padding: 24px 10px;">
+          <div style="font-size: 3rem; margin-bottom: 12px;">⚠️</div>
+          <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; color: var(--rose); margin-bottom: 8px;">Tautan Tidak Ditemukan</h2>
+          <p style="color: var(--text-muted); font-size: 0.86rem; line-height: 1.5; margin-bottom: 24px;">${msg}</p>
+          <a href="/" class="btn btn-secondary" style="display: inline-flex; width: auto; padding: 10px 24px;">Kembali ke Beranda</a>
+        </div>
+      `;
+    }
+
+    window.addEventListener('DOMContentLoaded', loadFileInfo);
+  </script>
+</body>
+</html>

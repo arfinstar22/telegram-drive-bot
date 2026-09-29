@@ -320,9 +320,13 @@ def get_or_create_file_share_token(file_id: int) -> str | None:
     f = get_file(file_id)
     if not f:
         return None
-    token = f.get("share_token")
-    if token:
-        return token
+    raw = f.get("share_token")
+    if raw:
+        from utils import parse_share_token
+        clean = parse_share_token(raw)["token"]
+        if clean:
+            return clean
+        return raw
     token = secrets.token_urlsafe(8)
     db.table("files").update({"share_token": token, "updated_at": _now()}).eq("id", file_id).execute()
     return token

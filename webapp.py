@@ -23,6 +23,7 @@ log = logging.getLogger(__name__)
 
 TEMPLATE_PATH = Path(__file__).parent / "templates" / "webapp.html"
 DROPZONE_TEMPLATE_PATH = Path(__file__).parent / "templates" / "dropzone.html"
+SHARE_FILE_TEMPLATE_PATH = Path(__file__).parent / "templates" / "share_file.html"
 
 
 class BaseApiHandler(tornado.web.RequestHandler):
@@ -68,6 +69,65 @@ class DropzonePageHandler(tornado.web.RequestHandler):
         except Exception as e:
             self.set_status(500)
             self.write(f"Error loading Dropzone: {e}")
+
+
+class PublicFileSharePageHandler(tornado.web.RequestHandler):
+    """Serve the public file view/download page without Telegram bot or auth."""
+    async def get(self, token: str):
+        try:
+            is_download = self.get_argument("download", "0") in ("1", "true")
+            f = db.get_file_by_share_token(token)
+            if not f or f.get("is_trashed"):
+                self.set_status(404)
+                self.set_header("Content-Type", "text/html; charset=utf-8")
+                self.write("""
+                <!DOCTYPE html>
+                <html lang="id">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Berkas Tidak Ditemukan - Darfin Storage</title>
+                    <style>
+                        body { background: #070B14; color: #F8FAFC; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; }
+                        .card { background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px 24px; max-width: 400px; }
+                        h2 { color: #f43f5e; margin-bottom: 8px; }
+                        p { color: #94A3B8; font-size: 0.9rem; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h2>⚠️ Tautan Tidak Valid</h2>
+                        <p>Berkas ini tidak ditemukan, telah dihapus, atau tautan publiknya telah dinonaktifkan oleh pemilik.</p>
+                    </div>
+                </body>
+                </html>
+                """)
+                return
+
+            if is_download:
+                try:
+                    bot = get_shared_bot()
+                    tg_file = await bot.get_file(f["file_id"])
+                    if tg_file and tg_file.file_path:
+                        self.redirect(tg_file.file_path)
+                        return
+                except Exception as ex:
+                    log.warning("Could not fetch direct CDN for share download: %s", ex)
+
+                bot_me = await get_shared_bot().get_me()
+                self.redirect(f"https://t.me/{bot_me.username}?start=sf_{token}")
+                return
+
+            if SHARE_FILE_TEMPLATE_PATH.exists():
+                html = SHARE_FILE_TEMPLATE_PATH.read_text(encoding="utf-8")
+            else:
+                html = "<h1>Share Template Not Found</h1>"
+            self.set_header("Content-Type", "text/html; charset=utf-8")
+            self.write(html)
+        except Exception as e:
+            log.exception("Error in PublicFileSharePageHandler: %s", e)
+            self.set_status(500)
+            self.write(f"Error loading shared file: {e}")
 
 
 class ApiDriveHandler(BaseApiHandler):
@@ -869,6 +929,95 @@ class ApiFolderDropzoneHandler(BaseApiHandler):
             self.write(json.dumps({"error": str(e)}))
 
 
+class ApiFileShareLinkHandler(BaseApiHandler):
+    """Manage file public share link (get/create/revoke)."""
+    async def post(self):
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            file_id = data.get("file_id")
+            user_id = data.get("user_id")
+            action = data.get("action", "get")
+
+            if not file_id or not user_id:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Missing file_id or user_id"}))
+                return
+
+            f = db.get_file(int(file_id))
+            if not f or f["user_id"] != int(user_id):
+                self.set_status(403)
+                self.write(json.dumps({"error": "Berkas tidak ditemukan atau akses ditolak"}))
+                return
+
+            if action == "revoke":
+                db.revoke_file_share_token(int(file_id))
+                self.write(json.dumps({"ok": True, "active": False}))
+                return
+
+            token = db.get_or_create_file_share_token(int(file_id))
+            base_url = f"{self.request.protocol}://{self.request.host}" if self.request.host else (WEBHOOK_URL.rstrip('/') if WEBHOOK_URL else "https://telegram-drive-bot-0upd.onrender.com")
+            share_url = f"{base_url}/s/{token}"
+            direct_dl_url = f"{base_url}/s/{token}?download=1"
+
+            self.write(json.dumps({
+                "ok": True,
+                "active": True,
+                "share_token": token,
+                "share_url": share_url,
+                "direct_download_url": direct_dl_url,
+                "file_name": f["file_name"],
+                "file_size_formatted": format_size(f.get("file_size", 0)),
+                "file_type": f.get("file_type", "document")
+            }))
+        except Exception as e:
+            log.exception("Error in ApiFileShareLinkHandler: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
+class ApiShareFileInfoHandler(BaseApiHandler):
+    """Fetch public file metadata by share token."""
+    async def get(self):
+        token = self.get_argument("token", None)
+        if not token:
+            self.set_status(400)
+            self.write(json.dumps({"error": "Missing token"}))
+            return
+
+        f = db.get_file_by_share_token(token)
+        if not f or f.get("is_trashed"):
+            self.set_status(404)
+            self.write(json.dumps({"error": "Berkas tidak ditemukan atau telah dihapus."}))
+            return
+
+        preview_url = None
+        bot = get_shared_bot()
+        try:
+            tg_file = await bot.get_file(f["file_id"])
+            if tg_file and tg_file.file_path:
+                preview_url = tg_file.file_path
+        except Exception:
+            pass
+
+        bot_me = await bot.get_me()
+        bot_username = bot_me.username if bot_me else "darfinstoragebot"
+
+        self.write(json.dumps({
+            "ok": True,
+            "file": {
+                "name": f["file_name"],
+                "size_formatted": format_size(f.get("file_size", 0)),
+                "size_bytes": f.get("file_size", 0),
+                "type": f.get("file_type", "document"),
+                "mime_type": f.get("mime_type", ""),
+                "created_at": f.get("created_at", "")[:10],
+                "preview_url": preview_url,
+                "download_url": f"/s/{token}?download=1",
+                "bot_url": f"https://t.me/{bot_username}?start=sf_{token}"
+            }
+        }))
+
+
 class ApiTrashHandler(BaseApiHandler):
     """List all trashed files for a user."""
     async def get(self):
@@ -1020,6 +1169,9 @@ def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
         (r"/api/dropzone/info/?", ApiDropzoneInfoHandler),
         (r"/api/dropzone/upload/?", ApiDropzoneUploadHandler),
         (r"/api/folder_dropzone/?", ApiFolderDropzoneHandler),
+        (r"/s/([a-zA-Z0-9_\-]+)/?", PublicFileSharePageHandler),
+        (r"/api/file_share_link/?", ApiFileShareLinkHandler),
+        (r"/api/share_file_info/?", ApiShareFileInfoHandler),
         (r"/api/trash/?", ApiTrashHandler),
         (r"/api/restore/?", ApiRestoreHandler),
         (r"/api/empty_trash/?", ApiEmptyTrashHandler),
@@ -1074,6 +1226,9 @@ def start_standalone_webapp_server(port: int = 10000):
         (r"/api/dropzone/info/?", ApiDropzoneInfoHandler),
         (r"/api/dropzone/upload/?", ApiDropzoneUploadHandler),
         (r"/api/folder_dropzone/?", ApiFolderDropzoneHandler),
+        (r"/s/([a-zA-Z0-9_\-]+)/?", PublicFileSharePageHandler),
+        (r"/api/file_share_link/?", ApiFileShareLinkHandler),
+        (r"/api/share_file_info/?", ApiShareFileInfoHandler),
         (r"/api/trash/?", ApiTrashHandler),
         (r"/api/restore/?", ApiRestoreHandler),
         (r"/api/empty_trash/?", ApiEmptyTrashHandler),
