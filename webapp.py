@@ -103,6 +103,7 @@ class ApiDriveHandler(BaseApiHandler):
         files_data = []
         for f in files_raw:
             _, note, tags = parse_file_metadata(f.get("mime_type"))
+            has_thumb = bool(f.get("thumbnail_file_id") or f.get("file_type") == "photo")
             files_data.append({
                 "id": f["id"],
                 "file_name": f.get("file_name", "File"),
@@ -113,6 +114,8 @@ class ApiDriveHandler(BaseApiHandler):
                 "created_at": f.get("created_at", ""),
                 "note": note,
                 "tags": tags,
+                "has_thumb": has_thumb,
+                "thumb_url": f"/api/thumbnail?file_id={f['id']}" if has_thumb else None,
                 "stream_url": f"/api/download?file_id={f['id']}&user_id={user_id}" if f.get("file_type") == "photo" else None,
             })
 
@@ -123,6 +126,47 @@ class ApiDriveHandler(BaseApiHandler):
             "files": files_data,
         }
         self.write(json.dumps(response_data))
+
+
+class ApiThumbnailHandler(tornado.web.RequestHandler):
+    """Serve thumbnail image for video, photo, or document files."""
+    async def get(self):
+        file_id_raw = self.get_argument("file_id", None)
+        if not file_id_raw or not file_id_raw.isdigit():
+            self.set_status(400)
+            self.write("Invalid file_id")
+            return
+
+        f = db.get_file(int(file_id_raw))
+        if not f:
+            self.set_status(404)
+            self.write("File not found")
+            return
+
+        thumb_id = f.get("thumbnail_file_id")
+        if not thumb_id and f.get("file_type") == "photo":
+            thumb_id = f.get("file_id")
+
+        if not thumb_id:
+            self.set_status(404)
+            self.write("No thumbnail")
+            return
+
+        try:
+            bot = Bot(BOT_TOKEN)
+            tg_file = await bot.get_file(thumb_id)
+            if not tg_file or not tg_file.file_path:
+                self.set_status(404)
+                return
+
+            client = tornado.httpclient.AsyncHTTPClient()
+            resp = await client.fetch(tg_file.file_path)
+            self.set_header("Content-Type", "image/jpeg")
+            self.set_header("Cache-Control", "public, max-age=604800, immutable")
+            self.write(resp.body)
+        except Exception as e:
+            log.warning("Could not fetch thumbnail for file %s: %s", f["id"], e)
+            self.set_status(404)
 
 
 class ApiDownloadHandler(tornado.web.RequestHandler):
@@ -429,21 +473,25 @@ class ApiUploadHandler(BaseApiHandler):
                 size = len(body)
 
                 lower_name = filename.lower()
+                thumb_fid = None
                 if any(lower_name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
                     ftype = "photo"
                     msg = await bot.send_photo(chat_id=user_id, photo=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
                     fid = msg.photo[-1].file_id
                     fuid = msg.photo[-1].file_unique_id
+                    thumb_fid = msg.photo[0].file_id if len(msg.photo) > 1 else None
                 elif any(lower_name.endswith(ext) for ext in [".mp4", ".mov", ".mkv", ".webm"]):
                     ftype = "video"
                     msg = await bot.send_video(chat_id=user_id, video=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
                     fid = msg.video.file_id
                     fuid = msg.video.file_unique_id
+                    thumb_fid = msg.video.thumbnail.file_id if msg.video.thumbnail else None
                 elif any(lower_name.endswith(ext) for ext in [".mp3", ".wav", ".flac", ".m4a"]):
                     ftype = "audio"
                     msg = await bot.send_audio(chat_id=user_id, audio=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
                     fid = msg.audio.file_id
                     fuid = msg.audio.file_unique_id
+                    thumb_fid = msg.audio.thumbnail.file_id if msg.audio.thumbnail else None
                 else:
                     ftype = "document"
                     from io import BytesIO
@@ -452,6 +500,7 @@ class ApiUploadHandler(BaseApiHandler):
                     msg = await bot.send_document(chat_id=user_id, document=bio, filename=filename, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
                     fid = msg.document.file_id
                     fuid = msg.document.file_unique_id
+                    thumb_fid = msg.document.thumbnail.file_id if msg.document.thumbnail else None
 
                 db.save_file(
                     user_id=user_id,
@@ -462,6 +511,7 @@ class ApiUploadHandler(BaseApiHandler):
                     file_size=size,
                     file_type=ftype,
                     mime_type=content_type,
+                    thumbnail_file_id=thumb_fid,
                 )
                 saved_count += 1
 
@@ -520,6 +570,7 @@ def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
         (r"/", WebAppPageHandler),
         (r"/webapp/?", WebAppPageHandler),
         (r"/api/drive/?", ApiDriveHandler),
+        (r"/api/thumbnail/?", ApiThumbnailHandler),
         (r"/api/download/?", ApiDownloadHandler),
         (r"/api/star/?", ApiStarHandler),
         (r"/api/send_to_chat/?", ApiSendToChatHandler),
@@ -563,6 +614,7 @@ def start_standalone_webapp_server(port: int = 10000):
         (r"/", WebAppPageHandler),
         (r"/webapp/?", WebAppPageHandler),
         (r"/api/drive/?", ApiDriveHandler),
+        (r"/api/thumbnail/?", ApiThumbnailHandler),
         (r"/api/download/?", ApiDownloadHandler),
         (r"/api/star/?", ApiStarHandler),
         (r"/api/send_to_chat/?", ApiSendToChatHandler),

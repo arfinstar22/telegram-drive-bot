@@ -403,7 +403,7 @@
 
     .file-thumb-wrap {
       width: 100%;
-      height: 96px;
+      height: 108px;
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.03);
       display: flex;
@@ -418,6 +418,53 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
+      transition: transform 0.2s ease;
+    }
+
+    .file-card:hover .file-thumb-img {
+      transform: scale(1.05);
+    }
+
+    .video-play-badge {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(6px);
+      border: 1.5px solid rgba(255, 255, 255, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+      transition: transform 0.15s, background 0.15s;
+    }
+
+    .file-card:hover .video-play-badge {
+      transform: translate(-50%, -50%) scale(1.15);
+      background: rgba(56, 189, 248, 0.85);
+    }
+
+    .video-modal-play-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: rgba(56, 189, 248, 0.9);
+      border: 2px solid #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(56, 189, 248, 0.6);
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .video-modal-play-btn:active {
+      transform: scale(0.92);
     }
 
     .file-type-badge {
@@ -1777,8 +1824,16 @@
       const tagsHtml = (f.tags || []).slice(0, 2).map(t => `<span class="tag-pill">#${escapeHtml(t)}</span>`).join('');
       
       let thumbContent = getFileIconSvg(f.file_type);
-      if (f.file_type === 'photo' && f.stream_url) {
-        thumbContent = `<img class="file-thumb-img" src="${f.stream_url}" loading="lazy" alt="${escapeHtml(f.file_name)}">`;
+      const thumbUrl = f.thumb_url || (f.file_type === 'photo' ? f.stream_url : null);
+      if (thumbUrl) {
+        thumbContent = `
+          <img class="file-thumb-img" src="${thumbUrl}" loading="lazy" alt="${escapeHtml(f.file_name)}" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='none'; this.parentElement.insertAdjacentHTML('afterbegin', getFileIconSvg('${f.file_type}'));">
+          ${f.file_type === 'video' ? `
+            <div class="video-play-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#FFFFFF"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+            </div>
+          ` : ''}
+        `;
       }
 
       return `
@@ -1810,6 +1865,11 @@
       const isStarred = f.is_starred ? 'starred' : '';
       const isSelected = selectedFileIds.has(f.id);
       const icon = getFileIconSvg(f.file_type, 20);
+      const rowThumbUrl = f.thumb_url || (f.file_type === 'photo' ? f.stream_url : null);
+      const rowIconContent = rowThumbUrl
+        ? `<img src="${rowThumbUrl}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" alt="${escapeHtml(f.file_name)}" onerror="this.parentElement.innerHTML = getFileIconSvg('${f.file_type}', 20);">`
+        : icon;
+
       return `
         <div class="file-row ${isSelected ? 'selected' : ''}" 
              onclick="handleFileClick(event, ${f.id})"
@@ -1818,8 +1878,8 @@
           <div class="select-checkbox ${isSelected ? 'checked' : ''}" onclick="event.stopPropagation(); toggleSelectFile(${f.id})">
             ${isSelected ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
           </div>
-          <div class="file-row-icon" style="background: rgba(255,255,255,0.05);">
-            ${icon}
+          <div class="file-row-icon" style="background: rgba(255,255,255,0.05); overflow: hidden; padding: 0;">
+            ${rowIconContent}
           </div>
           <div class="file-row-main">
             <div class="file-row-name">${escapeHtml(f.file_name)}</div>
@@ -2014,17 +2074,22 @@
         const isOver20MB = sizeBytes > 20 * 1024 * 1024;
         if (!isOver20MB) {
           previewEl.innerHTML = `
-            <video controls playsinline preload="metadata" style="width: 100%; max-height: 250px; border-radius: 8px; background: #000; display: block;" src="${dlUrl}"></video>
+            <video controls playsinline preload="metadata" poster="${f.thumb_url || ''}" style="width: 100%; max-height: 250px; border-radius: 8px; background: #000; display: block;" src="${dlUrl}"></video>
           `;
         } else {
+          const bannerBg = f.thumb_url
+            ? `background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(15,23,42,0.92) 85%), url('${f.thumb_url}') center/cover no-repeat;`
+            : `background: linear-gradient(180deg, rgba(245, 158, 11, 0.1), rgba(0, 0, 0, 0.5));`;
           previewEl.innerHTML = `
-            <div class="preview-video-large">
-              <div style="font-size: 2.2rem; margin-bottom: 6px;">🎬</div>
-              <div style="font-weight: 700; color: #fff; font-size: 0.95rem;">Video Berukuran Besar (${f.file_size_formatted})</div>
-              <div style="font-size: 0.74rem; color: var(--text-muted); margin: 6px auto 14px; max-width: 380px; line-height: 1.4;">
-                File di atas 20MB dapat ditonton langsung streaming di pemutar video Telegram tanpa limit unduhan bot.
+            <div class="preview-video-large" style="${bannerBg} border-radius: 10px; min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 16px;">
+              <button class="video-modal-play-btn" style="margin-bottom: 12px;" onclick="sendFileToChat()" title="Tonton di Telegram">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#FFFFFF" style="margin-left: 3px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </button>
+              <div style="font-weight: 700; color: #fff; font-size: 0.95rem; text-shadow: 0 2px 8px rgba(0,0,0,0.8);">${escapeHtml(f.file_name)}</div>
+              <div style="font-size: 0.74rem; color: #cbd5e1; margin: 4px auto 12px; max-width: 380px; line-height: 1.4; text-shadow: 0 1px 4px rgba(0,0,0,0.8);">
+                File berukuran ${f.file_size_formatted || ''}. Tonton langsung via video player Telegram tanpa batas kuota bot.
               </div>
-              <button class="btn btn-primary" style="margin: 0 auto; padding: 8px 16px; font-size: 0.8rem;" onclick="sendFileToChat()">
+              <button class="btn btn-primary" style="padding: 7px 16px; font-size: 0.8rem;" onclick="sendFileToChat()">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 Buka & Tonton di Telegram
               </button>
