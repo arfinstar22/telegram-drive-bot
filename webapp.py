@@ -14,7 +14,7 @@ import tornado.web
 import tornado.httputil
 from telegram import Bot
 
-from config import BOT_TOKEN, PORT
+from config import BOT_TOKEN, PORT, WEBHOOK_URL
 import database as db
 import smart_organizer
 from utils import format_size, parse_file_metadata
@@ -22,6 +22,7 @@ from utils import format_size, parse_file_metadata
 log = logging.getLogger(__name__)
 
 TEMPLATE_PATH = Path(__file__).parent / "templates" / "webapp.html"
+DROPZONE_TEMPLATE_PATH = Path(__file__).parent / "templates" / "dropzone.html"
 
 
 class BaseApiHandler(tornado.web.RequestHandler):
@@ -52,6 +53,21 @@ class WebAppPageHandler(tornado.web.RequestHandler):
     def head(self):
         self.set_header("Content-Type", "text/html; charset=utf-8")
         self.set_status(200)
+
+
+class DropzonePageHandler(tornado.web.RequestHandler):
+    """Serve the public Dropzone upload webpage."""
+    def get(self, token: str):
+        try:
+            if DROPZONE_TEMPLATE_PATH.exists():
+                html = DROPZONE_TEMPLATE_PATH.read_text(encoding="utf-8")
+            else:
+                html = "<h1>Dropzone Template Not Found</h1>"
+            self.set_header("Content-Type", "text/html; charset=utf-8")
+            self.write(html)
+        except Exception as e:
+            self.set_status(500)
+            self.write(f"Error loading Dropzone: {e}")
 
 
 class ApiDriveHandler(BaseApiHandler):
@@ -627,6 +643,187 @@ class ApiFileContentHandler(BaseApiHandler):
             self.write(json.dumps({"error": str(e)}))
 
 
+class ApiDropzoneInfoHandler(BaseApiHandler):
+    """Fetch folder details by dropzone share token."""
+    async def get(self):
+        token = self.get_argument("token", None)
+        if not token:
+            self.set_status(400)
+            self.write(json.dumps({"error": "Missing token"}))
+            return
+
+        folder = db.get_folder_by_share_token(token)
+        if not folder:
+            self.set_status(404)
+            self.write(json.dumps({"error": "Link Dropzone tidak valid atau telah dinonaktifkan."}))
+            return
+
+        user = db.get_user(folder["user_id"])
+        owner_name = user.get("first_name", "Darfin Storage") if user else "Darfin Storage"
+
+        self.write(json.dumps({
+            "ok": True,
+            "folder": {
+                "id": folder["id"],
+                "name": folder["name"],
+                "owner_name": owner_name,
+            }
+        }))
+
+
+class ApiDropzoneUploadHandler(BaseApiHandler):
+    """Direct multi-file upload from public Dropzone page."""
+    async def post(self):
+        try:
+            token = self.get_argument("token", None)
+            sender_name = (self.get_argument("sender_name", "") or "").strip() or "Tamu Dropzone"
+
+            if not token:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Missing token"}))
+                return
+
+            folder = db.get_folder_by_share_token(token)
+            if not folder:
+                self.set_status(404)
+                self.write(json.dumps({"error": "Folder Dropzone tidak ditemukan"}))
+                return
+
+            user_id = folder["user_id"]
+            folder_id = folder["id"]
+            folder_name = folder["name"]
+
+            uploaded_files = self.request.files.get("files", [])
+            if not uploaded_files:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Tidak ada berkas yang diunggah"}))
+                return
+
+            bot = get_shared_bot()
+            saved_count = 0
+            total_bytes = 0
+            file_names_summary = []
+
+            for file_info in uploaded_files:
+                filename = file_info["filename"]
+                body = file_info["body"]
+                size = len(body)
+                total_bytes += size
+                file_names_summary.append(filename)
+
+                lower_name = filename.lower()
+                thumb_fid = None
+                caption_note = f"📥 Masuk via Dropzone oleh: {sender_name} ke 📁 {folder_name}"
+
+                if any(lower_name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
+                    ftype = "photo"
+                    msg = await bot.send_photo(chat_id=user_id, photo=body, caption=caption_note)
+                    fid = msg.photo[-1].file_id
+                    fuid = msg.photo[-1].file_unique_id
+                    thumb_fid = msg.photo[0].file_id if len(msg.photo) > 1 else None
+                elif any(lower_name.endswith(ext) for ext in [".mp4", ".mov", ".mkv", ".webm"]):
+                    ftype = "video"
+                    msg = await bot.send_video(chat_id=user_id, video=body, caption=caption_note)
+                    fid = msg.video.file_id
+                    fuid = msg.video.file_unique_id
+                    thumb_fid = msg.video.thumbnail.file_id if msg.video.thumbnail else None
+                elif any(lower_name.endswith(ext) for ext in [".mp3", ".wav", ".flac", ".m4a"]):
+                    ftype = "audio"
+                    msg = await bot.send_audio(chat_id=user_id, audio=body, caption=caption_note)
+                    fid = msg.audio.file_id
+                    fuid = msg.audio.file_unique_id
+                    thumb_fid = msg.audio.thumbnail.file_id if msg.audio.thumbnail else None
+                else:
+                    ftype = "document"
+                    from io import BytesIO
+                    bio = BytesIO(body)
+                    bio.name = filename
+                    msg = await bot.send_document(chat_id=user_id, document=bio, filename=filename, caption=caption_note)
+                    fid = msg.document.file_id
+                    fuid = msg.document.file_unique_id
+                    thumb_fid = msg.document.thumbnail.file_id if msg.document.thumbnail else None
+
+                note = f"Dikirim via Dropzone oleh: {sender_name}"
+                mime_str = f"text/plain;;;{note};;;dropzone"
+                db.save_file(
+                    user_id=user_id,
+                    folder_id=folder_id,
+                    file_id=fid,
+                    file_unique_id=fuid,
+                    file_name=filename,
+                    file_size=size,
+                    file_type=ftype,
+                    mime_type=mime_str,
+                    thumbnail_file_id=thumb_fid,
+                )
+                saved_count += 1
+                await asyncio.sleep(0.2)
+
+            # Send summary notification to owner
+            try:
+                from utils import format_size
+                summary_text = (
+                    f"📥 <b>Dropzone: Berkas Baru Diterima!</b>\n\n"
+                    f"📁 <b>Folder:</b> {folder_name}\n"
+                    f"👤 <b>Pengirim:</b> {sender_name}\n"
+                    f"📦 <b>Jumlah:</b> {saved_count} berkas ({format_size(total_bytes)})\n"
+                    f"📄 <b>Daftar:</b>\n" + "\n".join(f"• {fn}" for fn in file_names_summary[:5])
+                )
+                if len(file_names_summary) > 5:
+                    summary_text += f"\n<i>...dan {len(file_names_summary) - 5} berkas lainnya</i>"
+                await bot.send_message(chat_id=user_id, text=summary_text, parse_mode="HTML")
+            except Exception as alert_err:
+                log.warning("Could not send dropzone notification to owner: %s", alert_err)
+
+            self.write(json.dumps({"ok": True, "count": saved_count}))
+        except Exception as e:
+            log.exception("Error in ApiDropzoneUploadHandler: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
+class ApiFolderDropzoneHandler(BaseApiHandler):
+    """Manage folder Dropzone link (create/get/revoke)."""
+    async def post(self):
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            folder_id = data.get("folder_id")
+            user_id = data.get("user_id")
+            action = data.get("action", "get")
+
+            if not folder_id or not user_id:
+                self.set_status(400)
+                self.write(json.dumps({"error": "Missing parameters"}))
+                return
+
+            folder = db.get_folder(int(folder_id))
+            if not folder or folder["user_id"] != int(user_id):
+                self.set_status(403)
+                self.write(json.dumps({"error": "Folder tidak ditemukan atau akses ditolak"}))
+                return
+
+            if action == "revoke":
+                db.revoke_folder_share_token(int(folder_id))
+                self.write(json.dumps({"ok": True, "active": False}))
+                return
+
+            token = db.get_or_create_folder_share_token(int(folder_id))
+            base_url = WEBHOOK_URL.rstrip('/') if WEBHOOK_URL else "https://telegram-drive-bot-0upd.onrender.com"
+            dropzone_url = f"{base_url}/dropzone/{token}"
+
+            self.write(json.dumps({
+                "ok": True,
+                "active": True,
+                "token": token,
+                "dropzone_url": dropzone_url,
+                "folder_name": folder["name"],
+            }))
+        except Exception as e:
+            log.exception("Error in ApiFolderDropzoneHandler: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"error": str(e)}))
+
+
 def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
     """Compile all WebApp + Telegram Webhook routes."""
     import telegram.ext._utils.webhookhandler as wh
@@ -648,6 +845,10 @@ def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
         (r"/api/batch_send_to_chat/?", ApiBatchSendToChatHandler),
         (r"/api/upload/?", ApiUploadHandler),
         (r"/api/file_content/?", ApiFileContentHandler),
+        (r"/dropzone/([a-zA-Z0-9_\-]+)/?", DropzonePageHandler),
+        (r"/api/dropzone/info/?", ApiDropzoneInfoHandler),
+        (r"/api/dropzone/upload/?", ApiDropzoneUploadHandler),
+        (r"/api/folder_dropzone/?", ApiFolderDropzoneHandler),
     ]
 
 
@@ -693,6 +894,10 @@ def start_standalone_webapp_server(port: int = 10000):
         (r"/api/batch_send_to_chat/?", ApiBatchSendToChatHandler),
         (r"/api/upload/?", ApiUploadHandler),
         (r"/api/file_content/?", ApiFileContentHandler),
+        (r"/dropzone/([a-zA-Z0-9_\-]+)/?", DropzonePageHandler),
+        (r"/api/dropzone/info/?", ApiDropzoneInfoHandler),
+        (r"/api/dropzone/upload/?", ApiDropzoneUploadHandler),
+        (r"/api/folder_dropzone/?", ApiFolderDropzoneHandler),
     ]
     app = tornado.web.Application(routes)
     try:

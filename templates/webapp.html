@@ -279,6 +279,26 @@
       color: #fff;
     }
 
+    .btn-dropzone-nav {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-left: auto;
+      transition: all 0.15s;
+    }
+
+    .btn-dropzone-nav:active {
+      transform: scale(0.95);
+    }
+
     /* Section Title */
     .section-title {
       font-size: 0.8rem;
@@ -1680,6 +1700,38 @@
     </div>
   </div>
 
+  <!-- Folder Dropzone Modal Sheet -->
+  <div class="modal-overlay" id="dropzoneModal" onclick="closeDropzoneModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <h3 class="sheet-title" style="margin-bottom: 0;">📤 Public Dropzone</h3>
+        <span class="tag-pill" style="color: var(--emerald); border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.1);">Aktif</span>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 14px;" id="dropzoneModalSub">
+        Siapapun dapat mengirim berkas ke folder ini tanpa perlu login atau akun Telegram.
+      </p>
+
+      <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 16px;">
+        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; margin-bottom: 6px; text-transform: uppercase;">Link Unggah Publik:</div>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="dropzoneUrlInput" readonly style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--accent); outline: none;">
+          <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.78rem;" onclick="copyDropzoneLink()">Salin</button>
+        </div>
+      </div>
+
+      <div class="sheet-actions" style="margin-top: 8px;">
+        <button class="btn btn-secondary" onclick="openDropzoneExternal()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          Buka Halaman
+        </button>
+        <button class="btn btn-danger" style="font-size: 0.78rem;" onclick="revokeDropzoneLink()">
+          Nonaktifkan Link
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Upload FAB & Hidden Input -->
   <button class="upload-fab" id="uploadFab" onclick="triggerWebUpload()" title="Unggah Berkas">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
@@ -1788,6 +1840,14 @@
           html += `<span class="crumb-item" onclick="navigateToFolder(${c.id})">${escapeHtml(c.name)}</span>`;
         }
       });
+      if (currentFolderId) {
+        html += `
+          <button class="btn-dropzone-nav" onclick="openDropzoneModal(${currentFolderId})" title="Public Dropzone untuk folder ini">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Dropzone
+          </button>
+        `;
+      }
       el.innerHTML = html;
     }
 
@@ -2805,6 +2865,93 @@
     function closeAudioPlayer() {
       audioEl.pause();
       document.getElementById('audioPlayerBar').style.display = 'none';
+    }
+
+    // Public Dropzone Modal Logic
+    let activeDropzoneFolderId = null;
+    let activeDropzoneUrl = '';
+
+    async function openDropzoneModal(folderId) {
+      triggerHaptic();
+      activeDropzoneFolderId = folderId || currentFolderId;
+      if (!activeDropzoneFolderId) return;
+
+      document.getElementById('dropzoneModal').classList.add('active');
+      document.getElementById('dropzoneUrlInput').value = 'Menghubungkan link...';
+
+      try {
+        const res = await fetch('/api/folder_dropzone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            folder_id: activeDropzoneFolderId,
+            user_id: userId,
+            action: 'get'
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          activeDropzoneUrl = data.dropzone_url;
+          document.getElementById('dropzoneUrlInput').value = activeDropzoneUrl;
+          document.getElementById('dropzoneModalSub').innerText = `Folder: "${data.folder_name}". Siapapun dapat mengunggah berkas tanpa login.`;
+        } else {
+          document.getElementById('dropzoneUrlInput').value = 'Gagal memuat link';
+          alert('Gagal membuat link: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        document.getElementById('dropzoneUrlInput').value = 'Error koneksi';
+        alert('Error: ' + err);
+      }
+    }
+
+    function closeDropzoneModal(e) {
+      if (!e || e.target?.id === 'dropzoneModal' || e.target?.classList?.contains('sheet-handle') || !e.target) {
+        document.getElementById('dropzoneModal').classList.remove('active');
+      }
+    }
+
+    function copyDropzoneLink() {
+      triggerHaptic();
+      const inp = document.getElementById('dropzoneUrlInput');
+      if (!inp.value || inp.value.includes('Menghubungkan')) return;
+      navigator.clipboard.writeText(inp.value).then(() => {
+        showToast('📋 Link Dropzone berhasil disalin!');
+      }).catch(() => {
+        inp.select();
+        document.execCommand('copy');
+        showToast('📋 Link Dropzone disalin!');
+      });
+    }
+
+    function openDropzoneExternal() {
+      if (activeDropzoneUrl) {
+        window.open(activeDropzoneUrl, '_blank');
+      }
+    }
+
+    async function revokeDropzoneLink() {
+      if (!activeDropzoneFolderId) return;
+      if (!confirm('Apakah Anda yakin ingin menonaktifkan link Dropzone ini? Link lama tidak akan bisa digunakan lagi.')) return;
+      triggerHaptic();
+
+      try {
+        const res = await fetch('/api/folder_dropzone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            folder_id: activeDropzoneFolderId,
+            user_id: userId,
+            action: 'revoke'
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('🔒 Link Dropzone dinonaktifkan.');
+          document.getElementById('dropzoneModal').classList.remove('active');
+        }
+      } catch (err) {
+        alert('Gagal menonaktifkan: ' + err);
+      }
     }
 
     // Utility Helpers
