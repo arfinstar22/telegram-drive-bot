@@ -128,8 +128,22 @@ class ApiDriveHandler(BaseApiHandler):
         self.write(json.dumps(response_data))
 
 
+# In-memory LRU cache for thumbnail binary (capped to 300 items ~3MB RAM max)
+_THUMB_CACHE: dict[int, bytes] = {}
+_MAX_THUMB_CACHE = 300
+_shared_bot_instance: Optional[Bot] = None
+
+
+def get_shared_bot() -> Bot:
+    """Reuse singleton Bot instance to avoid re-initializing connection pools."""
+    global _shared_bot_instance
+    if _shared_bot_instance is None:
+        _shared_bot_instance = Bot(BOT_TOKEN)
+    return _shared_bot_instance
+
+
 class ApiThumbnailHandler(tornado.web.RequestHandler):
-    """Serve thumbnail image for video, photo, or document files."""
+    """Serve thumbnail image for video, photo, or document files with in-memory caching."""
     async def get(self):
         file_id_raw = self.get_argument("file_id", None)
         if not file_id_raw or not file_id_raw.isdigit():
@@ -137,7 +151,16 @@ class ApiThumbnailHandler(tornado.web.RequestHandler):
             self.write("Invalid file_id")
             return
 
-        f = db.get_file(int(file_id_raw))
+        file_id = int(file_id_raw)
+
+        # 1. Instant hit from server RAM cache (<1ms response time)
+        if file_id in _THUMB_CACHE:
+            self.set_header("Content-Type", "image/jpeg")
+            self.set_header("Cache-Control", "public, max-age=604800, immutable")
+            self.write(_THUMB_CACHE[file_id])
+            return
+
+        f = db.get_file(file_id)
         if not f:
             self.set_status(404)
             self.write("File not found")
@@ -153,14 +176,20 @@ class ApiThumbnailHandler(tornado.web.RequestHandler):
             return
 
         try:
-            bot = Bot(BOT_TOKEN)
+            bot = get_shared_bot()
             tg_file = await bot.get_file(thumb_id)
             if not tg_file or not tg_file.file_path:
                 self.set_status(404)
                 return
 
             client = tornado.httpclient.AsyncHTTPClient()
-            resp = await client.fetch(tg_file.file_path)
+            resp = await client.fetch(tg_file.file_path, request_timeout=6.0)
+
+            # Store in RAM cache (FIFO / LRU eviction when limit reached)
+            _THUMB_CACHE[file_id] = resp.body
+            if len(_THUMB_CACHE) > _MAX_THUMB_CACHE:
+                _THUMB_CACHE.pop(next(iter(_THUMB_CACHE)))
+
             self.set_header("Content-Type", "image/jpeg")
             self.set_header("Cache-Control", "public, max-age=604800, immutable")
             self.write(resp.body)
@@ -186,7 +215,7 @@ class ApiDownloadHandler(tornado.web.RequestHandler):
             return
 
         try:
-            bot = Bot(BOT_TOKEN)
+            bot = get_shared_bot()
             tg_file = await bot.get_file(f["file_id"])
             if tg_file and tg_file.file_path:
                 self.redirect(tg_file.file_path)
@@ -233,7 +262,7 @@ class ApiSendToChatHandler(BaseApiHandler):
                 self.write(json.dumps({"error": "File not found"}))
                 return
 
-            bot = Bot(BOT_TOKEN)
+            bot = get_shared_bot()
             import keyboards as kb
             from utils import file_emoji, format_size, parse_file_metadata
             emoji = file_emoji(f["file_type"])
@@ -461,7 +490,7 @@ class ApiUploadHandler(BaseApiHandler):
                 self.write(json.dumps({"error": "Tidak ada file yang diunggah"}))
                 return
 
-            bot = Bot(BOT_TOKEN)
+            bot = get_shared_bot()
             f_obj = db.get_folder(folder_id)
             folder_name = f_obj["name"] if f_obj else "Folder"
 
@@ -543,7 +572,7 @@ class ApiFileContentHandler(BaseApiHandler):
             return
 
         try:
-            bot = Bot(BOT_TOKEN)
+            bot = get_shared_bot()
             tg_file = await bot.get_file(f["file_id"])
             if not tg_file or not tg_file.file_path:
                 self.set_status(500)
