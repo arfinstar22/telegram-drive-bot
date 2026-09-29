@@ -141,9 +141,22 @@
       background: var(--surface);
       border: 1px solid var(--border);
       backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border-radius: var(--radius);
       padding: 14px 16px;
       margin-bottom: 18px;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .storage-bar-card:hover {
+      border-color: rgba(56, 189, 248, 0.35);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .storage-bar-card:active {
+      transform: scale(0.985);
     }
 
     .storage-header {
@@ -153,13 +166,38 @@
       font-size: 0.8rem;
       font-weight: 600;
       color: var(--text-muted);
-      margin-bottom: 8px;
+      margin-bottom: 10px;
+    }
+
+    .storage-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .storage-title {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .unlimited-badge {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
     }
 
     .storage-used {
       color: #fff;
       font-weight: 700;
       font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
     }
 
     .btn-clean-dup {
@@ -183,18 +221,230 @@
     }
 
     .storage-progress {
-      height: 6px;
+      height: 7px;
       background: rgba(255, 255, 255, 0.08);
       border-radius: 4px;
       overflow: hidden;
+      display: flex;
+      gap: 2px;
     }
 
-    .storage-fill {
+    .storage-segment {
       height: 100%;
-      width: 18%;
-      background: linear-gradient(90deg, var(--accent), var(--accent-purple));
-      border-radius: 4px;
       transition: width 0.4s ease;
+      min-width: 2px;
+    }
+
+    .storage-bar-legend {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .storage-legend-items {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .storage-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.68rem;
+    }
+
+    .storage-legend-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .storage-click-hint {
+      color: var(--accent);
+      font-size: 0.68rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    /* Modal Sheet: Storage Stats & Diagnostics */
+    .stats-hero-banner {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.85));
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .stats-hero-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stats-hero-val {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+      margin: 4px 0 6px;
+      letter-spacing: -0.5px;
+    }
+
+    .badge-infinite {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stats-hero-right {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      padding-left: 14px;
+    }
+
+    .stats-mini-metric {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      min-width: 90px;
+    }
+
+    .smm-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .smm-val {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .stats-breakdown-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 12px 0;
+      max-height: 240px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .stats-breakdown-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .stats-breakdown-item:hover, .stats-breakdown-item:active {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(56, 189, 248, 0.3);
+      transform: scale(0.99);
+    }
+
+    .sbi-icon-wrap {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.15rem;
+      flex-shrink: 0;
+    }
+
+    .sbi-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sbi-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2px;
+    }
+
+    .sbi-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .sbi-size {
+      font-size: 0.78rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      color: #e2e8f0;
+    }
+
+    .sbi-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .sbi-count {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+    }
+
+    .sbi-percent {
+      font-size: 0.68rem;
+      font-weight: 700;
+    }
+
+    .sbi-bar-wrap {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .sbi-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+
+    .stats-info-box {
+      background: rgba(56, 189, 248, 0.06);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-top: 10px;
     }
 
     /* Search & Filter */
@@ -1503,19 +1753,31 @@
     </header>
 
     <!-- Storage Diagnostics Card -->
-    <div class="storage-bar-card">
+    <div class="storage-bar-card" onclick="openStorageStatsModal()" title="Klik untuk lihat Statistik & Rincian Storage">
       <div class="storage-header">
-        <span>Penggunaan Kapasitas</span>
+        <div class="storage-title-wrap">
+          <span class="storage-title">Penggunaan Kapasitas</span>
+          <span class="unlimited-badge">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 12c-2-2.5-4-4-6.5-4A5.5 5.5 0 0 0 0 13.5 5.5 5.5 0 0 0 5.5 19c2.5 0 4.5-1.5 6.5-4 2 2.5 4 4 6.5 4a5.5 5.5 0 0 0 5.5-5.5 5.5 5.5 0 0 0-5.5-5.5c-2.5 0-4.5 1.5-6.5 4z"/></svg>
+            Unlimited
+          </span>
+        </div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <span class="storage-used" id="storageSummary">0 MB • 0 File</span>
-          <button class="btn-clean-dup" onclick="openDuplicatesModal()" title="Pindai & Bersihkan Berkas Duplikat">
+          <button class="btn-clean-dup" onclick="event.stopPropagation(); openDuplicatesModal();" title="Pindai & Bersihkan Berkas Duplikat">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             Duplikat
           </button>
         </div>
       </div>
-      <div class="storage-progress">
-        <div class="storage-fill" id="storageFill" style="width: 15%"></div>
+      <div class="storage-progress" id="storageProgressBar" title="Klik untuk lihat rincian statistik">
+        <div class="storage-segment" style="width: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-purple));"></div>
+      </div>
+      <div class="storage-bar-legend">
+        <div class="storage-legend-items" id="storageBarLegend">
+          <span>Menghitung rincian berkas...</span>
+        </div>
+        <span class="storage-click-hint">Rincian ›</span>
       </div>
     </div>
 
@@ -1809,6 +2071,85 @@
     </div>
   </div>
 
+  <!-- Storage Statistics & Diagnostics Modal Sheet -->
+  <div class="modal-overlay" id="storageStatsModal" onclick="closeStorageStatsModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 34px; height: 34px; border-radius: 10px; background: rgba(56, 189, 248, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+            📊
+          </div>
+          <div>
+            <h3 class="sheet-title" style="margin-bottom: 2px;">Statistik Penyimpanan</h3>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">Telegram Cloud • Tanpa Batas</span>
+          </div>
+        </div>
+        <button class="btn-sel-close" onclick="closeStorageStatsModal()" title="Tutup">✕</button>
+      </div>
+
+      <!-- Hero Usage Banner -->
+      <div class="stats-hero-banner">
+        <div class="stats-hero-left">
+          <span class="stats-hero-sub">Total Ruang Digunakan</span>
+          <div class="stats-hero-val" id="statsModalTotalSize">0 MB</div>
+          <div class="stats-hero-unlimited">
+            <span class="badge-infinite">♾️ Kapasitas Tanpa Batas</span>
+          </div>
+        </div>
+        <div class="stats-hero-right">
+          <div class="stats-mini-metric">
+            <span class="smm-label">Berkas</span>
+            <span class="smm-val" id="statsModalTotalFiles">0</span>
+          </div>
+          <div class="stats-mini-metric">
+            <span class="smm-label">Folder</span>
+            <span class="smm-val" id="statsModalTotalFolders">0</span>
+          </div>
+          <div class="stats-mini-metric">
+            <span class="smm-label">Sampah</span>
+            <span class="smm-val" id="statsModalTrashCount" style="color: var(--rose);">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Distribution Visual Bar -->
+      <div style="margin: 14px 0 8px;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px;">
+          <span>Distribusi Kategori Berkas</span>
+          <span style="font-weight: 600; color: #fff;">100% Cloud</span>
+        </div>
+        <div class="storage-progress" id="statsModalProgressBar" style="height: 10px; border-radius: 6px;">
+          <!-- Dynamically filled segments -->
+        </div>
+      </div>
+
+      <!-- Breakdown List -->
+      <div class="stats-breakdown-list" id="statsBreakdownList">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Storage Info Tip Box -->
+      <div class="stats-info-box">
+        <div style="display: flex; gap: 10px; align-items: flex-start;">
+          <span style="font-size: 1.1rem; line-height: 1;">💡</span>
+          <div style="font-size: 0.75rem; color: #94a3b8; line-height: 1.45;">
+            <b style="color: #fff;">Penyimpanan Bebas Khawatir:</b> Berkas tersimpan di server Telegram tanpa memakan kuota HP Anda. Klik kategori di atas untuk memfilter daftar berkas langsung.
+          </div>
+        </div>
+      </div>
+
+      <div class="sheet-actions" style="margin-top: 14px; gap: 8px;">
+        <button class="btn btn-secondary" onclick="event.stopPropagation(); closeStorageStatsModal(); openDuplicatesModal();" style="flex: 1; font-size: 0.78rem;">
+          🧹 Pindai Duplikat
+        </button>
+        <button class="btn btn-primary" onclick="closeStorageStatsModal()" style="flex: 1; font-size: 0.78rem;">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Duplicates Cleaner Modal Sheet -->
   <div class="modal-overlay" id="duplicatesModal" onclick="closeDuplicatesModal(event)">
     <div class="modal-sheet" onclick="event.stopPropagation()">
@@ -1919,11 +2260,39 @@
       }
     }
 
+    let currentStorageData = null;
+
     function renderStorage(storage) {
       if (!storage) return;
-      document.getElementById('storageSummary').innerText = `${storage.total_size} • ${storage.total_files} File`;
+      currentStorageData = storage;
+      const summaryEl = document.getElementById('storageSummary');
+      if (summaryEl) summaryEl.innerText = `${storage.total_size} • ${storage.total_files} File`;
       const pill = document.getElementById('trashCountPill');
       if (pill) pill.innerText = storage.trash_count || 0;
+
+      // Render segmented distribution bar in storage card
+      const bar = document.getElementById('storageProgressBar');
+      const legend = document.getElementById('storageBarLegend');
+      if (bar && storage.breakdown && storage.breakdown.length > 0) {
+        const activeSegments = storage.breakdown.filter(b => b.size_bytes > 0 || b.count > 0);
+        if (activeSegments.length > 0) {
+          bar.innerHTML = activeSegments.map(b => `
+            <div class="storage-segment" style="width: ${Math.max(b.percent, 1.5)}%; background: ${b.color};" title="${escapeHtml(b.label)}: ${b.size_formatted} (${b.percent}%)"></div>
+          `).join('');
+
+          if (legend) {
+            legend.innerHTML = activeSegments.slice(0, 3).map(b => `
+              <div class="storage-legend-item">
+                <span class="storage-legend-dot" style="background: ${b.color};"></span>
+                <span>${b.emoji} ${escapeHtml(b.label.split(' ')[0])} <b>${b.percent}%</b></span>
+              </div>
+            `).join('') + (activeSegments.length > 3 ? `<span style="font-size:0.65rem; color:var(--text-muted);">+${activeSegments.length - 3} lainnya</span>` : '');
+          }
+        } else {
+          bar.innerHTML = `<div class="storage-segment" style="width: 100%; background: rgba(255,255,255,0.1);"></div>`;
+          if (legend) legend.innerHTML = `<span>Belum ada berkas</span>`;
+        }
+      }
     }
 
     function renderBreadcrumbs(crumbs) {
@@ -3317,6 +3686,85 @@
         }
       } catch (err) {
         listEl.innerHTML = `<div style="text-align:center; color:var(--rose); padding:16px;">Error koneksi: ${err}</div>`;
+      }
+    }
+
+    // Storage Statistics Modal Handlers
+    function openStorageStatsModal() {
+      triggerHaptic();
+      const storage = currentStorageData || (driveData && driveData.storage);
+      if (!storage) return;
+
+      const sizeEl = document.getElementById('statsModalTotalSize');
+      const filesEl = document.getElementById('statsModalTotalFiles');
+      const foldersEl = document.getElementById('statsModalTotalFolders');
+      const trashEl = document.getElementById('statsModalTrashCount');
+
+      if (sizeEl) sizeEl.innerText = storage.total_size || '0 B';
+      if (filesEl) filesEl.innerText = storage.total_files || '0';
+      if (foldersEl) foldersEl.innerText = storage.total_folders || '0';
+      if (trashEl) trashEl.innerText = storage.trash_count || '0';
+
+      const bar = document.getElementById('statsModalProgressBar');
+      const list = document.getElementById('statsBreakdownList');
+
+      const breakdown = storage.breakdown || [];
+      const activeSegments = breakdown.filter(b => b.size_bytes > 0 || b.count > 0);
+
+      if (bar) {
+        if (activeSegments.length > 0) {
+          bar.innerHTML = activeSegments.map(b => `
+            <div class="storage-segment" style="width: ${Math.max(b.percent, 1.5)}%; background: ${b.color};" title="${escapeHtml(b.label)}: ${b.size_formatted} (${b.percent}%)"></div>
+          `).join('');
+        } else {
+          bar.innerHTML = `<div class="storage-segment" style="width: 100%; background: rgba(255,255,255,0.1);"></div>`;
+        }
+      }
+
+      if (list) {
+        if (breakdown.length > 0) {
+          list.innerHTML = breakdown.map(b => `
+            <div class="stats-breakdown-item" onclick="filterFromStats('${b.type}')" title="Klik untuk lihat berkas ${escapeHtml(b.label)}">
+              <div class="sbi-icon-wrap" style="background: ${b.color}22; color: ${b.color};">
+                ${b.emoji}
+              </div>
+              <div class="sbi-info">
+                <div class="sbi-top">
+                  <span class="sbi-label">${escapeHtml(b.label)}</span>
+                  <span class="sbi-size">${b.size_formatted}</span>
+                </div>
+                <div class="sbi-bottom">
+                  <span class="sbi-count">${b.count} Berkas</span>
+                  <span class="sbi-percent" style="color: ${b.color};">${b.percent}%</span>
+                </div>
+                <div class="sbi-bar-wrap">
+                  <div class="sbi-bar-fill" style="width: ${Math.min(b.percent, 100)}%; background: ${b.color};"></div>
+                </div>
+              </div>
+              <span style="font-size: 0.85rem; color: var(--text-muted); margin-left: 4px;">›</span>
+            </div>
+          `).join('');
+        } else {
+          list.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-muted); font-size: 0.8rem;">Belum ada statistik berkas.</div>`;
+        }
+      }
+
+      const modal = document.getElementById('storageStatsModal');
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeStorageStatsModal(event) {
+      if (event && event.target && event.target.id !== 'storageStatsModal' && !event.target.classList.contains('sheet-handle')) return;
+      const modal = document.getElementById('storageStatsModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    function filterFromStats(type) {
+      closeStorageStatsModal();
+      triggerHaptic();
+      const targetChip = document.querySelector(`.chip[data-type="${type}"]`) || document.querySelector('.chip[data-type="all"]');
+      if (targetChip) {
+        targetChip.click();
       }
     }
 

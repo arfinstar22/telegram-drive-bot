@@ -84,12 +84,56 @@ class ApiDriveHandler(BaseApiHandler):
 
         # Fetch storage diagnostics
         info = db.get_storage_info(user_id)
+        total_size_bytes = info.get("total_size", 0)
+        by_type = info.get("by_type", {})
+        size_by_type = info.get("size_by_type", {})
+
+        categories = [
+            ("video", "Video & Film", "🎬", "#38bdf8"),
+            ("photo", "Foto & Gambar", "🖼", "#f59e0b"),
+            ("document", "Dokumen", "📄", "#10b981"),
+            ("audio", "Musik & Audio", "🎵", "#a855f7"),
+        ]
+        breakdown = []
+        accounted_types = set()
+        for cat_key, cat_label, cat_emoji, cat_color in categories:
+            cnt = by_type.get(cat_key, 0)
+            sz = size_by_type.get(cat_key, 0)
+            pct = round((sz / total_size_bytes * 100), 1) if total_size_bytes > 0 else 0
+            breakdown.append({
+                "type": cat_key,
+                "label": cat_label,
+                "emoji": cat_emoji,
+                "color": cat_color,
+                "count": cnt,
+                "size_bytes": sz,
+                "size_formatted": format_size(sz),
+                "percent": pct,
+            })
+            accounted_types.add(cat_key)
+
+        other_cnt = sum(cnt for k, cnt in by_type.items() if k not in accounted_types)
+        other_sz = sum(sz for k, sz in size_by_type.items() if k not in accounted_types)
+        if other_cnt > 0 or other_sz > 0:
+            other_pct = round((other_sz / total_size_bytes * 100), 1) if total_size_bytes > 0 else 0
+            breakdown.append({
+                "type": "other",
+                "label": "Berkas Lainnya",
+                "emoji": "📁",
+                "color": "#ec4899",
+                "count": other_cnt,
+                "size_bytes": other_sz,
+                "size_formatted": format_size(other_sz),
+                "percent": other_pct,
+            })
+
         storage_summary = {
             "total_files": info.get("total_files", 0),
             "total_folders": info.get("total_folders", 0),
-            "total_size": format_size(info.get("total_size", 0)),
-            "total_size_bytes": info.get("total_size", 0),
+            "total_size": format_size(total_size_bytes),
+            "total_size_bytes": total_size_bytes,
             "trash_count": info.get("trash_count", 0),
+            "breakdown": breakdown,
         }
 
         # Breadcrumbs

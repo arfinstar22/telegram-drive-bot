@@ -222,9 +222,12 @@ def get_storage_info(user_id: int) -> dict:
 
     total_size = sum(f.get("file_size", 0) for f in files_data)
     by_type: dict[str, int] = {}
+    size_by_type: dict[str, int] = {}
     for f in files_data:
         ft = f.get("file_type", "other")
+        sz = f.get("file_size", 0)
         by_type[ft] = by_type.get(ft, 0) + 1
+        size_by_type[ft] = size_by_type.get(ft, 0) + sz
 
     folder_res = db.table("folders").select("id", count="exact").eq("user_id", user_id).execute()
 
@@ -236,6 +239,7 @@ def get_storage_info(user_id: int) -> dict:
         "total_folders": folder_res.count or 0,
         "trash_count": trash_res.count or 0,
         "by_type": by_type,
+        "size_by_type": size_by_type,
     }
 
 
