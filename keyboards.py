@@ -6,13 +6,9 @@ from utils import file_emoji, format_size, truncate
 
 # ── Reply Keyboards (bottom-screen persistent buttons) ──
 
-def main_menu(lang: str = "id", user_id: int | None = None):
+def main_menu(lang: str = "id"):
     webapp_label = "📱 Open WebApp Drive" if lang == "en" else "📱 Buka WebApp Drive"
-    target_url = WEBAPP_URL or ""
-    if target_url and user_id:
-        sep = "&" if "?" in target_url else "?"
-        target_url = f"{target_url}{sep}user_id={user_id}"
-    webapp_btn = KeyboardButton(webapp_label, web_app=WebAppInfo(url=target_url))
+    webapp_btn = KeyboardButton(webapp_label)
     if lang == "en":
         return ReplyKeyboardMarkup(
             [[webapp_btn],
@@ -30,6 +26,14 @@ def main_menu(lang: str = "id", user_id: int | None = None):
          ["🏠 Beranda"]],
         resize_keyboard=True,
     )
+
+
+def inline_webapp_button(lang: str = "id") -> InlineKeyboardMarkup:
+    """Inline WebApp launcher button that provides full cryptographic Telegram initData."""
+    btn_label = "🚀 Open Drive" if lang == "en" else "🚀 Buka Drive"
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(btn_label, web_app=WebAppInfo(url=WEBAPP_URL))]
+    ])
 
 
 def upload_mode(lang: str = "id"):

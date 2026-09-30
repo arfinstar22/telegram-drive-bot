@@ -28,6 +28,8 @@ import auth
 import database as db
 import utils
 import webapp
+import keyboards as kb
+from handlers import menu
 
 
 class AdversarialSecurityTests(tornado.testing.AsyncHTTPTestCase):
@@ -417,7 +419,96 @@ class AdversarialSecurityTests(tornado.testing.AsyncHTTPTestCase):
         with patch("auth.validate_telegram_init_data", return_value={"id": 11111, "user_id": 11111}):
             # This confirms the test catches any bypass
             mutated_res = auth.validate_telegram_init_data(raw_tampered)
-            self.assertIsNotNone(mutated_res) # Proves mutation is detectable!
+            self.assertIsNotNone(mutated_res)  # Proves mutation is detectable!
+
+    # ─────────────────────────────────────────────────────────────
+    # 11. Secure WebApp Launch Architecture & Bridge Tests
+    # ─────────────────────────────────────────────────────────────
+
+    def test_adv_auth_body_user_id_spoofing_rejected(self):
+        """Attacker sends JSON with user_id to /api/auth/session without valid initData."""
+        payload = {"user_id": 22222}
+        res = self.fetch("/api/auth/session", method="POST", body=json.dumps(payload), headers={"Content-Type": "application/json"})
+        self.assertEqual(res.code, 400)
+        data = json.loads(res.body.decode("utf-8"))
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["error"]["code"], "MISSING_DATA")
+
+    def test_adv_auth_body_fallback_user_spoofing_rejected(self):
+        """Attacker sends JSON with fallback_user object to /api/auth/session without valid initData."""
+        payload = {"fallback_user": {"id": 22222, "first_name": "Bob"}}
+        res = self.fetch("/api/auth/session", method="POST", body=json.dumps(payload), headers={"Content-Type": "application/json"})
+        self.assertEqual(res.code, 400)
+        data = json.loads(res.body.decode("utf-8"))
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["error"]["code"], "MISSING_DATA")
+
+    def test_adv_direct_browser_no_auth_no_private_data(self):
+        """Direct browser request to private endpoints without valid session must receive 401 UNAUTHORIZED."""
+        res = self.fetch("/api/drive")
+        self.assertEqual(res.code, 401)
+        data = json.loads(res.body.decode("utf-8"))
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["error"]["code"], "UNAUTHORIZED")
+
+        for endpoint in ["/api/download?file_id=1", "/api/thumbnail?file_id=1"]:
+            res = self.fetch(endpoint)
+            self.assertEqual(res.code, 401, f"Expected 401 for {endpoint}")
+
+    def test_reply_keyboard_is_text_only(self):
+        """Verify Reply Keyboard has persistent text button without web_app or query parameters."""
+        kb_id = kb.main_menu("id")
+        self.assertTrue(kb_id.resize_keyboard)
+        first_btn_id = kb_id.keyboard[0][0]
+        self.assertEqual(first_btn_id.text, "📱 Buka WebApp Drive")
+        self.assertIsNone(first_btn_id.web_app)
+
+        kb_en = kb.main_menu("en")
+        self.assertTrue(kb_en.resize_keyboard)
+        first_btn_en = kb_en.keyboard[0][0]
+        self.assertEqual(first_btn_en.text, "📱 Open WebApp Drive")
+        self.assertIsNone(first_btn_en.web_app)
+
+    def test_inline_webapp_button_has_web_app(self):
+        """Verify Inline Keyboard button has web_app with official WEBAPP_URL."""
+        ikb_id = kb.inline_webapp_button("id")
+        btn_id = ikb_id.inline_keyboard[0][0]
+        self.assertEqual(btn_id.text, "🚀 Buka Drive")
+        self.assertIsNotNone(btn_id.web_app)
+        self.assertEqual(btn_id.web_app.url, config.WEBAPP_URL)
+
+        ikb_en = kb.inline_webapp_button("en")
+        btn_en = ikb_en.inline_keyboard[0][0]
+        self.assertEqual(btn_en.text, "🚀 Open Drive")
+        self.assertIsNotNone(btn_en.web_app)
+        self.assertEqual(btn_en.web_app.url, config.WEBAPP_URL)
+
+    @tornado.testing.gen_test
+    async def test_open_webapp_prompt_handler(self):
+        """Verify open_webapp_prompt replies with Inline WebApp button and keeps keyboard persistent."""
+        mock_update = MagicMock()
+        mock_update.effective_user.id = 11111
+        mock_update.message.reply_text = MagicMock()
+
+        # In async context, mock return an awaitable
+        async def async_reply(*args, **kwargs):
+            return kwargs
+        mock_update.message.reply_text.side_effect = async_reply
+
+        mock_context = MagicMock()
+        mock_context.user_data = {"language": "id"}
+
+        with patch("database.get_user", return_value={"id": 11111, "language": "id"}):
+            await menu.open_webapp_prompt(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        args, kwargs = mock_update.message.reply_text.call_args
+        reply_text = args[0] if args else kwargs.get("text", "")
+        self.assertIn("Darfin Storage", reply_text)
+        self.assertIn("membuka Drive", reply_text)
+        reply_markup = kwargs["reply_markup"]
+        self.assertEqual(reply_markup.inline_keyboard[0][0].text, "🚀 Buka Drive")
+        self.assertIsNotNone(reply_markup.inline_keyboard[0][0].web_app)
 
 
 if __name__ == "__main__":

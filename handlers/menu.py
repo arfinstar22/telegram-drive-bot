@@ -234,7 +234,36 @@ async def _send_welcome_screen(update_or_query, context: ContextTypes.DEFAULT_TY
         chat_id=chat_id,
         text=text,
         parse_mode="HTML",
-        reply_markup=kb.main_menu(lang, user_id=user_id),
+        reply_markup=kb.main_menu(lang),
+    )
+
+
+async def open_webapp_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Bridge handler for '📱 Buka WebApp Drive' text button from permanent Reply Keyboard.
+
+    Sends an Inline Keyboard button containing the official Inline WebApp URL.
+    This ensures Telegram client opens an Inline Mini App with full cryptographic initData.
+    """
+    user = update.effective_user
+    user_id = user.id if user else 0
+    existing_user = db.get_user(user_id) if user_id else None
+    lang = (existing_user or {}).get("language", "id") if existing_user else context.user_data.get("language", "id")
+
+    if lang == "en":
+        text = (
+            "📂 <b>Darfin Storage</b>\n\n"
+            "Click the button below to open your Drive."
+        )
+    else:
+        text = (
+            "📂 <b>Darfin Storage</b>\n\n"
+            "Klik tombol di bawah untuk membuka Drive Anda."
+        )
+
+    await update.message.reply_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=kb.inline_webapp_button(lang),
     )
 
 

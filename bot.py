@@ -62,6 +62,7 @@ def main():
     app.add_handler(CommandHandler("done", files.done_uploading))
 
     # ── Reply Keyboard buttons (ID & EN supported) ─────
+    app.add_handler(MessageHandler(filters.Regex(r"^📱 (Buka WebApp Drive|Open WebApp Drive)$"), menu.open_webapp_prompt))
     app.add_handler(MessageHandler(filters.Regex(r"^📁 (My Files|File Saya)$"), folders.my_files))
     app.add_handler(MessageHandler(filters.Regex(r"^📤 (Upload|Unggah)$"), files.upload_menu))
     app.add_handler(MessageHandler(filters.Regex(r"^⭐ (Starred|Favorit)$"), menu.starred_menu))
