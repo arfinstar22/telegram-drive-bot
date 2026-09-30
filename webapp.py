@@ -654,7 +654,7 @@ class ApiStarHandler(BaseApiHandler):
 
 async def _send_single_file_to_chat(bot: Bot, user_id: int, f: dict):
     import keyboards as kb
-    from utils import file_emoji, format_size, parse_file_metadata
+    from utils import file_emoji, format_size, parse_file_metadata, optimize_preview_image
     emoji = file_emoji(f["file_type"])
     size = format_size(f.get("file_size", 0))
     created = f.get("created_at", "")[:10]
@@ -680,20 +680,27 @@ async def _send_single_file_to_chat(bot: Bot, user_id: int, f: dict):
 
     if is_image:
         try:
-            await bot.send_photo(chat_id=user_id, photo=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
-            return
+            await bot.send_chat_action(chat_id=user_id, action="upload_photo")
         except Exception:
             pass
 
-        if thumb_fid:
+        native_fid = None
+        fid_val = fid or ""
+        thumb_val = thumb_fid or ""
+        if fid_val.startswith("AgAC"):
+            native_fid = fid_val
+        elif thumb_val.startswith("AgAC"):
+            native_fid = thumb_val
+
+        if native_fid:
             try:
-                await bot.send_photo(chat_id=user_id, photo=thumb_fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+                await bot.send_photo(chat_id=user_id, photo=native_fid, caption=caption, parse_mode="HTML", reply_markup=markup)
                 return
             except Exception:
                 pass
 
         buf = None
-        if f.get("file_size", 0) <= 20 * 1024 * 1024:
+        if f.get("file_size", 0) <= 15 * 1024 * 1024:
             try:
                 tg_file = await bot.get_file(fid)
                 buf = await tg_file.download_as_bytearray()
@@ -709,7 +716,8 @@ async def _send_single_file_to_chat(bot: Bot, user_id: int, f: dict):
 
         if buf:
             try:
-                sent = await bot.send_photo(chat_id=user_id, photo=bytes(buf), caption=caption, parse_mode="HTML", reply_markup=markup)
+                optimized = optimize_preview_image(bytes(buf), max_dim=1600, quality=88)
+                sent = await bot.send_photo(chat_id=user_id, photo=optimized, caption=caption, parse_mode="HTML", reply_markup=markup)
                 if sent and sent.photo:
                     db.update_file_thumbnail(f["id"], sent.photo[-1].file_id, file_type="photo")
                 return

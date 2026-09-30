@@ -322,3 +322,23 @@ def encode_share_token(
     return result
 
 
+def optimize_preview_image(raw_bytes: bytes, max_dim: int = 1600, quality: int = 88) -> bytes:
+    """Optimize image for high-speed Telegram photo preview while keeping crisp HD quality."""
+    if not raw_bytes:
+        return raw_bytes
+    try:
+        import io
+        from PIL import Image
+        with Image.open(io.BytesIO(raw_bytes)) as im:
+            w, h = im.size
+            if max(w, h) > max_dim:
+                im.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+            if im.mode in ("RGBA", "P"):
+                im = im.convert("RGB")
+            out = io.BytesIO()
+            im.save(out, format="JPEG", quality=quality, optimize=True)
+            return out.getvalue()
+    except Exception:
+        return raw_bytes
+
+

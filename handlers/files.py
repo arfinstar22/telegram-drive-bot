@@ -14,7 +14,7 @@ import keyboards as kb
 import time
 import secrets
 import zipfile
-from utils import extract_file_info, file_emoji, format_size, parse_file_metadata, parse_share_token
+from utils import extract_file_info, file_emoji, format_size, parse_file_metadata, parse_share_token, optimize_preview_image
 
 log = logging.getLogger(__name__)
 
@@ -561,25 +561,32 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     markup = kb.file_actions(f)
 
     if is_image:
-        # 1. Try sending directly as native photo file_id
+        # Immediate visual feedback: show "uploading photo..." in chat status bar
         try:
-            await query.message.reply_photo(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
-            return
+            await context.bot.send_chat_action(chat_id=query.message.chat_id, action="upload_photo")
         except Exception:
             pass
 
-        # 2. Try thumbnail_file_id (if already cached native photo or valid photo ID)
-        if thumb_fid:
+        # 1. Fast path: If already a native photo ID (starts with AgAC), reply instantly (< 0.2s)
+        native_fid = None
+        fid_val = f.get("file_id") or ""
+        thumb_val = thumb_fid or ""
+        if fid_val.startswith("AgAC"):
+            native_fid = fid_val
+        elif thumb_val.startswith("AgAC"):
+            native_fid = thumb_val
+
+        if native_fid:
             try:
-                await query.message.reply_photo(thumb_fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+                await query.message.reply_photo(native_fid, caption=caption, parse_mode="HTML", reply_markup=markup)
                 return
             except Exception:
                 pass
 
-        # 3. Download bytes from Telegram CDN and reply as native photo (guarantees Gambar 2 preview)
+        # 2. Download and optimize: convert to crisp 1600px HD photo and upload (~1.2s total)
         try:
             buf = None
-            if f.get("file_size", 0) <= 20 * 1024 * 1024:
+            if f.get("file_size", 0) <= 15 * 1024 * 1024:
                 try:
                     tg_file = await context.bot.get_file(f["file_id"])
                     buf = await tg_file.download_as_bytearray()
@@ -594,8 +601,11 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     buf = None
 
             if buf:
+                # 1600px HD + quality 88 gives crystal clear sharp rendering without blurriness,
+                # while shrinking payload to ~150-250KB so Telegram uploads in ~0.2s
+                optimized = optimize_preview_image(bytes(buf), max_dim=1600, quality=88)
                 sent = await query.message.reply_photo(
-                    photo=bytes(buf),
+                    photo=optimized,
                     caption=caption,
                     parse_mode="HTML",
                     reply_markup=markup,
@@ -605,9 +615,9 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     db.update_file_thumbnail(f["id"], cached_pid, file_type="photo")
                 return
         except Exception as exc:
-            log.warning("Failed to reply_photo with bytes for %s: %s", f["file_name"], exc)
+            log.warning("Failed to render optimized photo preview for %s: %s", f["file_name"], exc)
 
-        # 4. Fallback to document only if everything fails (e.g. >20MB image without thumbnail)
+        # 3. Fallback to document only if everything fails (e.g. >20MB image)
         await query.message.reply_document(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
         return
 

@@ -193,7 +193,7 @@ class TestUploadConfirmation(unittest.IsolatedAsyncioTestCase):
             "file_name": "foto_resolusi_tinggi.png",
             "file_type": "photo",
             "file_size": 15728640,
-            "thumbnail_file_id": "thumb_photo_456",
+            "thumbnail_file_id": "AgAC_cached_thumb_456",
             "created_at": "2026-10-01T00:00:00",
             "mime_type": "image/png",
         }
@@ -202,26 +202,20 @@ class TestUploadConfirmation(unittest.IsolatedAsyncioTestCase):
         query_update.callback_query.answer = AsyncMock()
         query_update.callback_query.data = "fi:99"
         query_update.callback_query.from_user.id = 555
-        # Simulating that reply_photo with doc_full_res_123 fails (as Telegram Bot API does for doc IDs),
-        # but succeeds with thumb_photo_456
-        async def mock_reply_photo(target, **kwargs):
-            if target == "doc_full_res_123":
-                raise Exception("Wrong file identifier")
-            return MagicMock()
-
-        query_update.callback_query.message.reply_photo = AsyncMock(side_effect=mock_reply_photo)
+        query_update.callback_query.message.reply_photo = AsyncMock()
         query_update.callback_query.message.reply_document = AsyncMock()
 
         context = MagicMock()
 
         await files.preview_file(query_update, context)
 
-        # Verified reply_photo called with the Photo thumbnail
+        # Verified reply_photo called with the native Photo thumbnail instantly
         query_update.callback_query.message.reply_photo.assert_called()
         last_call_target = query_update.callback_query.message.reply_photo.call_args[0][0]
-        self.assertEqual(last_call_target, "thumb_photo_456")
+        self.assertEqual(last_call_target, "AgAC_cached_thumb_456")
         # And reply_document was NOT used because photo preview succeeded
         query_update.callback_query.message.reply_document.assert_not_called()
+
 
 
     @patch("handlers.files.db")
@@ -277,7 +271,28 @@ class TestUploadConfirmation(unittest.IsolatedAsyncioTestCase):
         # 3. Thumbnail was cached with new native photo id
         mock_db.update_file_thumbnail.assert_called_with(101, "new_native_photo_id_777", file_type="photo")
 
+    def test_optimize_preview_image_downsamples_large_image(self):
+        import io
+        from PIL import Image
+        from utils import optimize_preview_image
+
+        # 3000x2000 image
+        img = Image.new("RGB", (3000, 2000), color=(255, 0, 0))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=95)
+        raw_bytes = buf.getvalue()
+
+        optimized = optimize_preview_image(raw_bytes, max_dim=1600, quality=88)
+        self.assertIsNotNone(optimized)
+        self.assertLess(len(optimized), len(raw_bytes))
+
+        # Verify resolution is capped at 1600 on longest edge
+        with Image.open(io.BytesIO(optimized)) as out_img:
+            self.assertEqual(out_img.size[0], 1600)
+            self.assertAlmostEqual(out_img.size[1], 1067, delta=1)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
