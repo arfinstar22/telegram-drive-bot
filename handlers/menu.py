@@ -234,7 +234,7 @@ async def _send_welcome_screen(update_or_query, context: ContextTypes.DEFAULT_TY
         chat_id=chat_id,
         text=text,
         parse_mode="HTML",
-        reply_markup=kb.main_menu(lang),
+        reply_markup=kb.main_menu(lang, user_id=user_id),
     )
 
 

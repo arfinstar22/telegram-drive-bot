@@ -6,9 +6,13 @@ from utils import file_emoji, format_size, truncate
 
 # ── Reply Keyboards (bottom-screen persistent buttons) ──
 
-def main_menu(lang: str = "id"):
+def main_menu(lang: str = "id", user_id: int | None = None):
     webapp_label = "📱 Open WebApp Drive" if lang == "en" else "📱 Buka WebApp Drive"
-    webapp_btn = KeyboardButton(webapp_label, web_app=WebAppInfo(url=WEBAPP_URL))
+    target_url = WEBAPP_URL or ""
+    if target_url and user_id:
+        sep = "&" if "?" in target_url else "?"
+        target_url = f"{target_url}{sep}user_id={user_id}"
+    webapp_btn = KeyboardButton(webapp_label, web_app=WebAppInfo(url=target_url))
     if lang == "en":
         return ReplyKeyboardMarkup(
             [[webapp_btn],
