@@ -442,10 +442,11 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if not f:
-        await query.answer("File tidak ditemukan", show_alert=True)
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
         return
 
     emoji = file_emoji(f["file_type"])
@@ -488,10 +489,11 @@ async def download_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if not f:
-        await query.answer("File tidak ditemukan", show_alert=True)
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
         return
 
     await query.message.reply_document(f["file_id"],
@@ -503,12 +505,17 @@ async def rename_file_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
+
+    f = db.get_file_for_user(file_id, user_id)
+    if not f:
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
+        return
 
     context.user_data["state"] = "renaming_file"
     context.user_data["rename_target_id"] = file_id
 
-    f = db.get_file(file_id)
-    name = f["file_name"] if f else "?"
+    name = f["file_name"]
     await query.message.reply_text(
         f"✏️ Rename file <b>{name}</b>\nKetik nama baru:",
         parse_mode="HTML", reply_markup=kb.cancel_only(),
@@ -521,15 +528,14 @@ async def move_file_picker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     cancel_auto_delete(query.message.chat_id, query.message.message_id)
     file_id = int(query.data.split(":")[1])
-
     user_id = query.from_user.id
-    folders = db.get_all_folders(user_id)
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if not f:
-        await query.answer("File tidak ditemukan", show_alert=True)
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
         return
 
+    folders = db.get_all_folders(user_id)
     await query.message.reply_text(
         f"📁 Pindahkan <b>{f['file_name']}</b> ke folder:",
         parse_mode="HTML",
@@ -544,19 +550,27 @@ async def move_to_folder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     parts = query.data.split(":")
     file_id = int(parts[1])
     folder_id = int(parts[2])
+    user_id = query.from_user.id
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
+    if not f:
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
+        return
+
     if folder_id == 0:
-        inbox = db.get_or_create_inbox_folder(query.from_user.id)
+        inbox = db.get_or_create_inbox_folder(user_id)
         target_id = inbox["id"]
         folder_name = inbox["name"]
     else:
-        folder = db.get_folder(folder_id)
+        folder = db.get_folder_for_user(folder_id, user_id)
+        if not folder:
+            await query.answer("Folder tujuan tidak ditemukan atau akses ditolak", show_alert=True)
+            return
         target_id = folder_id
-        folder_name = folder["name"] if folder else "?"
+        folder_name = folder["name"]
 
-    db.move_file(file_id, target_id)
-    file_name = f["file_name"] if f else "?"
+    db.move_file(file_id, target_id, user_id=user_id)
+    file_name = f["file_name"]
     await query.edit_message_text(
         f"✅ <b>{file_name}</b> dipindahkan ke 📁 <b>{folder_name}</b>\n\n"
         f"<i>⏱ Pesan ini otomatis bersih dalam 4 detik...</i>",
@@ -570,10 +584,11 @@ async def delete_file_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if not f:
-        await query.answer("File tidak ditemukan", show_alert=True)
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
         return
 
     await query.message.reply_text(
@@ -587,17 +602,18 @@ async def confirm_delete_file(update: Update, context: ContextTypes.DEFAULT_TYPE
     """fxc:{file_id} — trash the file."""
     query = update.callback_query
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    f = db.get_file(file_id)
-    db.trash_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
+    if not f:
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
+        return
+
+    db.trash_file(file_id, user_id=user_id)
     await query.answer("File dihapus ✅")
 
-    folder_name = ""
-    if f:
-        folder = db.get_folder(f["folder_id"])
-        folder_name = folder["name"] if folder else ""
     await query.edit_message_text(
-        f"🗑 <b>{f['file_name'] if f else '?'}</b> dipindahkan ke Trash.",
+        f"🗑 <b>{f['file_name']}</b> dipindahkan ke Trash.",
         parse_mode="HTML",
     )
 
@@ -627,12 +643,13 @@ async def toggle_star_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """fst:{file_id} — toggle star on file."""
     query = update.callback_query
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    is_starred = db.toggle_star_file(file_id)
+    is_starred = db.toggle_star_file(file_id, user_id=user_id)
     msg = "Ditambahkan ke Favorit ⭐" if is_starred else "Dihapus dari Favorit"
     await query.answer(msg)
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if f:
         await query.edit_message_reply_markup(reply_markup=kb.file_actions(f))
 
@@ -644,13 +661,14 @@ async def share_file_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if not f:
-        await query.answer("File tidak ditemukan", show_alert=True)
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
         return
 
-    token = db.get_or_create_file_share_token(file_id)
+    token = db.get_or_create_file_share_token(file_id, user_id=user_id)
     bot_me = await context.bot.get_me()
     share_link = f"https://t.me/{bot_me.username}?start=sf_{token}"
 
@@ -671,7 +689,8 @@ async def revoke_file_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """fsh_rev:{file_id} — revoke share link."""
     query = update.callback_query
     file_id = int(query.data.split(":")[1])
-    db.revoke_file_share_token(file_id)
+    user_id = query.from_user.id
+    db.revoke_file_share_token(file_id, user_id=user_id)
     await query.answer("Link dibatalkan ✅")
     await query.edit_message_text("❌ Link publik untuk file ini telah dinonaktifkan.")
 
@@ -684,7 +703,12 @@ async def batch_download_folder(update: Update, context: ContextTypes.DEFAULT_TY
     folder_id = int(query.data.split(":")[1])
     user_id = query.from_user.id
 
-    files = db.get_all_files_in_folder(folder_id)
+    folder = db.get_folder_for_user(folder_id, user_id)
+    if not folder:
+        await query.answer("Folder tidak ditemukan atau akses ditolak.", show_alert=True)
+        return
+
+    files = db.get_all_files_in_folder(folder_id, user_id=user_id)
     if not files:
         await query.answer("Folder ini belum memiliki file.", show_alert=True)
         return
@@ -717,8 +741,12 @@ async def download_folder_zip(update: Update, context: ContextTypes.DEFAULT_TYPE
     folder_id = int(query.data.split(":")[1])
     user_id = query.from_user.id
 
-    folder = db.get_folder(folder_id)
-    files = db.get_all_files_in_folder(folder_id)
+    folder = db.get_folder_for_user(folder_id, user_id)
+    if not folder:
+        await query.answer("Folder tidak ditemukan atau akses ditolak.", show_alert=True)
+        return
+
+    files = db.get_all_files_in_folder(folder_id, user_id=user_id)
     if not files:
         await query.answer("Folder ini belum memiliki file.", show_alert=True)
         return
@@ -783,10 +811,11 @@ async def share_file_security_menu(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query
     await query.answer()
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if not f:
-        await query.answer("File tidak ditemukan", show_alert=True)
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
         return
 
     sec = parse_share_token(f.get("share_token") or "")
@@ -826,6 +855,12 @@ async def share_file_set_pin_prompt(update: Update, context: ContextTypes.DEFAUL
     query = update.callback_query
     await query.answer()
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
+
+    f = db.get_file_for_user(file_id, user_id)
+    if not f:
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
+        return
 
     context.user_data["state"] = "awaiting_file_share_pin"
     context.user_data["sec_file_id"] = file_id
@@ -844,13 +879,19 @@ async def share_file_set_expire(update: Update, context: ContextTypes.DEFAULT_TY
     parts = query.data.split(":")
     file_id = int(parts[1])
     duration = parts[2]
+    user_id = query.from_user.id
+
+    f = db.get_file_for_user(file_id, user_id)
+    if not f:
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
+        return
 
     hours = 24 if duration == "24h" else 168
     exp_ts = int(time.time()) + (hours * 3600)
-    db.update_file_share_security(file_id, expires_at=exp_ts)
+    db.update_file_share_security(file_id, expires_at=exp_ts, user_id=user_id)
     await query.answer(f"Masa berlaku diatur ke {hours // 24} hari! ✅")
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     sec = parse_share_token(f.get("share_token") or "")
     pin_txt = f"🔑 <code>{sec['pin']}</code>" if sec.get("pin") else "<i>Tidak ada</i>"
     diff = sec["expires_at"] - int(time.time())
@@ -879,20 +920,22 @@ async def share_file_set_burn(update: Update, context: ContextTypes.DEFAULT_TYPE
     """fsh_burn:{file_id} — toggle 1-time download limit."""
     query = update.callback_query
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if not f:
-        await query.answer("File tidak ditemukan", show_alert=True)
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
         return
 
     sec = parse_share_token(f.get("share_token") or "")
     new_limit = None if sec.get("limit") == 1 else 1
-    db.update_file_share_security(file_id, limit=new_limit)
+    db.update_file_share_security(file_id, limit=new_limit, user_id=user_id)
 
     status_str = "diaktifkan" if new_limit == 1 else "dinonaktifkan"
     await query.answer(f"1x unduh {status_str}! ✅")
 
-    sec = parse_share_token(db.get_file(file_id).get("share_token") or "")
+    f = db.get_file_for_user(file_id, user_id)
+    sec = parse_share_token(f.get("share_token") or "")
     pin_txt = f"🔑 <code>{sec['pin']}</code>" if sec.get("pin") else "<i>Tidak ada</i>"
     if sec.get("expires_at"):
         diff = sec["expires_at"] - int(time.time())
@@ -921,11 +964,17 @@ async def share_file_clear_security(update: Update, context: ContextTypes.DEFAUL
     """fsh_clear:{file_id} — remove all PIN, expiry, and limits."""
     query = update.callback_query
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    db.update_file_share_security(file_id, clear_all=True)
+    f = db.get_file_for_user(file_id, user_id)
+    if not f:
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
+        return
+
+    db.update_file_share_security(file_id, clear_all=True, user_id=user_id)
     await query.answer("Semua proteksi dihapus! 🔓")
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     sec = parse_share_token(f.get("share_token") or "")
 
     text = (
@@ -951,10 +1000,11 @@ async def file_tag_view(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if not f:
-        await query.answer("File tidak ditemukan", show_alert=True)
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
         return
 
     _, note, tags = parse_file_metadata(f.get("mime_type"))
@@ -981,6 +1031,12 @@ async def file_tag_edit_prompt(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
+
+    f = db.get_file_for_user(file_id, user_id)
+    if not f:
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
+        return
 
     context.user_data["state"] = "awaiting_file_tags"
     context.user_data["tag_file_id"] = file_id
@@ -999,11 +1055,17 @@ async def file_tag_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ftag_del:{file_id} — remove all note & tags."""
     query = update.callback_query
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    db.update_file_notes_and_tags(file_id, note="", tags=[])
+    f = db.get_file_for_user(file_id, user_id)
+    if not f:
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
+        return
+
+    db.update_file_notes_and_tags(file_id, note="", tags=[], user_id=user_id)
     await query.answer("Catatan & tag dibersihkan! ✅")
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     text = (
         f"🏷 <b>Tag & Catatan Pribadi</b>\n\n"
         f"📄 File: <code>{f['file_name']}</code>\n\n"
@@ -1023,14 +1085,19 @@ async def file_tag_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def public_download_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """pdl:{file_id} — guest downloads a shared file."""
     query = update.callback_query
-    await query.answer()
     file_id = int(query.data.split(":")[1])
 
     f = db.get_file(file_id)
-    if not f:
-        await query.answer("File tidak ditemukan atau telah dihapus.", show_alert=True)
+    if not f or not f.get("share_token"):
+        await query.answer("File tidak ditemukan atau link sudah tidak aktif.", show_alert=True)
         return
 
+    valid, err_or_data = db.validate_public_share(f["share_token"])
+    if not valid:
+        await query.answer(f"Akses ditolak: {err_or_data}", show_alert=True)
+        return
+
+    await query.answer()
     await query.message.reply_document(f["file_id"], caption=f"📥 {f['file_name']}")
     db.record_file_share_download(file_id)
 
@@ -1038,10 +1105,20 @@ async def public_download_file(update: Update, context: ContextTypes.DEFAULT_TYP
 async def public_save_to_drive(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """psave:{file_id} — guest saves shared file to their own drive."""
     query = update.callback_query
-    await query.answer()
     file_id = int(query.data.split(":")[1])
     user_id = query.from_user.id
 
+    f = db.get_file(file_id)
+    if not f or not f.get("share_token"):
+        await query.answer("File tidak ditemukan atau link sudah tidak aktif.", show_alert=True)
+        return
+
+    valid, err_or_data = db.validate_public_share(f["share_token"])
+    if not valid:
+        await query.answer(f"Akses ditolak: {err_or_data}", show_alert=True)
+        return
+
+    await query.answer()
     folders = db.get_all_folders(user_id)
     if not folders:
         await query.message.reply_text(
@@ -1060,19 +1137,28 @@ async def public_save_to_drive(update: Update, context: ContextTypes.DEFAULT_TYP
 async def public_save_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """psaveto:{file_id}:{folder_id} — execute copy file."""
     query = update.callback_query
-    await query.answer()
     parts = query.data.split(":")
     file_id = int(parts[1])
     folder_id = int(parts[2])
     user_id = query.from_user.id
 
     source_file = db.get_file(file_id)
-    if not source_file:
-        await query.edit_message_text("❌ File sumber tidak ditemukan.")
+    if not source_file or not source_file.get("share_token"):
+        await query.answer("File sumber tidak ditemukan atau tidak dibagikan.", show_alert=True)
         return
 
-    folder = db.get_folder(folder_id)
-    folder_name = folder["name"] if folder else "folder"
+    valid, err_or_data = db.validate_public_share(source_file["share_token"])
+    if not valid:
+        await query.answer(f"Akses ditolak: {err_or_data}", show_alert=True)
+        return
+
+    folder = db.get_folder_for_user(folder_id, user_id)
+    if not folder:
+        await query.answer("Folder tujuan tidak ditemukan atau bukan milik Anda.", show_alert=True)
+        return
+
+    folder_name = folder["name"]
+    await query.answer()
 
     saved = db.copy_file_to_user_folder(source_file, user_id, folder_id)
     if saved:
@@ -1147,10 +1233,11 @@ async def smart_folder_suggest(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if not f:
-        await query.answer("File tidak ditemukan.", show_alert=True)
+        await query.answer("File tidak ditemukan atau akses ditolak.", show_alert=True)
         return
 
     folder_name, topic, year = smart_organizer.suggest_folder(
@@ -1158,7 +1245,7 @@ async def smart_folder_suggest(update: Update, context: ContextTypes.DEFAULT_TYP
     )
     context.user_data[f"smf_target_{file_id}"] = folder_name
 
-    current_folder = db.get_folder(f["folder_id"])
+    current_folder = db.get_folder_for_user(f["folder_id"], user_id)
     curr_name = current_folder["name"] if current_folder else "Inbox"
 
     text = (
@@ -1185,9 +1272,9 @@ async def smart_folder_apply(update: Update, context: ContextTypes.DEFAULT_TYPE)
     file_id = int(query.data.split(":")[1])
     user_id = query.from_user.id
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if not f:
-        await query.edit_message_text("❌ File tidak ditemukan.")
+        await query.edit_message_text("❌ File tidak ditemukan atau akses ditolak.")
         return
 
     target_name = context.user_data.pop(f"smf_target_{file_id}", None)
@@ -1197,7 +1284,7 @@ async def smart_folder_apply(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
     target_folder = db.get_or_create_folder(user_id, target_name)
-    db.move_file(file_id, target_folder["id"])
+    db.move_file(file_id, target_folder["id"], user_id=user_id)
 
     btn = InlineKeyboardMarkup([
         [InlineKeyboardButton(f"📂 Buka Folder '{target_name}'", callback_data=f"f:{target_folder['id']}")],
@@ -1217,10 +1304,11 @@ async def smart_rename_suggest(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if not f:
-        await query.answer("File tidak ditemukan.", show_alert=True)
+        await query.answer("File tidak ditemukan atau akses ditolak.", show_alert=True)
         return
 
     new_name = smart_organizer.smart_rename(f["file_name"])
@@ -1244,14 +1332,15 @@ async def smart_apply_rename(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
     file_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
     new_name = context.user_data.pop(f"smr_new_{file_id}", None)
 
-    f = db.get_file(file_id)
+    f = db.get_file_for_user(file_id, user_id)
     if not f or not new_name:
-        await query.edit_message_text("❌ Usulan nama sudah kadaluarsa.")
+        await query.edit_message_text("❌ Usulan nama sudah kadaluarsa atau akses ditolak.")
         return
 
-    db.rename_file(file_id, new_name)
+    db.rename_file(file_id, new_name, user_id=user_id)
     await query.edit_message_text(
         f"✅ Nama file berhasil diubah menjadi:\n<b>{new_name}</b>",
         parse_mode="HTML",

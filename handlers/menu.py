@@ -163,24 +163,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-    # Check if this is a newly registered ID that has a previous account with same username
-    if not existing_user and user.username:
-        rec = db.find_recoverable_account(user.id, user.username)
-        if rec:
-            text = (
-                f"👋 <b>Halo, {user.first_name}!</b>\n\n"
-                f"🔍 <b>Deteksi Akun Lama:</b>\n"
-                f"Kami menemukan penyimpanan yang sebelumnya terdaftar dengan username @{user.username}:\n"
-                f"📁 <b>{rec['total_folders']} Folder</b> • 📄 <b>{rec['total_files']} File</b>\n\n"
-                f"Apakah Anda ingin memulihkan dan menyambungkan seluruh data lama Anda ke akun Telegram ini?"
-            )
-            await update.message.reply_text(
-                text,
-                parse_mode="HTML",
-                reply_markup=kb.account_recovery_detected(rec["old_user_id"]),
-            )
-            return
-
     await _send_welcome_screen(update, context, user.id, lang)
 
 
@@ -349,47 +331,31 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def _process_recovery_key(update: Update, context: ContextTypes.DEFAULT_TYPE, key_input: str):
     clean = key_input.strip()
-    target_old_id = None
-
-    if clean.upper().startswith("DS-"):
-        num_str = clean[3:].strip()
-        if num_str.isdigit():
-            target_old_id = int(num_str)
-    elif clean.isdigit():
-        target_old_id = int(clean)
-    else:
-        clean_user = clean.lstrip("@").lower()
-        res = db.table("users").select("*").ilike("username", clean_user).execute()
-        candidates = res.data or []
-        for cand in candidates:
-            if cand["id"] != update.effective_user.id:
-                target_old_id = cand["id"]
-                break
-
     _reset(context)
 
-    if not target_old_id:
+    if not clean.upper().startswith("DREC-"):
         await update.message.reply_text(
-            "❌ <b>Akun lama tidak ditemukan.</b>\nPastikan format Kunci Pemulihan (DS-xxx), Telegram ID, atau @username sudah benar.",
+            "❌ <b>Format kode pemulihan tidak valid.</b>\n\n"
+            "Format kode pemulihan yang sah adalah <code>DREC-xxxx-xxxx</code>.\n"
+            "Buat kode ini terlebih dahulu dari akun Telegram lama Anda melalui menu <b>Settings > Identitas & Pemulihan Akun</b>.",
             parse_mode="HTML",
             reply_markup=kb.main_menu(),
         )
         return
 
-    info_old = db.get_storage_info(target_old_id)
-    if info_old["total_files"] == 0 and info_old["total_folders"] == 0:
+    success, msg = db.redeem_account_recovery_code(update.effective_user.id, clean)
+    if not success:
         await update.message.reply_text(
-            "⚠️ Akun tersebut ditemukan tetapi tidak memiliki file atau folder tersimpan.",
+            f"❌ <b>Gagal memulihkan data:</b>\n{msg}",
+            parse_mode="HTML",
             reply_markup=kb.main_menu(),
         )
         return
 
-    db.transfer_user_data(target_old_id, update.effective_user.id)
-    from utils import format_size
     await update.message.reply_text(
         f"🎉 <b>Data Berhasil Dipulihkan!</b>\n\n"
-        f"Berhasil menyambungkan 📁 <b>{info_old['total_folders']} Folder</b> dan 📄 <b>{info_old['total_files']} File</b> ({format_size(info_old['total_size'])}) ke akun ini.\n\n"
-        f"Selamat menikmati kembali Darfin Storage! 🚀",
+        f"Seluruh file dan folder dari akun lama Anda telah berhasil dipindahkan ke akun ini.\n"
+        f"Buka 📁 <b>My Files</b> untuk melihat seluruh berkas Anda!",
         parse_mode="HTML",
         reply_markup=kb.main_menu(),
     )
@@ -403,10 +369,20 @@ async def _verify_share_pin(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         await update.message.reply_text("❌ File tidak ditemukan atau link sudah kadaluarsa.", reply_markup=kb.main_menu())
         return
 
-    from utils import parse_share_token, file_emoji, format_size
+    from utils import parse_share_token, file_emoji, format_size, verify_pin
     sec = parse_share_token(f.get("share_token") or "")
-    if sec.get("pin") and pin_text.strip() != str(sec["pin"]).strip():
-        await update.message.reply_text("❌ <b>PIN salah!</b> Silakan coba lagi:", parse_mode="HTML")
+    stored_pin = sec.get("pin")
+
+    attempts = context.user_data.get("pin_attempts", 0) + 1
+    context.user_data["pin_attempts"] = attempts
+
+    if attempts > 5:
+        _reset(context)
+        await update.message.reply_text("❌ Terlalu banyak percobaan PIN salah. Akses dibatalkan.", reply_markup=kb.main_menu())
+        return
+
+    if stored_pin and not verify_pin(pin_text.strip(), stored_pin):
+        await update.message.reply_text(f"❌ <b>PIN salah!</b> (Percobaan {attempts}/5). Silakan coba lagi:", parse_mode="HTML")
         return
 
     _reset(context)
@@ -427,6 +403,7 @@ async def _verify_share_pin(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 async def _save_file_share_pin(update: Update, context: ContextTypes.DEFAULT_TYPE, pin_text: str):
     file_id = context.user_data.get("sec_file_id")
+    user_id = update.effective_user.id
     clean_pin = pin_text.strip()
     if not clean_pin.isdigit() or len(clean_pin) != 4:
         await update.message.reply_text(
@@ -436,7 +413,7 @@ async def _save_file_share_pin(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     _reset(context)
-    db.update_file_share_security(file_id, pin=clean_pin)
+    db.update_file_share_security(file_id, pin=clean_pin, user_id=user_id)
     await update.message.reply_text(
         f"✅ <b>PIN Proteksi Berhasil Disimpan!</b>\n\n"
         f"PIN: <code>{clean_pin}</code>\n"
@@ -449,18 +426,19 @@ async def _save_file_share_pin(update: Update, context: ContextTypes.DEFAULT_TYP
 async def _save_file_tags(update: Update, context: ContextTypes.DEFAULT_TYPE, raw_text: str):
     import re
     file_id = context.user_data.get("tag_file_id")
+    user_id = update.effective_user.id
     _reset(context)
 
-    f = db.get_file(file_id) if file_id else None
+    f = db.get_file_for_user(file_id, user_id) if file_id else None
     if not f:
-        await update.message.reply_text("❌ File tidak ditemukan.", reply_markup=kb.main_menu())
+        await update.message.reply_text("❌ File tidak ditemukan atau akses ditolak.", reply_markup=kb.main_menu())
         return
 
     found_tags = re.findall(r"#([a-zA-Z0-9_-]+)", raw_text)
     note_clean = re.sub(r"#[a-zA-Z0-9_-]+", "", raw_text).strip()
     note_clean = re.sub(r"\s+", " ", note_clean)
 
-    db.update_file_notes_and_tags(file_id, note=note_clean, tags=found_tags)
+    db.update_file_notes_and_tags(file_id, note=note_clean, tags=found_tags, user_id=user_id)
 
     tag_str = " ".join(f"#{t}" for t in found_tags) if found_tags else "<i>(Tidak ada)</i>"
     note_str = f"<i>{note_clean}</i>" if note_clean else "<i>(Tidak ada)</i>"
@@ -476,22 +454,15 @@ async def _save_file_tags(update: Update, context: ContextTypes.DEFAULT_TYPE, ra
 
 
 async def callback_recovery_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """rec:link:{old_user_id} — execute 1-click account link from auto-detect."""
+    """rec:link:{old_user_id} — deprecated unsafe direct link handler."""
     query = update.callback_query
-    await query.answer()
-    old_id = int(query.data.split(":")[2])
-    new_id = query.from_user.id
-
-    info = db.transfer_user_data(old_id, new_id)
-    from utils import format_size
-    text = (
-        f"🎉 <b>Data Berhasil Dipulihkan!</b>\n\n"
-        f"Seluruh file dari akun lama Anda telah disambungkan ke akun ini:\n"
-        f"📁 <b>{info['total_folders']} Folder</b> • 📄 <b>{info['total_files']} File</b> ({format_size(info['total_size'])})\n\n"
-        f"Buka 📁 <b>My Files</b> untuk melihat seluruh berkas Anda!"
+    await query.answer("Fitur ini dinonaktifkan demi keamanan.", show_alert=True)
+    await query.edit_message_text(
+        "❌ <b>Pemulihan Otomatis Dinonaktifkan</b>\n\n"
+        "Demi keamanan data pengguna, pemulihan akun otomatis berdasarkan ID/username telah dinonaktifkan.\n\n"
+        "Silakan buka akun Telegram lama Anda, buka menu <b>Settings > Identitas & Pemulihan Akun > Buat Kode Pemulihan Sementara</b>, lalu masukkan kode tersebut di akun ini.",
+        parse_mode="HTML",
     )
-    await query.edit_message_text(text, parse_mode="HTML")
-    await query.message.reply_text("Silakan pilih menu:", reply_markup=kb.main_menu())
 
 
 async def callback_recovery_ignore(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -500,7 +471,6 @@ async def callback_recovery_ignore(update: Update, context: ContextTypes.DEFAULT
     await query.answer()
     await query.edit_message_text("✅ Anda memilih memulai storage baru.", parse_mode="HTML")
     await query.message.reply_text(WELCOME, parse_mode="HTML", reply_markup=kb.main_menu())
-
 
 
 async def _create_folder(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
@@ -514,7 +484,6 @@ async def _create_folder(update: Update, context: ContextTypes.DEFAULT_TYPE, nam
     if folder:
         await update.message.reply_text(f"✅ Folder <b>{name}</b> dibuat!", parse_mode="HTML",
                                         reply_markup=kb.main_menu())
-        # Show parent folder contents
         from handlers.folders import _show_folder_view
         await _show_folder_view(update, context, parent_id, user_id, send_new=True)
     else:
@@ -523,19 +492,21 @@ async def _create_folder(update: Update, context: ContextTypes.DEFAULT_TYPE, nam
 
 async def _rename_folder(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
     folder_id = context.user_data.get("rename_target_id")
-    db.rename_folder(folder_id, name)
+    user_id = update.effective_user.id
+    db.rename_folder(folder_id, name, user_id=user_id)
     _reset(context)
     await update.message.reply_text(f"✅ Folder renamed to <b>{name}</b>", parse_mode="HTML",
                                     reply_markup=kb.main_menu())
     from handlers.folders import _show_folder_view
-    folder = db.get_folder(folder_id)
+    folder = db.get_folder_for_user(folder_id, user_id)
     if folder:
-        await _show_folder_view(update, context, folder.get("parent_id"), update.effective_user.id, send_new=True)
+        await _show_folder_view(update, context, folder.get("parent_id"), user_id, send_new=True)
 
 
 async def _rename_file(update: Update, context: ContextTypes.DEFAULT_TYPE, name: str):
     file_id = context.user_data.get("rename_target_id")
-    db.rename_file(file_id, name)
+    user_id = update.effective_user.id
+    db.rename_file(file_id, name, user_id=user_id)
     _reset(context)
     await update.message.reply_text(f"✅ File renamed to <b>{name}</b>", parse_mode="HTML",
                                     reply_markup=kb.main_menu())

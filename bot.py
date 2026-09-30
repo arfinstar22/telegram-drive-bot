@@ -21,23 +21,28 @@ async def keep_alive_worker():
     import urllib.request
     ping_url = f"{WEBHOOK_URL.rstrip('/')}/api/ping"
     log.info("Keep-alive worker started. Target: %s (interval: 10m)", ping_url)
-    # Wait 3 minutes before beginning recurring keep-alive pings
-    await asyncio.sleep(180)
-    while True:
-        try:
-            req = urllib.request.Request(
-                ping_url,
-                headers={"User-Agent": "DarfinStorage-KeepAlive/1.0"}
-            )
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(
-                None,
-                lambda: urllib.request.urlopen(req, timeout=15)
-            )
-            log.info("Keep-alive ping OK -> %s", ping_url)
-        except Exception as e:
-            log.debug("Keep-alive ping note: %s", e)
-        await asyncio.sleep(600)
+    try:
+        # Wait 3 minutes before beginning recurring keep-alive pings
+        await asyncio.sleep(180)
+        while True:
+            try:
+                req = urllib.request.Request(
+                    ping_url,
+                    headers={"User-Agent": "DarfinStorage-KeepAlive/1.0"}
+                )
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(
+                    None,
+                    lambda: urllib.request.urlopen(req, timeout=15)
+                )
+                log.info("Keep-alive ping OK -> %s", ping_url)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                log.debug("Keep-alive ping note: %s", e)
+            await asyncio.sleep(600)
+    except asyncio.CancelledError:
+        log.info("Keep-alive worker cancelled gracefully.")
 
 
 async def post_init(application: Application) -> None:
@@ -135,6 +140,7 @@ def main():
     app.add_handler(CallbackQueryHandler(settings.reset_storage_prompt, pattern=r"^rst:prompt$"))
     app.add_handler(CallbackQueryHandler(settings.reset_storage_confirm, pattern=r"^rst:confirm$"))
     app.add_handler(CallbackQueryHandler(settings.account_recovery_menu, pattern=r"^rec:menu$"))
+    app.add_handler(CallbackQueryHandler(settings.account_recovery_generate_code, pattern=r"^rec:gen_code$"))
     app.add_handler(CallbackQueryHandler(settings.account_recovery_input_prompt, pattern=r"^rec:input_prompt$"))
     app.add_handler(CallbackQueryHandler(menu.callback_recovery_link, pattern=r"^rec:link:\d+$"))
     app.add_handler(CallbackQueryHandler(menu.callback_recovery_ignore, pattern=r"^rec:ignore$"))

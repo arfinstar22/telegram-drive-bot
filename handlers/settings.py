@@ -116,23 +116,23 @@ async def trash_restore(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """tr:{file_id} — restore file from trash."""
     query = update.callback_query
     file_id = int(query.data.split(":")[1])
-    f = db.get_file(file_id)
+    user_id = query.from_user.id
+    f = db.get_file_for_user(file_id, user_id)
 
     if f:
         # Check if folder still exists
-        folder = db.get_folder(f["folder_id"])
+        folder = db.get_folder_for_user(f["folder_id"], user_id)
         if not folder:
             await query.answer("Folder asli sudah dihapus. Tidak bisa restore.", show_alert=True)
             return
 
-        db.restore_file(file_id)
+        db.restore_file(file_id, user_id=user_id)
         await query.answer(f"♻️ {f['file_name']} restored!")
     else:
-        await query.answer("File tidak ditemukan", show_alert=True)
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
         return
 
     # Refresh trash view
-    user_id = query.from_user.id
     files = db.get_trash(user_id)
     text = f"🗑 <b>Trash</b>\n\n{len(files)} file" if files else "🗑 <b>Trash</b>\n\nKosong!"
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb.trash_list(files))
@@ -142,16 +142,16 @@ async def trash_permanent_delete(update: Update, context: ContextTypes.DEFAULT_T
     """tp:{file_id} — permanently delete from trash."""
     query = update.callback_query
     file_id = int(query.data.split(":")[1])
-    f = db.get_file(file_id)
+    user_id = query.from_user.id
+    f = db.get_file_for_user(file_id, user_id)
 
     if f:
-        db.permanent_delete(file_id)
+        db.permanent_delete(file_id, user_id=user_id)
         await query.answer(f"❌ {f['file_name']} dihapus permanen")
     else:
-        await query.answer("File tidak ditemukan", show_alert=True)
+        await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
         return
 
-    user_id = query.from_user.id
     files = db.get_trash(user_id)
     text = f"🗑 <b>Trash</b>\n\n{len(files)} file" if files else "🗑 <b>Trash</b>\n\nKosong!"
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb.trash_list(files))
@@ -270,36 +270,57 @@ async def reset_storage_confirm(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 # ── Account Recovery & Identity ────────────────────────
-
 async def account_recovery_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """rec:menu — show account recovery key and manual link option."""
+    """rec:menu — show account recovery options with secure token generation."""
     query = update.callback_query
     await query.answer()
     user = query.from_user
-    key = f"DS-{user.id}"
 
     text = (
         "🔑 <b>Identitas & Pemulihan Akun</b>\n"
         "━━━━━━━━━━━━━━━━━━━\n"
         f"👤 <b>Nama:</b> {user.full_name}\n"
         f"🆔 <b>Telegram ID:</b> <code>{user.id}</code>\n"
-        f"🏷 <b>Username:</b> @{user.username if user.username else '<i>Belum pasang username</i>'}\n"
-        f"🔐 <b>Kunci Pemulihan:</b> <code>{key}</code>\n\n"
-        "📌 <b>Bagaimana Bot Mengenali Anda?</b>\n"
-        "1. <b>Otomatis:</b> Selama akun Telegram Anda sama, bot otomatis mengenali dan menyimpan seluruh data Anda selamanya.\n"
-        "2. <b>Auto-Sync Username:</b> Jika Anda menghapus akun dan membuat akun baru dengan @username yang sama, bot otomatis menawarkan pemulihan data saat klik /start.\n"
-        "3. <b>Kunci Akun:</b> Simpan Kunci Pemulihan di atas. Jika Anda ganti akun atau nomor baru, gunakan tombol di bawah untuk menyambungkan data lama ke akun ini."
+        f"🏷 <b>Username:</b> @{user.username if user.username else '<i>Belum pasang username</i>'}\n\n"
+        "📌 <b>Keamanan Pemulihan Akun:</b>\n"
+        "Pemulihan akun memerlukan kode rahasia <i>one-time</i> yang dibuat langsung dari akun pemilik lama.\n\n"
+        "• <b>Buat Kode:</b> Jika Anda berencana mengganti akun Telegram, buat kode pemulihan sementara (berlaku 15 menit).\n"
+        "• <b>Sambungkan:</b> Di akun Telegram baru Anda, masukkan kode tersebut untuk menyambungkan seluruh file dan folder."
     )
     from telegram import InlineKeyboardMarkup, InlineKeyboardButton
     buttons = [
-        [InlineKeyboardButton("🔄 Sambungkan Akun Lama", callback_data="rec:input_prompt")],
+        [InlineKeyboardButton("🔐 Buat Kode Pemulihan Sementara", callback_data="rec:gen_code")],
+        [InlineKeyboardButton("🔄 Masukkan Kode Pemulihan", callback_data="rec:input_prompt")],
         [InlineKeyboardButton("⬅️ Kembali ke Settings", callback_data="sb")],
     ]
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
 
 
+async def account_recovery_generate_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """rec:gen_code — generate a cryptographically secure 15-minute one-time recovery code."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    code = db.generate_account_recovery_code(user_id)
+
+    text = (
+        "🔐 <b>Kode Pemulihan Akun Sementara</b>\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        f"Kode Anda:\n<code>{code}</code>\n\n"
+        "⚠️ <b>Perhatian Penting:</b>\n"
+        "• Kode ini hanya berlaku selama <b>15 menit</b>.\n"
+        "• Hanya dapat digunakan <b>satu kali</b>.\n"
+        "• <b>JANGAN</b> berikan kode ini kepada siapa pun! Siapa pun yang memiliki kode ini dapat memindahkan seluruh file Anda ke akun mereka."
+    )
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    buttons = [
+        [InlineKeyboardButton("⬅️ Kembali", callback_data="rec:menu")],
+    ]
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(buttons))
+
+
 async def account_recovery_input_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """rec:input_prompt — ask user to send old username or recovery key."""
+    """rec:input_prompt — ask user to send one-time recovery code."""
     query = update.callback_query
     await query.answer()
     context.user_data["state"] = "awaiting_recovery_key"
@@ -307,11 +328,8 @@ async def account_recovery_input_prompt(update: Update, context: ContextTypes.DE
     text = (
         "🔄 <b>Pemulihan Data Akun Lama</b>\n"
         "━━━━━━━━━━━━━━━━━━━\n"
-        "Kirimkan salah satu data akun lama Anda:\n"
-        "• <b>Kunci Pemulihan</b> (contoh: <code>DS-123456789</code>)\n"
-        "• <b>Telegram ID lama</b> (contoh: <code>123456789</code>)\n"
-        "• <b>Username lama</b> (contoh: <code>@darfinstar</code>)\n\n"
-        "Ketik datanya di chat sekarang atau klik Batal:"
+        "Ketikkan <b>Kode Pemulihan</b> <i>(format: DREC-xxxx-xxxx)</i> yang telah Anda buat dari akun lama Anda:\n\n"
+        "<i>Ketik kodenya di chat sekarang atau klik Batal:</i>"
     )
     from telegram import InlineKeyboardMarkup, InlineKeyboardButton
     buttons = [

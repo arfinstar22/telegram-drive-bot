@@ -1961,6 +1961,18 @@
   </style>
 </head>
 <body>
+  <!-- Fail-Closed Unauthorized Screen -->
+  <div id="unauthorizedOverlay" style="display:none; position:fixed; inset:0; z-index:99999; background:#090D16; align-items:center; justify-content:center; padding:24px; text-align:center;">
+    <div style="background:rgba(17,24,39,0.85); border:1px solid rgba(244,63,94,0.35); border-radius:24px; padding:36px 24px; max-width:400px; box-shadow:0 12px 40px rgba(0,0,0,0.6); backdrop-filter:blur(20px);">
+      <div style="font-size:48px; margin-bottom:16px;">🔒</div>
+      <h2 style="font-size:20px; font-weight:700; color:#F8FAFC; margin-bottom:8px;">Akses Tidak Diizinkan</h2>
+      <p style="font-size:14px; color:#94A3B8; line-height:1.6; margin-bottom:24px;">
+        Darfin Storage dilindungi autentikasi resmi Telegram. Harap buka aplikasi Cloud Drive ini langsung dari aplikasi Telegram melalui bot resmi.
+      </p>
+      <a href="https://t.me" id="openTelegramBtn" style="display:inline-block; padding:12px 28px; background:linear-gradient(135deg, #0284C7, #6366F1); color:#fff; text-decoration:none; font-weight:600; border-radius:12px; font-size:14px; box-shadow:0 4px 16px rgba(56,189,248,0.25);">Buka di Telegram</a>
+    </div>
+  </div>
+
   <div class="ambient-bg"></div>
 
   <div class="container">
@@ -2574,11 +2586,81 @@
       } catch (e) {}
     }
 
-    // Determine current user ID
-    const urlParams = new URLSearchParams(window.location.search);
-    let userId = tg?.initDataUnsafe?.user?.id || urlParams.get('user_id') || 1166479771;
-    let userName = tg?.initDataUnsafe?.user?.first_name || 'My Drive';
-    document.getElementById('userName').innerText = userName;
+    let authToken = '';
+    let currentUser = null;
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s]);
+    }
+
+    function showUnauthorizedScreen() {
+      const overlay = document.getElementById('unauthorizedOverlay');
+      if (overlay) overlay.style.display = 'flex';
+      const container = document.querySelector('.container');
+      if (container) container.style.display = 'none';
+      const bnav = document.querySelector('.bottom-nav');
+      if (bnav) bnav.style.display = 'none';
+    }
+
+    async function initSession() {
+      const initData = window.Telegram?.WebApp?.initData || '';
+      try {
+        const res = await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ init_data: initData }),
+          credentials: 'same-origin'
+        });
+        if (!res.ok) {
+          showUnauthorizedScreen();
+          return false;
+        }
+        const data = await res.json();
+        if (data.ok && data.session_token) {
+          authToken = data.session_token;
+          currentUser = data.user || {};
+          const userNameEl = document.getElementById('userName');
+          if (userNameEl) userNameEl.innerText = currentUser.first_name || 'My Drive';
+          return true;
+        } else {
+          showUnauthorizedScreen();
+          return false;
+        }
+      } catch (err) {
+        console.error('Session handshake failed:', err);
+        showUnauthorizedScreen();
+        return false;
+      }
+    }
+
+    async function authFetch(url, options = {}) {
+      options.headers = options.headers || {};
+      if (authToken) {
+        if (options.headers instanceof Headers) {
+          options.headers.set('Authorization', `Bearer ${authToken}`);
+        } else {
+          options.headers['Authorization'] = `Bearer ${authToken}`;
+        }
+      }
+      const initData = window.Telegram?.WebApp?.initData;
+      if (initData) {
+        if (options.headers instanceof Headers) {
+          options.headers.set('X-Telegram-Init-Data', initData);
+        } else {
+          options.headers['X-Telegram-Init-Data'] = initData;
+        }
+      }
+      options.credentials = 'same-origin';
+      return fetch(url, options);
+    }
+
+    function signMediaUrl(url) {
+      if (!url) return '';
+      if (!authToken) return url;
+      const sep = url.includes('?') ? '&' : '?';
+      return `${url}${sep}auth=${encodeURIComponent(authToken)}`;
+    }
 
     let currentFolderId = null;
     let currentCategory = 'all';
@@ -2667,9 +2749,9 @@
 
     async function pollServerStatus() {
       try {
-        let url = `/api/drive?user_id=${userId}`;
-        if (currentFolderId) url += `&folder_id=${currentFolderId}`;
-        const res = await fetch(url);
+        let url = '/api/drive';
+        if (currentFolderId) url += `?folder_id=${currentFolderId}`;
+        const res = await authFetch(url);
         if (res.ok) {
           const data = await res.json();
           handleServerWakeupSuccess(data);
@@ -2742,6 +2824,11 @@
     }
 
     async function loadDriveData() {
+      if (!authToken) {
+        const authed = await initSession();
+        if (!authed) return;
+      }
+
       if (!isServerAwake) {
         if (coldStartTimer) clearTimeout(coldStartTimer);
         coldStartTimer = setTimeout(() => {
@@ -2750,10 +2837,10 @@
       }
 
       try {
-        let url = `/api/drive?user_id=${userId}`;
-        if (currentFolderId) url += `&folder_id=${currentFolderId}`;
+        let url = '/api/drive';
+        if (currentFolderId) url += `?folder_id=${currentFolderId}`;
 
-        const res = await fetch(url);
+        const res = await authFetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         
@@ -3105,10 +3192,10 @@
         applyFilter();
       }
       try {
-        await fetch('/api/star', {
+        await authFetch('/api/star', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_id: fileId, user_id: userId })
+          body: JSON.stringify({ file_id: fileId })
         });
       } catch (err) {
         console.error('Star failed', err);
@@ -3146,22 +3233,22 @@
       previewEl.innerHTML = '';
 
       const fname = (f.file_name || '').toLowerCase();
-      const dlUrl = `/api/download?file_id=${f.id}&user_id=${userId}`;
+      const dlUrl = signMediaUrl(`/api/download?file_id=${f.id}`);
 
       if (f.file_type === 'photo') {
         previewEl.style.display = 'block';
-        previewEl.innerHTML = `<img src="${f.stream_url || dlUrl}" style="width: 100%; max-height: 250px; object-fit: contain; background: #000; border-radius: 8px; display: block;" alt="${escapeHtml(f.file_name)}">`;
+        previewEl.innerHTML = `<img src="${signMediaUrl(f.stream_url) || dlUrl}" style="width: 100%; max-height: 250px; object-fit: contain; background: #000; border-radius: 8px; display: block;" alt="${escapeHtml(f.file_name)}">`;
       } else if (f.file_type === 'video') {
         previewEl.style.display = 'block';
         const sizeBytes = f.file_size || 0;
         const isOver20MB = sizeBytes > 20 * 1024 * 1024;
         if (!isOver20MB) {
           previewEl.innerHTML = `
-            <video controls playsinline preload="metadata" poster="${f.thumb_url || ''}" style="width: 100%; max-height: 250px; border-radius: 8px; background: #000; display: block;" src="${dlUrl}"></video>
+            <video controls playsinline preload="metadata" poster="${signMediaUrl(f.thumb_url) || ''}" style="width: 100%; max-height: 250px; border-radius: 8px; background: #000; display: block;" src="${dlUrl}"></video>
           `;
         } else {
           const bannerBg = f.thumb_url
-            ? `background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(15,23,42,0.92) 85%), url('${f.thumb_url}') center/cover no-repeat;`
+            ? `background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(15,23,42,0.92) 85%), url('${signMediaUrl(f.thumb_url)}') center/cover no-repeat;`
             : `background: linear-gradient(180deg, rgba(245, 158, 11, 0.1), rgba(0, 0, 0, 0.5));`;
           previewEl.innerHTML = `
             <div class="preview-video-large" style="${bannerBg} border-radius: 10px; min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 16px;">
@@ -3199,7 +3286,7 @@
             </div>
             <div class="code-preview-box" id="codeBoxContent">Memuat teks...</div>
           `;
-          fetch(`/api/file_content?file_id=${f.id}`)
+          authFetch(`/api/file_content?file_id=${f.id}`)
             .then(r => r.json())
             .then(data => {
               const box = document.getElementById('codeBoxContent');
@@ -3241,10 +3328,10 @@
       btn.disabled = true;
 
       try {
-        const res = await fetch('/api/send_to_chat', {
+        const res = await authFetch('/api/send_to_chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_id: activeModalFile.id, user_id: userId })
+          body: JSON.stringify({ file_id: activeModalFile.id })
         });
         const data = await res.json();
         if (data.ok) {
@@ -3449,14 +3536,13 @@
         onConfirm: async (newName) => {
           if (!newName || !newName.trim()) return;
           try {
-            const res = await fetch('/api/rename', {
+            const res = await authFetch('/api/rename', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 id: fld.id,
                 new_name: newName.trim(),
-                type: 'folder',
-                user_id: userId
+                type: 'folder'
               })
             });
             const data = await res.json();
@@ -3487,12 +3573,11 @@
         confirmText: 'Ya, Hapus Folder',
         onConfirm: async () => {
           try {
-            const res = await fetch('/api/batch_delete', {
+            const res = await authFetch('/api/batch_delete', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                folder_ids: [fld.id],
-                user_id: userId
+                folder_ids: [fld.id]
               })
             });
             const data = await res.json();
@@ -3609,7 +3694,7 @@
       document.getElementById('moveFolderModal').classList.add('active');
 
       try {
-        const res = await fetch(`/api/all_folders?user_id=${userId}`);
+        const res = await authFetch('/api/all_folders');
         const data = await res.json();
         const folders = data.folders || [];
         
@@ -3643,7 +3728,7 @@
 
         listEl.innerHTML = html;
       } catch (err) {
-        listEl.innerHTML = `<div style="text-align:center; padding: 24px; color:#ef4444;">Gagal memuat folder: ${err}</div>`;
+        listEl.innerHTML = `<div style="text-align:center; padding: 24px; color:#ef4444;">Gagal memuat folder: ${escapeHtml(err.message || String(err))}</div>`;
       }
     }
 
@@ -3675,13 +3760,12 @@
       btn.disabled = true;
 
       try {
-        const res = await fetch('/api/batch_move', {
+        const res = await authFetch('/api/batch_move', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             file_ids: pendingMoveFileIds,
-            target_folder_id: targetMoveFolderId,
-            user_id: userId
+            target_folder_id: targetMoveFolderId
           })
         });
         const data = await res.json();
@@ -3734,10 +3818,10 @@
       document.getElementById('fileShareModal').classList.add('active');
 
       try {
-        const res = await fetch('/api/file_share_link', {
+        const res = await authFetch('/api/file_share_link', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_id: fileId, user_id: userId, action: 'get' })
+          body: JSON.stringify({ file_id: fileId, action: 'get' })
         });
         const data = await res.json();
         if (data.ok) {
@@ -3786,10 +3870,10 @@
       if (!confirm('Apakah Anda yakin ingin menonaktifkan tautan publik berkas ini?')) return;
 
       try {
-        const res = await fetch('/api/file_share_link', {
+        const res = await authFetch('/api/file_share_link', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_id: activeModalFile.id, user_id: userId, action: 'revoke' })
+          body: JSON.stringify({ file_id: activeModalFile.id, action: 'revoke' })
         });
         const data = await res.json();
         if (data.ok) {
@@ -3835,11 +3919,11 @@
       }
 
       try {
-        let uploadUrl = `/api/upload?user_id=${userId}`;
+        let uploadUrl = '/api/upload';
         if (currentFolderId) {
-          uploadUrl += `&folder_id=${currentFolderId}`;
+          uploadUrl += `?folder_id=${currentFolderId}`;
         }
-        const res = await fetch(uploadUrl, {
+        const res = await authFetch(uploadUrl, {
           method: 'POST',
           body: formData
         });
@@ -3872,13 +3956,12 @@
       const newStarState = !allStarred;
 
       try {
-        const res = await fetch('/api/batch_star', {
+        const res = await authFetch('/api/batch_star', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             file_ids: fileIds,
-            is_starred: newStarState,
-            user_id: userId
+            is_starred: newStarState
           })
         });
         const data = await res.json();
@@ -3914,12 +3997,11 @@
       showToast(`Mengirim ${fileIds.length} berkas ke chat Telegram...`);
 
       try {
-        const res = await fetch('/api/batch_send_to_chat', {
+        const res = await authFetch('/api/batch_send_to_chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            file_ids: fileIds,
-            user_id: userId
+            file_ids: fileIds
           })
         });
         const data = await res.json();
@@ -3982,12 +4064,11 @@
         defaultValue: '',
         onConfirm: async (folderName) => {
           try {
-            const res = await fetch('/api/create_folder', {
+            const res = await authFetch('/api/create_folder', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 name: folderName,
-                user_id: userId,
                 parent_id: currentFolderId
               })
             });
@@ -4014,14 +4095,13 @@
         defaultValue: f.file_name,
         onConfirm: async (newName) => {
           try {
-            const res = await fetch('/api/rename', {
+            const res = await authFetch('/api/rename', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 id: f.id,
                 new_name: newName,
-                is_folder: false,
-                user_id: userId
+                is_folder: false
               })
             });
             const data = await res.json();
@@ -4078,12 +4158,11 @@
         msg: `Apakah Anda yakin ingin menghapus ${count} berkas ini secara permanen dari penyimpanan Anda?`,
         onConfirm: async () => {
           try {
-            const res = await fetch('/api/batch_delete', {
+            const res = await authFetch('/api/batch_delete', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                file_ids: fileIds,
-                user_id: userId
+                file_ids: fileIds
               })
             });
             const data = await res.json();
@@ -4107,7 +4186,7 @@
       const bar = document.getElementById('audioPlayerBar');
       const title = document.getElementById('audioTitle');
       title.innerText = f.file_name;
-      audioEl.src = `/api/download?file_id=${f.id}&user_id=${userId}`;
+      audioEl.src = signMediaUrl(`/api/download?file_id=${f.id}`);
       audioEl.play();
       bar.style.display = 'flex';
       updatePlayIcons(true);
@@ -4164,12 +4243,11 @@
       document.getElementById('dropzoneUrlInput').value = 'Menghubungkan link...';
 
       try {
-        const res = await fetch('/api/folder_dropzone', {
+        const res = await authFetch('/api/folder_dropzone', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             folder_id: activeDropzoneFolderId,
-            user_id: userId,
             action: 'get'
           })
         });
@@ -4219,12 +4297,11 @@
       triggerHaptic();
 
       try {
-        const res = await fetch('/api/folder_dropzone', {
+        const res = await authFetch('/api/folder_dropzone', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             folder_id: activeDropzoneFolderId,
-            user_id: userId,
             action: 'revoke'
           })
         });
@@ -4270,7 +4347,7 @@
       `;
 
       try {
-        const res = await fetch(`/api/trash?user_id=${userId}`);
+        const res = await authFetch('/api/trash');
         const data = await res.json();
         if (data.ok) {
           trashFiles = data.files || [];
@@ -4278,10 +4355,10 @@
           const pill = document.getElementById('trashCountPill');
           if (pill) pill.innerText = trashFiles.length;
         } else {
-          container.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><p>Gagal memuat sampah.</p></div>`;
+          container.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><p>Gagal memuat sampah: ${escapeHtml(data.error || 'Unknown error')}</p></div>`;
         }
       } catch (err) {
-        container.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><p>Error: ${err}</p></div>`;
+        container.innerHTML = `<div class="empty-state" style="grid-column: 1/-1;"><p>Error: ${escapeHtml(err.message || String(err))}</p></div>`;
       }
     }
 
@@ -4310,7 +4387,7 @@
       container.className = 'files-grid';
       container.innerHTML = files.map(f => {
         const iconSvg = getFileIconSvg(f.file_type);
-        const thumbUrl = f.thumb_url;
+        const thumbUrl = f.thumb_url ? signMediaUrl(f.thumb_url) : '';
         const thumbHtml = thumbUrl
           ? `<img class="file-thumb-img" src="${thumbUrl}" loading="lazy" alt="${escapeHtml(f.file_name)}" onerror="this.parentElement.innerHTML = getFileIconSvg('${f.file_type}');">`
           : iconSvg;
@@ -4342,10 +4419,10 @@
     async function restoreTrashFile(fileId) {
       triggerHaptic();
       try {
-        const res = await fetch('/api/restore', {
+        const res = await authFetch('/api/restore', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_ids: [fileId], user_id: userId })
+          body: JSON.stringify({ file_ids: [fileId] })
         });
         const data = await res.json();
         if (data.ok) {
@@ -4369,10 +4446,10 @@
         msg: `Semua berkas (${trashFiles.length} item) di kotak sampah akan dihapus secara permanen dan tidak dapat dipulihkan.`,
         onConfirm: async () => {
           try {
-            const res = await fetch('/api/empty_trash', {
+            const res = await authFetch('/api/empty_trash', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ user_id: userId })
+              body: JSON.stringify({})
             });
             const data = await res.json();
             if (data.ok) {
@@ -4402,7 +4479,7 @@
       btn.disabled = true;
 
       try {
-        const res = await fetch(`/api/duplicates?user_id=${userId}`);
+        const res = await authFetch('/api/duplicates');
         const data = await res.json();
         if (data.ok) {
           if (!data.total_duplicates) {
@@ -4438,10 +4515,10 @@
             </div>
           `).join('');
         } else {
-          listEl.innerHTML = `<div style="text-align:center; color:var(--rose); padding:16px;">Gagal memindai: ${data.error}</div>`;
+          listEl.innerHTML = `<div style="text-align:center; color:var(--rose); padding:16px;">Gagal memindai: ${escapeHtml(data.error || 'Unknown error')}</div>`;
         }
       } catch (err) {
-        listEl.innerHTML = `<div style="text-align:center; color:var(--rose); padding:16px;">Error koneksi: ${err}</div>`;
+        listEl.innerHTML = `<div style="text-align:center; color:var(--rose); padding:16px;">Error koneksi: ${escapeHtml(err.message || String(err))}</div>`;
       }
     }
 
@@ -4537,10 +4614,10 @@
       btn.innerText = 'Membersihkan...';
 
       try {
-        const res = await fetch('/api/clean_duplicates', {
+        const res = await authFetch('/api/clean_duplicates', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: userId })
+          body: JSON.stringify({})
         });
         const data = await res.json();
         if (data.ok) {

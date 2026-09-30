@@ -43,7 +43,7 @@ async def _show_root(query, user_id: int):
 
 
 async def _show_folder_contents(query, context, folder_id: int, user_id: int, page: int = 1):
-    folder = db.get_folder(folder_id)
+    folder = db.get_folder_for_user(folder_id, user_id)
     if not folder:
         await query.edit_message_text("❌ Folder tidak ditemukan.")
         return
@@ -168,12 +168,17 @@ async def rename_folder_prompt(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
     folder_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
+
+    folder = db.get_folder_for_user(folder_id, user_id)
+    if not folder:
+        await query.edit_message_text("❌ Folder tidak ditemukan.")
+        return
 
     context.user_data["state"] = "renaming_folder"
     context.user_data["rename_target_id"] = folder_id
 
-    folder = db.get_folder(folder_id)
-    name = folder["name"] if folder else "?"
+    name = folder["name"]
     await query.message.reply_text(
         f"✏️ Rename folder <b>{name}</b>\nKetik nama baru:",
         parse_mode="HTML",
@@ -186,8 +191,9 @@ async def delete_folder_prompt(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
     folder_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    folder = db.get_folder(folder_id)
+    folder = db.get_folder_for_user(folder_id, user_id)
     if not folder:
         await query.edit_message_text("❌ Folder tidak ditemukan.")
         return
@@ -207,14 +213,18 @@ async def delete_folder_prompt(update: Update, context: ContextTypes.DEFAULT_TYP
 async def confirm_delete_folder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """dxc:{folder_id} — actually delete."""
     query = update.callback_query
-    await query.answer("Folder dihapus ✅")
     folder_id = int(query.data.split(":")[1])
-
-    folder = db.get_folder(folder_id)
-    parent_id = folder["parent_id"] if folder else None
     user_id = query.from_user.id
 
-    db.delete_folder(folder_id)
+    folder = db.get_folder_for_user(folder_id, user_id)
+    if not folder:
+        await query.answer("Folder tidak ditemukan / akses ditolak", show_alert=True)
+        return
+
+    await query.answer("Folder dihapus ✅")
+    parent_id = folder.get("parent_id")
+
+    db.delete_folder(folder_id, user_id=user_id)
 
     # Go back to parent
     if parent_id:
@@ -238,10 +248,10 @@ async def toggle_star_folder(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """dst:{folder_id} — toggle starred status for folder."""
     query = update.callback_query
     folder_id = int(query.data.split(":")[1])
-    is_starred = db.toggle_star_folder(folder_id)
+    user_id = query.from_user.id
+    is_starred = db.toggle_star_folder(folder_id, user_id=user_id)
     msg = "Ditambahkan ke Favorit ⭐" if is_starred else "Dihapus dari Favorit"
     await query.answer(msg)
-    user_id = query.from_user.id
     await _show_folder_contents(query, context, folder_id, user_id)
 
 
@@ -263,13 +273,14 @@ async def share_folder_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
     folder_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
-    folder = db.get_folder(folder_id)
+    folder = db.get_folder_for_user(folder_id, user_id)
     if not folder:
         await query.edit_message_text("❌ Folder tidak ditemukan.")
         return
 
-    token = db.get_or_create_folder_share_token(folder_id)
+    token = db.get_or_create_folder_share_token(folder_id, user_id=user_id)
     bot_me = await context.bot.get_me()
     share_link = f"https://t.me/{bot_me.username}?start=sd_{token}"
 
@@ -287,7 +298,7 @@ async def revoke_folder_share(update: Update, context: ContextTypes.DEFAULT_TYPE
     """dsh_rev:{folder_id} — revoke share link."""
     query = update.callback_query
     folder_id = int(query.data.split(":")[1])
-    db.revoke_folder_share_token(folder_id)
-    await query.answer("Link dibatalkan ✅")
     user_id = query.from_user.id
+    db.revoke_folder_share_token(folder_id, user_id=user_id)
+    await query.answer("Link dibatalkan ✅")
     await _show_folder_contents(query, context, folder_id, user_id)

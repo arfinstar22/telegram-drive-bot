@@ -389,8 +389,14 @@
     }
 
     let retryCount = 0;
+    let enteredPin = '';
 
-    async function loadFileInfo() {
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s]);
+    }
+
+    async function loadFileInfo(pin = '') {
       shareToken = getTokenFromUrl();
       if (!shareToken) {
         showError('Token link tidak valid.');
@@ -398,24 +404,65 @@
       }
 
       try {
-        const res = await fetch(`/api/share_file_info?token=${shareToken}`);
+        let apiUrl = `/api/share_file_info?token=${encodeURIComponent(shareToken)}`;
+        if (pin) apiUrl += `&pin=${encodeURIComponent(pin)}`;
+        const res = await fetch(apiUrl);
         const data = await res.json();
+
+        if (data.pin_required) {
+          renderPinPrompt(data.file, data.error);
+          return;
+        }
+
         if (!data.ok || !data.file) {
           showError(data.error || 'Berkas tidak ditemukan atau telah dihapus.');
           return;
         }
 
         fileData = data.file;
+        if (pin) enteredPin = pin;
         renderFile(fileData);
       } catch (err) {
         if (retryCount < 6) {
           retryCount++;
           document.getElementById('fileTitle').innerText = `Menyiapkan server (${retryCount * 5}s)...`;
-          setTimeout(loadFileInfo, 3500);
+          setTimeout(() => loadFileInfo(pin), 3500);
           return;
         }
         showError('Gagal memuat data berkas. Pastikan server aktif: ' + err.message);
       }
+    }
+
+    function renderPinPrompt(filePreview, errorMsg) {
+      const errHtml = errorMsg ? `<div style="color:var(--rose); font-size:0.8rem; margin-bottom:12px; font-weight:600;">❌ ${escapeHtml(errorMsg)}</div>` : '';
+      const fname = filePreview?.name ? escapeHtml(filePreview.name) : 'Berkas Terproteksi';
+      document.getElementById('mainContainer').innerHTML = `
+        <div style="text-align: center; padding: 20px 8px;">
+          <div style="font-size: 3rem; margin-bottom: 12px;">🔒</div>
+          <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; color: #FFF; margin-bottom: 6px;">Berkas Dilindungi PIN</h2>
+          <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 18px;">
+            Pemilik berkas <strong>${fname}</strong> memasang 4-digit PIN rahasia untuk mengakses berkas ini.
+          </p>
+          ${errHtml}
+          <div style="display:flex; justify-content:center; gap:8px; margin-bottom:18px;">
+            <input type="password" id="inputPin" maxlength="6" inputmode="numeric" placeholder="Ketik PIN..." style="width:160px; padding:12px; background:rgba(0,0,0,0.5); border:1px solid var(--border); border-radius:12px; color:#fff; font-size:1.1rem; text-align:center; letter-spacing:4px; font-family:'JetBrains Mono', monospace; outline:none;" onkeydown="if(event.key==='Enter') submitPin()">
+          </div>
+          <button class="btn btn-primary" style="display:inline-flex; width:auto; padding:12px 32px;" onclick="submitPin()">
+            Buka Kunci Akses
+          </button>
+        </div>
+      `;
+      setTimeout(() => {
+        const inp = document.getElementById('inputPin');
+        if (inp) inp.focus();
+      }, 100);
+    }
+
+    function submitPin() {
+      const inp = document.getElementById('inputPin');
+      const val = (inp?.value || '').trim();
+      if (!val) return;
+      loadFileInfo(val);
     }
 
     function renderFile(f) {
@@ -426,7 +473,8 @@
       document.getElementById('fileDateText').innerText = f.created_at ? `Diunggah ${f.created_at}` : '';
 
       const dlBtn = document.getElementById('btnDownload');
-      const directDlUrl = `/s/${shareToken}?download=1`;
+      let directDlUrl = `/s/${shareToken}?download=1`;
+      if (enteredPin) directDlUrl += `&pin=${encodeURIComponent(enteredPin)}`;
       dlBtn.href = directDlUrl;
       dlBtn.setAttribute('download', f.name);
 
@@ -441,11 +489,11 @@
       const previewUrl = f.preview_url || directDlUrl;
 
       if (type === 'photo') {
-        previewArea.innerHTML = `<img class="preview-media-img" src="${previewUrl}" alt="${f.name}" onerror="renderDocFallback()">`;
+        previewArea.innerHTML = `<img class="preview-media-img" src="${previewUrl}" alt="${escapeHtml(f.name)}" onerror="renderDocFallback()">`;
       } else if (type === 'video') {
         previewArea.innerHTML = `
           <video class="preview-media-video" controls playsinline preload="metadata">
-            <source src="${directDlUrl}" type="${f.mime_type || 'video/mp4'}">
+            <source src="${directDlUrl}" type="${escapeHtml(f.mime_type || 'video/mp4')}">
             Browser Anda tidak mendukung pemutar video.
           </video>
         `;
@@ -456,7 +504,7 @@
             <div style="font-size: 0.85rem; font-weight: 600; color: #fff;">Pemutar Audio</div>
           </div>
           <audio class="preview-media-audio" controls style="width: 90%; margin-bottom: 14px;">
-            <source src="${directDlUrl}" type="${f.mime_type || 'audio/mpeg'}">
+            <source src="${directDlUrl}" type="${escapeHtml(f.mime_type || 'audio/mpeg')}">
           </audio>
         `;
       } else {
@@ -487,13 +535,13 @@
         <div style="text-align: center; padding: 24px 10px;">
           <div style="font-size: 3rem; margin-bottom: 12px;">⚠️</div>
           <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; color: var(--rose); margin-bottom: 8px;">Tautan Tidak Ditemukan</h2>
-          <p style="color: var(--text-muted); font-size: 0.86rem; line-height: 1.5; margin-bottom: 24px;">${msg}</p>
+          <p style="color: var(--text-muted); font-size: 0.86rem; line-height: 1.5; margin-bottom: 24px;">${escapeHtml(msg)}</p>
           <a href="/" class="btn btn-secondary" style="display: inline-flex; width: auto; padding: 10px 24px;">Kembali ke Beranda</a>
         </div>
       `;
     }
 
-    window.addEventListener('DOMContentLoaded', loadFileInfo);
+    window.addEventListener('DOMContentLoaded', () => loadFileInfo());
   </script>
 </body>
 </html>

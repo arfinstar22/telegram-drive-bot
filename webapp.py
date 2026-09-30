@@ -1,23 +1,48 @@
 """Telegram Mini App (TMA) Web Server & API for Darfin Storage.
 
-Serves the visual glassmorphic cloud drive interface directly inside Telegram.
-Integrates with Tornado and Python-Telegram-Bot webhook server without extra dependencies.
+Serves the visual cloud drive interface directly inside Telegram.
+Enforces authentication, authorization, ownership verification,
+upload limits, exact-match share token validation, and secure rate limiting.
 """
 
 import asyncio
 import json
 import logging
 from pathlib import Path
+import time
 from typing import Optional
 
 import tornado.web
 import tornado.httputil
+import tornado.httpclient
 from telegram import Bot
 
-from config import BOT_TOKEN, PORT, WEBHOOK_URL
+from config import (
+    BOT_TOKEN,
+    PORT,
+    WEBHOOK_URL,
+    PUBLIC_BASE_URL,
+    ALLOWED_ORIGINS,
+    MAX_UPLOAD_FILE_SIZE_MB,
+    MAX_UPLOAD_BATCH_FILES,
+    MAX_UPLOAD_BATCH_MB,
+)
 import database as db
 import smart_organizer
-from utils import format_size, parse_file_metadata
+from utils import (
+    format_size,
+    parse_file_metadata,
+    parse_share_token,
+    sanitize_filename,
+    escape_html,
+    verify_pin,
+)
+from auth import (
+    require_authenticated_user,
+    get_authenticated_user,
+    validate_telegram_init_data,
+    create_session_token,
+)
 
 log = logging.getLogger(__name__)
 
@@ -25,21 +50,88 @@ TEMPLATE_PATH = Path(__file__).parent / "templates" / "webapp.html"
 DROPZONE_TEMPLATE_PATH = Path(__file__).parent / "templates" / "dropzone.html"
 SHARE_FILE_TEMPLATE_PATH = Path(__file__).parent / "templates" / "share_file.html"
 
+# In-memory rate limiter
+# Format: {key: [timestamps]}
+_RATE_LIMITS: dict[str, list[float]] = {}
+
+
+def check_rate_limit(key: str, max_requests: int = 10, window_seconds: int = 60) -> bool:
+    """Simple, zero-dependency in-memory rate limiter for sensitive endpoints."""
+    now = time.time()
+    timestamps = _RATE_LIMITS.setdefault(key, [])
+    _RATE_LIMITS[key] = [t for t in timestamps if now - t < window_seconds]
+    if len(_RATE_LIMITS[key]) >= max_requests:
+        return False
+    _RATE_LIMITS[key].append(now)
+    return True
+
+
+class RateLimiter:
+    """Zero-dependency token bucket / sliding window rate limiter."""
+    def __init__(self, max_requests: int = 60, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+
+    def allow_request(self, key: str) -> bool:
+        return check_rate_limit(key, self.max_requests, self.window_seconds)
+
+    def is_allowed(self, key: str) -> bool:
+        return self.allow_request(key)
+
 
 class BaseApiHandler(tornado.web.RequestHandler):
     def set_default_headers(self):
-        self.set_header("Access-Control-Allow-Origin", "*")
-        self.set_header("Access-Control-Allow-Headers", "x-requested-with, content-type")
-        self.set_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-        self.set_header("Content-Type", "application/json; charset=utf-8")
+        # Origin verification for CORS
+        origin = self.request.headers.get("Origin")
+        if origin:
+            if not ALLOWED_ORIGINS or origin in ALLOWED_ORIGINS:
+                self.set_header("Access-Control-Allow-Origin", origin)
+                self.set_header("Access-Control-Allow-Credentials", "true")
+            else:
+                log.debug("CORS origin not allowed: %s", origin)
+        elif not ALLOWED_ORIGINS:
+            self.set_header("Access-Control-Allow-Origin", "*")
 
-    def options(self):
+        self.set_header(
+            "Access-Control-Allow-Headers",
+            "x-requested-with, content-type, authorization, x-telegram-init-data",
+        )
+        self.set_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD")
+        self.set_header("Content-Type", "application/json; charset=utf-8")
+        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_header("X-Frame-Options", "SAMEORIGIN")
+        self.set_header("Referrer-Policy", "strict-origin-when-cross-origin")
+
+    def options(self, *args, **kwargs):
         self.set_status(204)
         self.finish()
 
+    def write_error(self, status_code: int, **kwargs):
+        """Sanitized error responses to prevent leaking internal traces or SQL."""
+        self.set_header("Content-Type", "application/json; charset=utf-8")
+        err_msg = "Terjadi kesalahan pada server."
+        if status_code == 400:
+            err_msg = "Permintaan tidak valid."
+        elif status_code == 401:
+            err_msg = "Autentikasi Telegram diperlukan."
+        elif status_code == 403:
+            err_msg = "Akses ditolak."
+        elif status_code == 404:
+            err_msg = "Objek tidak ditemukan."
+        elif status_code == 429:
+            err_msg = "Terlalu banyak permintaan. Silakan tunggu beberapa saat."
+
+        self.finish(json.dumps({
+            "ok": False,
+            "error": {
+                "code": f"HTTP_{status_code}",
+                "message": err_msg,
+            }
+        }))
+
 
 class ApiPingHandler(BaseApiHandler):
-    """Health check / ping endpoint for keep-alive worker and WebApp cold-start detection."""
+    """Health check / ping endpoint."""
     def get(self):
         self.write({"ok": True, "status": "awake", "service": "telegram-drive-bot"})
 
@@ -48,6 +140,15 @@ class ApiPingHandler(BaseApiHandler):
 
 
 class WebAppPageHandler(tornado.web.RequestHandler):
+    def set_default_headers(self):
+        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        # Allow embedding in Telegram WebApp
+        self.set_header(
+            "Content-Security-Policy",
+            "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org telegram:;",
+        )
+
     def get(self):
         try:
             if TEMPLATE_PATH.exists():
@@ -57,8 +158,9 @@ class WebAppPageHandler(tornado.web.RequestHandler):
             self.set_header("Content-Type", "text/html; charset=utf-8")
             self.write(html)
         except Exception as e:
+            log.error("Error loading WebApp template: %s", e)
             self.set_status(500)
-            self.write(f"Error loading WebApp: {e}")
+            self.write("Error loading WebApp")
 
     def head(self):
         self.set_header("Content-Type", "text/html; charset=utf-8")
@@ -67,6 +169,10 @@ class WebAppPageHandler(tornado.web.RequestHandler):
 
 class DropzonePageHandler(tornado.web.RequestHandler):
     """Serve the public Dropzone upload webpage."""
+    def set_default_headers(self):
+        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_header("Referrer-Policy", "strict-origin-when-cross-origin")
+
     def get(self, token: str):
         try:
             if DROPZONE_TEMPLATE_PATH.exists():
@@ -76,44 +182,79 @@ class DropzonePageHandler(tornado.web.RequestHandler):
             self.set_header("Content-Type", "text/html; charset=utf-8")
             self.write(html)
         except Exception as e:
+            log.error("Error loading Dropzone template: %s", e)
             self.set_status(500)
-            self.write(f"Error loading Dropzone: {e}")
+            self.write("Error loading Dropzone")
 
 
 class PublicFileSharePageHandler(tornado.web.RequestHandler):
-    """Serve the public file view/download page without Telegram bot or auth."""
+    """Serve the public file view/download page with strict policy enforcement."""
+    def set_default_headers(self):
+        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_header("Referrer-Policy", "strict-origin-when-cross-origin")
+
     async def get(self, token: str):
         try:
             is_download = self.get_argument("download", "0") in ("1", "true")
-            f = db.get_file_by_share_token(token)
-            if not f or f.get("is_trashed"):
+            pin = self.get_argument("pin", None)
+
+            f, err = db.validate_public_share(token, pin=pin)
+            if err == "NOT_FOUND" or not f:
                 self.set_status(404)
                 self.set_header("Content-Type", "text/html; charset=utf-8")
-                self.write("""
-                <!DOCTYPE html>
-                <html lang="id">
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Berkas Tidak Ditemukan - Darfin Storage</title>
-                    <style>
-                        body { background: #070B14; color: #F8FAFC; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; }
-                        .card { background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px 24px; max-width: 400px; }
-                        h2 { color: #f43f5e; margin-bottom: 8px; }
-                        p { color: #94A3B8; font-size: 0.9rem; }
-                    </style>
-                </head>
-                <body>
-                    <div class="card">
-                        <h2>⚠️ Tautan Tidak Valid</h2>
-                        <p>Berkas ini tidak ditemukan, telah dihapus, atau tautan publiknya telah dinonaktifkan oleh pemilik.</p>
-                    </div>
-                </body>
-                </html>
-                """)
+                self.write("""<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tautan Tidak Valid - Darfin Storage</title>
+    <style>
+        body { background: #070B14; color: #F8FAFC; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; }
+        .card { background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px 24px; max-width: 400px; }
+        h2 { color: #f43f5e; margin-bottom: 8px; }
+        p { color: #94A3B8; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>⚠️ Tautan Tidak Valid</h2>
+        <p>Berkas ini tidak ditemukan, telah dihapus, atau tautan publiknya telah dinonaktifkan oleh pemilik.</p>
+    </div>
+</body>
+</html>""")
                 return
 
+            if err in ("EXPIRED", "LIMIT_EXHAUSTED"):
+                self.set_status(410)
+                self.set_header("Content-Type", "text/html; charset=utf-8")
+                self.write("""<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tautan Kadaluarsa - Darfin Storage</title>
+    <style>body { background: #070B14; color: #F8FAFC; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; }
+    .card { background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px 24px; max-width: 400px; }
+    h2 { color: #f59e0b; margin-bottom: 8px; } p { color: #94A3B8; font-size: 0.9rem; }</style>
+</head>
+<body>
+    <div class="card">
+        <h2>⏳ Tautan Sudah Kadaluarsa</h2>
+        <p>Tautan berkas ini telah melewati batas waktu atau batas unduhan maksimum.</p>
+    </div>
+</body>
+</html>""")
+                return
+
+            # Direct download request
             if is_download:
+                if err in ("PIN_REQUIRED", "PIN_INCORRECT"):
+                    # Redirect to file share page for PIN unlock
+                    self.redirect(f"/s/{token}")
+                    return
+
+                # Record download atomically
+                db.record_file_share_download(f["id"])
+
                 try:
                     bot = get_shared_bot()
                     tg_file = await bot.get_file(f["file_id"])
@@ -124,7 +265,8 @@ class PublicFileSharePageHandler(tornado.web.RequestHandler):
                     log.warning("Could not fetch direct CDN for share download: %s", ex)
 
                 bot_me = await get_shared_bot().get_me()
-                self.redirect(f"https://t.me/{bot_me.username}?start=sf_{token}")
+                bot_username = bot_me.username if bot_me else "darfinstoragebot"
+                self.redirect(f"https://t.me/{bot_username}?start=sf_{token}")
                 return
 
             if SHARE_FILE_TEMPLATE_PATH.exists():
@@ -136,20 +278,91 @@ class PublicFileSharePageHandler(tornado.web.RequestHandler):
         except Exception as e:
             log.exception("Error in PublicFileSharePageHandler: %s", e)
             self.set_status(500)
-            self.write(f"Error loading shared file: {e}")
+            self.write("Error loading shared file")
+
+
+class ApiAuthSessionHandler(BaseApiHandler):
+    """Authenticate Telegram WebApp initData and issue signed session cookie."""
+    async def post(self):
+        try:
+            init_data = self.request.headers.get("X-Telegram-Init-Data")
+            if not init_data and self.request.body:
+                try:
+                    body = json.loads(self.request.body.decode("utf-8"))
+                    init_data = body.get("init_data") or body.get("initData")
+                except Exception:
+                    pass
+
+            if not init_data:
+                self.set_status(400)
+                self.write(json.dumps({"ok": False, "error": {"code": "MISSING_DATA", "message": "init_data is required."}}))
+                return
+
+            validated = validate_telegram_init_data(init_data)
+            if not validated:
+                self.set_status(401)
+                self.write(json.dumps({"ok": False, "error": {"code": "INVALID_SIGNATURE", "message": "Validasi Telegram gagal."}}))
+                return
+
+            user_id = validated["user_id"]
+            db.upsert_user(user_id, username=validated.get("username"), full_name=validated.get("first_name"))
+            db.get_or_create_inbox_folder(user_id)
+
+            token = create_session_token(user_id, duration_seconds=86400)
+            # Set secure cookie
+            self.set_cookie(
+                "tma_session",
+                token,
+                expires_days=1,
+                httponly=True,
+                secure=self.request.protocol == "https",
+                samesite="Lax" if self.request.protocol != "https" else "None",
+            )
+
+            self.write(json.dumps({
+                "ok": True,
+                "user": {
+                    "id": user_id,
+                    "first_name": validated.get("first_name", ""),
+                    "username": validated.get("username"),
+                },
+                "token": token,
+                "session_token": token,
+            }))
+        except Exception as e:
+            log.exception("Error in ApiAuthSessionHandler.post: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Terjadi kesalahan autentikasi."}}))
+
+    async def get(self):
+        user = get_authenticated_user(self)
+        if not user:
+            self.set_status(401)
+            self.write(json.dumps({"ok": False, "error": {"code": "UNAUTHORIZED", "message": "Belum terautentikasi."}}))
+            return
+        self.write(json.dumps({"ok": True, "user": user}))
 
 
 class ApiDriveHandler(BaseApiHandler):
+    """Retrieve drive contents for authenticated user."""
     async def get(self):
-        user_id_raw = self.get_argument("user_id", None)
-        if not user_id_raw or not user_id_raw.isdigit():
-            self.set_status(400)
-            self.write(json.dumps({"error": "Invalid or missing user_id"}))
+        user_id = require_authenticated_user(self)
+        if not user_id:
             return
 
-        user_id = int(user_id_raw)
         folder_id_raw = self.get_argument("folder_id", None)
-        folder_id = int(folder_id_raw) if folder_id_raw and folder_id_raw.isdigit() else None
+        folder_id = None
+        if folder_id_raw and folder_id_raw.isdigit():
+            folder_id = int(folder_id_raw)
+            if folder_id > 0:
+                # Verify folder ownership
+                target_fld = db.get_folder(folder_id, user_id=user_id)
+                if not target_fld:
+                    self.set_status(404)
+                    self.write(json.dumps({"ok": False, "error": {"code": "FOLDER_NOT_FOUND", "message": "Folder tidak ditemukan."}}))
+                    return
+            else:
+                folder_id = None
 
         # Fetch storage diagnostics
         info = db.get_storage_info(user_id)
@@ -208,15 +421,14 @@ class ApiDriveHandler(BaseApiHandler):
         # Breadcrumbs
         breadcrumbs = []
         if folder_id:
-            raw_path = db.get_folder_path(folder_id)
-            breadcrumbs = [{"id": f["id"], "name": f["name"]} for f in raw_path]
+            raw_path = db.get_folder_path(folder_id, user_id=user_id)
+            breadcrumbs = [{"id": f["id"], "name": escape_html(f["name"])} for f in raw_path]
 
         # Folders
         folders = db.get_folders(user_id, parent_id=folder_id)
         folders_data = []
         for f in folders:
-            # Count files in this subfolder
-            cnt = db.get_file_count(f["id"])
+            cnt = db.get_file_count(f["id"], user_id=user_id)
             folders_data.append({
                 "id": f["id"],
                 "name": f["name"],
@@ -226,9 +438,12 @@ class ApiDriveHandler(BaseApiHandler):
 
         # Files
         if folder_id:
-            files_raw = db.get_all_files_in_folder(folder_id)
+            files_raw = db.get_all_files_in_folder(folder_id, user_id=user_id)
         else:
             files_raw = db.get_all_user_files(user_id, limit=60)
+
+        # Generate signed auth token for media URLs
+        media_auth_token = create_session_token(user_id, duration_seconds=3600)
 
         files_data = []
         for f in files_raw:
@@ -245,27 +460,27 @@ class ApiDriveHandler(BaseApiHandler):
                 "note": note,
                 "tags": tags,
                 "has_thumb": has_thumb,
-                "thumb_url": f"/api/thumbnail?file_id={f['id']}" if has_thumb else None,
-                "stream_url": f"/api/download?file_id={f['id']}&user_id={user_id}" if f.get("file_type") == "photo" else None,
+                "thumb_url": f"/api/thumbnail?file_id={f['id']}&auth={media_auth_token}" if has_thumb else None,
+                "stream_url": f"/api/download?file_id={f['id']}&auth={media_auth_token}" if f.get("file_type") == "photo" else None,
             })
 
-        response_data = {
+        self.write(json.dumps({
+            "ok": True,
             "storage": storage_summary,
             "breadcrumbs": breadcrumbs,
             "folders": folders_data,
             "files": files_data,
-        }
-        self.write(json.dumps(response_data))
+        }))
 
 
-# In-memory LRU cache for thumbnail binary (capped to 300 items ~3MB RAM max)
+# In-memory thumbnail cache
 _THUMB_CACHE: dict[int, bytes] = {}
-_MAX_THUMB_CACHE = 300
+_MAX_THUMB_CACHE = 250
+_MAX_THUMB_BYTES = 500 * 1024  # 500 KB per entry limit
 _shared_bot_instance: Optional[Bot] = None
 
 
 def get_shared_bot() -> Bot:
-    """Reuse singleton Bot instance to avoid re-initializing connection pools."""
     global _shared_bot_instance
     if _shared_bot_instance is None:
         _shared_bot_instance = Bot(BOT_TOKEN)
@@ -273,7 +488,7 @@ def get_shared_bot() -> Bot:
 
 
 class ApiThumbnailHandler(tornado.web.RequestHandler):
-    """Serve thumbnail image for video, photo, or document files with in-memory caching."""
+    """Serve thumbnail image with ownership validation or active share verification."""
     async def get(self):
         file_id_raw = self.get_argument("file_id", None)
         if not file_id_raw or not file_id_raw.isdigit():
@@ -283,17 +498,35 @@ class ApiThumbnailHandler(tornado.web.RequestHandler):
 
         file_id = int(file_id_raw)
 
-        # 1. Instant hit from server RAM cache (<1ms response time)
-        if file_id in _THUMB_CACHE:
-            self.set_header("Content-Type", "image/jpeg")
-            self.set_header("Cache-Control", "public, max-age=604800, immutable")
-            self.write(_THUMB_CACHE[file_id])
+        # Authenticate requester
+        user = get_authenticated_user(self)
+        user_id = user["user_id"] if user else None
+
+        # Check public share fallback
+        share_token = self.get_argument("share_token", None)
+        is_authorized = False
+
+        if user_id:
+            f = db.get_file(file_id, user_id=user_id)
+            if f:
+                is_authorized = True
+        elif share_token:
+            shared_file, err = db.validate_public_share(share_token)
+            if shared_file and shared_file["id"] == file_id:
+                f = shared_file
+                is_authorized = True
+
+        if not is_authorized:
+            self.set_status(401 if not user_id else 404)
+            self.write("Unauthorized or file not found")
             return
 
-        f = db.get_file(file_id)
-        if not f:
-            self.set_status(404)
-            self.write("File not found")
+        # RAM Cache hit
+        if file_id in _THUMB_CACHE:
+            self.set_header("Content-Type", "image/jpeg")
+            self.set_header("Cache-Control", "private, max-age=86400")
+            self.set_header("X-Content-Type-Options", "nosniff")
+            self.write(_THUMB_CACHE[file_id])
             return
 
         thumb_id = f.get("thumbnail_file_id")
@@ -315,22 +548,27 @@ class ApiThumbnailHandler(tornado.web.RequestHandler):
             client = tornado.httpclient.AsyncHTTPClient()
             resp = await client.fetch(tg_file.file_path, request_timeout=6.0)
 
-            # Store in RAM cache (FIFO / LRU eviction when limit reached)
-            _THUMB_CACHE[file_id] = resp.body
-            if len(_THUMB_CACHE) > _MAX_THUMB_CACHE:
-                _THUMB_CACHE.pop(next(iter(_THUMB_CACHE)))
+            if len(resp.body) <= _MAX_THUMB_BYTES:
+                _THUMB_CACHE[file_id] = resp.body
+                if len(_THUMB_CACHE) > _MAX_THUMB_CACHE:
+                    _THUMB_CACHE.pop(next(iter(_THUMB_CACHE)))
 
             self.set_header("Content-Type", "image/jpeg")
-            self.set_header("Cache-Control", "public, max-age=604800, immutable")
+            self.set_header("Cache-Control", "private, max-age=86400")
+            self.set_header("X-Content-Type-Options", "nosniff")
             self.write(resp.body)
         except Exception as e:
-            log.warning("Could not fetch thumbnail for file %s: %s", f["id"], e)
+            log.warning("Could not fetch thumbnail for file %s: %s", file_id, e)
             self.set_status(404)
 
 
 class ApiDownloadHandler(tornado.web.RequestHandler):
-    """Directly stream or redirect to Telegram CDN for file viewing/playing."""
+    """Directly stream or redirect to Telegram CDN for file owned by authenticated user."""
     async def get(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         file_id_raw = self.get_argument("file_id", None)
         if not file_id_raw or not file_id_raw.isdigit():
             self.set_status(400)
@@ -338,8 +576,8 @@ class ApiDownloadHandler(tornado.web.RequestHandler):
             return
 
         file_id = int(file_id_raw)
-        f = db.get_file(file_id)
-        if not f:
+        f = db.get_file(file_id, user_id=user_id)
+        if not f or f.get("is_trashed"):
             self.set_status(404)
             self.write("File not found")
             return
@@ -351,40 +589,57 @@ class ApiDownloadHandler(tornado.web.RequestHandler):
                 self.redirect(tg_file.file_path)
                 return
         except Exception as e:
-            log.warning("Could not fetch direct Telegram CDN url for file %s: %s", file_id, e)
+            log.warning("Could not fetch CDN url for file %s: %s", file_id, e)
 
-        # Fallback to direct bot message link
-        bot_url = f"https://t.me/darfinstoragebot?start=sf_{f.get('share_token') or f['id']}"
-        self.redirect(bot_url)
+        bot_me = await get_shared_bot().get_me()
+        bot_username = bot_me.username if bot_me else "darfinstoragebot"
+        self.redirect(f"https://t.me/{bot_username}?start=sf_{f.get('share_token') or f['id']}")
 
 
 class ApiStarHandler(BaseApiHandler):
+    """Toggle star on owned file or folder."""
     async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         try:
             data = json.loads(self.request.body.decode("utf-8"))
             file_id = data.get("file_id")
             folder_id = data.get("folder_id")
-            if file_id:
-                db.toggle_star_file(file_id)
-            elif folder_id:
-                db.toggle_star_folder(folder_id)
-            self.write(json.dumps({"ok": True}))
+
+            if file_id and str(file_id).isdigit():
+                res = db.toggle_star_file(int(file_id), user_id=user_id)
+            elif folder_id and str(folder_id).isdigit():
+                res = db.toggle_star_folder(int(folder_id), user_id=user_id)
+            else:
+                self.set_status(400)
+                self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "ID berkas atau folder wajib disertakan."}}))
+                return
+
+            if res is None:
+                self.set_status(404)
+                self.write(json.dumps({"ok": False, "error": {"code": "NOT_FOUND", "message": "Berkas atau folder tidak ditemukan."}}))
+                return
+
+            self.write(json.dumps({"ok": True, "is_starred": res}))
         except Exception as e:
+            log.exception("Error in ApiStarHandler: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal mengubah status bintang."}}))
 
 
 async def _send_single_file_to_chat(bot: Bot, user_id: int, f: dict):
-    """Sends a single media or document file with actions markup to Telegram chat."""
     import keyboards as kb
     from utils import file_emoji, format_size, parse_file_metadata
     emoji = file_emoji(f["file_type"])
     size = format_size(f.get("file_size", 0))
     created = f.get("created_at", "")[:10]
     _, note, tags = parse_file_metadata(f.get("mime_type"))
-    note_line = f"\n📝 <i>{note}</i>" if note else ""
-    tags_line = f"\n🏷 " + " ".join(f"#{t}" for t in tags) if tags else ""
-    caption = f"{emoji} <b>{f['file_name']}</b>\n📊 {size} • 📅 {created}{note_line}{tags_line}"
+    note_line = f"\n📝 <i>{escape_html(note)}</i>" if note else ""
+    tags_line = f"\n🏷 " + " ".join(f"#{escape_html(t)}" for t in tags) if tags else ""
+    safe_name = escape_html(f["file_name"])
+    caption = f"{emoji} <b>{safe_name}</b>\n📊 {size} • 📅 {created}{note_line}{tags_line}"
     markup = kb.file_actions(f)
 
     ftype = f.get("file_type", "document")
@@ -408,52 +663,62 @@ async def _send_single_file_to_chat(bot: Bot, user_id: int, f: dict):
 
 
 class ApiSendToChatHandler(BaseApiHandler):
-    """Sends file directly into user's Telegram chat with full interactive buttons."""
+    """Sends file to authenticated user's Telegram chat."""
     async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         try:
             data = json.loads(self.request.body.decode("utf-8"))
-            file_id = data.get("file_id")
-            user_id = data.get("user_id")
-            if not file_id or not user_id:
+            file_id_raw = data.get("file_id")
+            if not file_id_raw or not str(file_id_raw).isdigit():
                 self.set_status(400)
-                self.write(json.dumps({"error": "Missing file_id or user_id"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "file_id wajib disertakan."}}))
                 return
 
-            f = db.get_file(file_id)
-            if not f:
+            file_id = int(file_id_raw)
+            f = db.get_file(file_id, user_id=user_id)
+            if not f or f.get("is_trashed"):
                 self.set_status(404)
-                self.write(json.dumps({"error": "File not found"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "NOT_FOUND", "message": "Berkas tidak ditemukan."}}))
                 return
 
             bot = get_shared_bot()
-            await _send_single_file_to_chat(bot, int(user_id), f)
+            await _send_single_file_to_chat(bot, user_id, f)
             self.write(json.dumps({"ok": True}))
         except Exception as e:
             log.exception("Failed to send file to chat: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal mengirim berkas ke Telegram."}}))
 
 
 class ApiBatchSendToChatHandler(BaseApiHandler):
-    """Batch sends multiple files into user's Telegram chat."""
+    """Batch sends multiple owned files into authenticated user's Telegram chat."""
     async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         try:
             data = json.loads(self.request.body.decode("utf-8"))
             file_ids = data.get("file_ids", [])
-            user_id = data.get("user_id")
-            if not file_ids or not user_id:
+            if not isinstance(file_ids, list) or not file_ids:
                 self.set_status(400)
-                self.write(json.dumps({"error": "Missing file_ids or user_id"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "file_ids wajib berupa array."}}))
                 return
+
+            # Cap batch size to prevent rate-limit flooding
+            unique_ids = list(dict.fromkeys(int(fid) for fid in file_ids if str(fid).isdigit()))[:30]
 
             bot = get_shared_bot()
             sent = 0
-            for fid in file_ids:
+            for fid in unique_ids:
                 try:
-                    f = db.get_file(int(fid))
-                    if not f:
+                    f = db.get_file(fid, user_id=user_id)
+                    if not f or f.get("is_trashed"):
                         continue
-                    await _send_single_file_to_chat(bot, int(user_id), f)
+                    await _send_single_file_to_chat(bot, user_id, f)
                     sent += 1
                     await asyncio.sleep(0.3)
                 except Exception as ex:
@@ -463,344 +728,443 @@ class ApiBatchSendToChatHandler(BaseApiHandler):
         except Exception as e:
             log.exception("Error batch sending files to chat: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal mengirim batch berkas."}}))
 
 
 class ApiAllFoldersHandler(BaseApiHandler):
-    """Returns list of all user folders for destination selection."""
+    """Returns list of all authenticated user's folders."""
     async def get(self):
-        user_id_raw = self.get_argument("user_id", None)
-        if not user_id_raw or not user_id_raw.isdigit():
-            self.set_status(400)
-            self.write(json.dumps({"error": "Invalid user_id"}))
+        user_id = require_authenticated_user(self)
+        if not user_id:
             return
 
-        user_id = int(user_id_raw)
         folders = db.get_all_folders(user_id)
         data = []
         for f in folders:
-            cnt = db.get_file_count(f["id"])
+            cnt = db.get_file_count(f["id"], user_id=user_id)
             data.append({
                 "id": f["id"],
                 "name": f["name"],
                 "parent_id": f.get("parent_id"),
                 "file_count": cnt,
             })
-        self.write(json.dumps({"folders": data}))
+        self.write(json.dumps({"ok": True, "folders": data}))
 
 
 class ApiBatchMoveHandler(BaseApiHandler):
-    """Batch moves multiple files to target folder."""
+    """Batch moves multiple owned files to a target folder owned by user."""
     async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         try:
             data = json.loads(self.request.body.decode("utf-8"))
             file_ids = data.get("file_ids", [])
             target_folder_id = data.get("target_folder_id")
-            user_id = data.get("user_id")
 
-            if not file_ids or target_folder_id is None or not user_id:
+            if not file_ids or target_folder_id is None:
                 self.set_status(400)
-                self.write(json.dumps({"error": "Missing parameters"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "Parameter tidak lengkap."}}))
                 return
 
             target_folder_id = int(target_folder_id)
             if target_folder_id == 0:
-                inbox = db.get_or_create_inbox_folder(int(user_id))
+                inbox = db.get_or_create_inbox_folder(user_id)
                 target_folder_id = inbox["id"]
                 folder_name = inbox["name"]
             else:
-                tf = db.get_folder(target_folder_id)
+                tf = db.get_folder(target_folder_id, user_id=user_id)
                 if not tf:
                     self.set_status(404)
-                    self.write(json.dumps({"error": "Folder tujuan tidak ditemukan"}))
+                    self.write(json.dumps({"ok": False, "error": {"code": "FOLDER_NOT_FOUND", "message": "Folder tujuan tidak ditemukan."}}))
                     return
                 folder_name = tf["name"]
 
+            unique_ids = list(dict.fromkeys(int(fid) for fid in file_ids if str(fid).isdigit()))[:100]
             moved = 0
-            for fid in file_ids:
-                try:
-                    db.move_file(int(fid), target_folder_id)
+            for fid in unique_ids:
+                if db.move_file(fid, target_folder_id, user_id=user_id):
                     moved += 1
-                except Exception as ex:
-                    log.warning("Failed moving file %s: %s", fid, ex)
 
             self.write(json.dumps({"ok": True, "count": moved, "folder_name": folder_name}))
         except Exception as e:
             log.exception("Error batch moving files: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal memindahkan berkas."}}))
 
 
 class ApiCreateFolderHandler(BaseApiHandler):
     """Create new folder in drive."""
     async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         try:
             data = json.loads(self.request.body.decode("utf-8"))
-            name = (data.get("name") or "").strip()
+            name = sanitize_filename(data.get("name") or "").strip()
             parent_id = data.get("parent_id")
-            user_id = data.get("user_id")
-            if not name or not user_id:
+            if not name:
                 self.set_status(400)
-                self.write(json.dumps({"error": "Nama folder dan user_id wajib diisi"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "Nama folder wajib diisi."}}))
                 return
 
-            folder = db.get_or_create_folder(int(user_id), name, int(parent_id) if parent_id else None)
+            parent_id_clean = int(parent_id) if parent_id and str(parent_id).isdigit() and int(parent_id) > 0 else None
+            folder = db.create_folder(user_id, name, parent_id_clean)
+            if not folder:
+                self.set_status(400)
+                self.write(json.dumps({"ok": False, "error": {"code": "CREATE_FAILED", "message": "Gagal membuat folder."}}))
+                return
+
             self.write(json.dumps({"ok": True, "folder": folder}))
         except Exception as e:
             log.exception("Error create folder: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal membuat folder."}}))
 
 
 class ApiRenameHandler(BaseApiHandler):
-    """Rename file or folder."""
+    """Rename owned file or folder."""
     async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         try:
             data = json.loads(self.request.body.decode("utf-8"))
             item_type = data.get("type", "file")
             item_id = data.get("id")
-            new_name = (data.get("new_name") or "").strip()
-            user_id = data.get("user_id")
+            new_name = sanitize_filename(data.get("new_name") or "").strip()
 
-            if not item_id or not new_name or not user_id:
+            if not item_id or not str(item_id).isdigit() or not new_name:
                 self.set_status(400)
-                self.write(json.dumps({"error": "Missing parameters"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "ID dan nama baru wajib diisi."}}))
                 return
 
+            item_id = int(item_id)
             if item_type == "folder":
-                db.rename_folder(int(item_id), new_name)
+                ok = db.rename_folder(item_id, new_name, user_id=user_id)
             else:
-                db.rename_file(int(item_id), new_name)
+                ok = db.rename_file(item_id, new_name, user_id=user_id)
+
+            if not ok:
+                self.set_status(404)
+                self.write(json.dumps({"ok": False, "error": {"code": "NOT_FOUND", "message": "Objek tidak ditemukan atau akses ditolak."}}))
+                return
 
             self.write(json.dumps({"ok": True}))
         except Exception as e:
             log.exception("Error rename: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal mengubah nama."}}))
 
 
 class ApiBatchDeleteHandler(BaseApiHandler):
-    """Trash/delete files and folders."""
+    """Trash/delete owned files and folders."""
     async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         try:
             data = json.loads(self.request.body.decode("utf-8"))
             file_ids = data.get("file_ids", [])
             folder_ids = data.get("folder_ids", [])
-            user_id = data.get("user_id")
 
             del_files = 0
-            for fid in file_ids:
-                try:
-                    db.trash_file(int(fid))
-                    del_files += 1
-                except Exception as ex:
-                    log.warning("Failed trashing file %s: %s", fid, ex)
+            if isinstance(file_ids, list):
+                for fid in list(dict.fromkeys(int(f) for f in file_ids if str(f).isdigit()))[:100]:
+                    if db.trash_file(fid, user_id=user_id):
+                        del_files += 1
 
             del_folders = 0
-            for fld_id in folder_ids:
-                try:
-                    db.delete_folder(int(fld_id))
-                    del_folders += 1
-                except Exception as ex:
-                    log.warning("Failed deleting folder %s: %s", fld_id, ex)
+            if isinstance(folder_ids, list):
+                for fld_id in list(dict.fromkeys(int(f) for f in folder_ids if str(f).isdigit()))[:50]:
+                    if db.delete_folder(fld_id, user_id=user_id):
+                        del_folders += 1
 
-            self.write(json.dumps({"ok": True, "deleted_files": del_files, "deleted_folders": del_folders}))
+            self.write(json.dumps({
+                "ok": True,
+                "deleted_files": del_files,
+                "deleted_folders": del_folders,
+            }))
         except Exception as e:
             log.exception("Error batch delete: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal menghapus berkas."}}))
 
 
 class ApiBatchStarHandler(BaseApiHandler):
-    """Batch star/unstar files."""
+    """Batch star/unstar owned files."""
     async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         try:
             data = json.loads(self.request.body.decode("utf-8"))
             file_ids = data.get("file_ids", [])
             is_starred = bool(data.get("is_starred", True))
 
-            for fid in file_ids:
-                try:
-                    db.db.table("files").update({"is_starred": is_starred, "updated_at": db._now()}).eq("id", int(fid)).execute()
-                except Exception as ex:
-                    log.warning("Failed starring file %s: %s", fid, ex)
+            updated = 0
+            if isinstance(file_ids, list):
+                for fid in list(dict.fromkeys(int(f) for f in file_ids if str(f).isdigit()))[:100]:
+                    f = db.get_file(fid, user_id=user_id)
+                    if f:
+                        db.db.table("files").update({"is_starred": is_starred, "updated_at": db._now()}).eq("id", fid).eq("user_id", user_id).execute()
+                        updated += 1
 
-            self.write(json.dumps({"ok": True}))
+            self.write(json.dumps({"ok": True, "count": updated}))
         except Exception as e:
             log.exception("Error batch star: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal memperbarui favorit."}}))
 
 
 class ApiUploadHandler(BaseApiHandler):
-    """Direct file upload from WebApp."""
+    """Direct file upload from authenticated WebApp with size guards."""
     async def post(self):
-        try:
-            user_id_raw = self.get_argument("user_id", None)
-            folder_id_raw = self.get_argument("folder_id", None)
-            if not user_id_raw or not user_id_raw.isdigit():
-                self.set_status(400)
-                self.write(json.dumps({"error": "Invalid user_id"}))
-                return
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
 
-            user_id = int(user_id_raw)
+        try:
+            folder_id_raw = self.get_argument("folder_id", None)
+            folder_id = None
             if folder_id_raw and folder_id_raw.isdigit() and int(folder_id_raw) > 0:
-                folder_id = int(folder_id_raw)
-            else:
+                f_obj = db.get_folder(int(folder_id_raw), user_id=user_id)
+                if f_obj:
+                    folder_id = f_obj["id"]
+
+            if not folder_id:
                 inbox = db.get_or_create_inbox_folder(user_id)
                 folder_id = inbox["id"]
+                folder_name = inbox["name"]
+            else:
+                f_obj = db.get_folder(folder_id, user_id=user_id)
+                folder_name = f_obj["name"] if f_obj else "Folder"
 
             uploaded_files = self.request.files.get("files", [])
             if not uploaded_files:
                 self.set_status(400)
-                self.write(json.dumps({"error": "Tidak ada file yang diunggah"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "NO_FILES", "message": "Tidak ada berkas yang diunggah."}}))
+                return
+
+            if len(uploaded_files) > MAX_UPLOAD_BATCH_FILES:
+                self.set_status(400)
+                self.write(json.dumps({
+                    "ok": False,
+                    "error": {
+                        "code": "BATCH_LIMIT_EXCEEDED",
+                        "message": f"Maksimal {MAX_UPLOAD_BATCH_FILES} berkas sekaligus per batch.",
+                    },
+                }))
+                return
+
+            max_single_bytes = MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024
+            max_batch_bytes = MAX_UPLOAD_BATCH_MB * 1024 * 1024
+            total_batch_bytes = sum(len(finfo["body"]) for finfo in uploaded_files)
+
+            if total_batch_bytes > max_batch_bytes:
+                self.set_status(400)
+                self.write(json.dumps({
+                    "ok": False,
+                    "error": {
+                        "code": "TOTAL_SIZE_EXCEEDED",
+                        "message": f"Total ukuran batch melebihi batas {MAX_UPLOAD_BATCH_MB} MB.",
+                    },
+                }))
                 return
 
             bot = get_shared_bot()
-            f_obj = db.get_folder(folder_id)
-            folder_name = f_obj["name"] if f_obj else "Folder"
-
             saved_count = 0
+            failed_count = 0
+            failed_files = []
+
             for fileinfo in uploaded_files:
-                filename = fileinfo["filename"]
+                raw_filename = fileinfo["filename"]
+                filename = sanitize_filename(raw_filename)
                 body = fileinfo["body"]
                 content_type = fileinfo.get("content_type", "application/octet-stream")
                 size = len(body)
 
+                if size > max_single_bytes:
+                    failed_count += 1
+                    failed_files.append({"name": filename, "reason": f"Ukuran melebihi {MAX_UPLOAD_FILE_SIZE_MB} MB"})
+                    continue
+
                 lower_name = filename.lower()
                 thumb_fid = None
-                if any(lower_name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
-                    ftype = "photo"
-                    msg = await bot.send_photo(chat_id=user_id, photo=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
-                    fid = msg.photo[-1].file_id
-                    fuid = msg.photo[-1].file_unique_id
-                    thumb_fid = msg.photo[0].file_id if len(msg.photo) > 1 else None
-                elif any(lower_name.endswith(ext) for ext in [".mp4", ".mov", ".mkv", ".webm"]):
-                    ftype = "video"
-                    msg = await bot.send_video(chat_id=user_id, video=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
-                    fid = msg.video.file_id
-                    fuid = msg.video.file_unique_id
-                    thumb_fid = msg.video.thumbnail.file_id if msg.video.thumbnail else None
-                elif any(lower_name.endswith(ext) for ext in [".mp3", ".wav", ".flac", ".m4a"]):
-                    ftype = "audio"
-                    msg = await bot.send_audio(chat_id=user_id, audio=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
-                    fid = msg.audio.file_id
-                    fuid = msg.audio.file_unique_id
-                    thumb_fid = msg.audio.thumbnail.file_id if msg.audio.thumbnail else None
-                else:
-                    ftype = "document"
-                    from io import BytesIO
-                    bio = BytesIO(body)
-                    bio.name = filename
-                    msg = await bot.send_document(chat_id=user_id, document=bio, filename=filename, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
-                    fid = msg.document.file_id
-                    fuid = msg.document.file_unique_id
-                    thumb_fid = msg.document.thumbnail.file_id if msg.document.thumbnail else None
+                try:
+                    if any(lower_name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
+                        ftype = "photo"
+                        msg = await bot.send_photo(chat_id=user_id, photo=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
+                        fid = msg.photo[-1].file_id
+                        fuid = msg.photo[-1].file_unique_id
+                        thumb_fid = msg.photo[0].file_id if len(msg.photo) > 1 else None
+                    elif any(lower_name.endswith(ext) for ext in [".mp4", ".mov", ".mkv", ".webm"]):
+                        ftype = "video"
+                        msg = await bot.send_video(chat_id=user_id, video=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
+                        fid = msg.video.file_id
+                        fuid = msg.video.file_unique_id
+                        thumb_fid = msg.video.thumbnail.file_id if msg.video.thumbnail else None
+                    elif any(lower_name.endswith(ext) for ext in [".mp3", ".wav", ".flac", ".m4a"]):
+                        ftype = "audio"
+                        msg = await bot.send_audio(chat_id=user_id, audio=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
+                        fid = msg.audio.file_id
+                        fuid = msg.audio.file_unique_id
+                        thumb_fid = msg.audio.thumbnail.file_id if msg.audio.thumbnail else None
+                    else:
+                        ftype = "document"
+                        from io import BytesIO
+                        bio = BytesIO(body)
+                        bio.name = filename
+                        msg = await bot.send_document(chat_id=user_id, document=bio, filename=filename, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
+                        fid = msg.document.file_id
+                        fuid = msg.document.file_unique_id
+                        thumb_fid = msg.document.thumbnail.file_id if msg.document.thumbnail else None
 
-                db.save_file(
-                    user_id=user_id,
-                    folder_id=folder_id,
-                    file_id=fid,
-                    file_unique_id=fuid,
-                    file_name=filename,
-                    file_size=size,
-                    file_type=ftype,
-                    mime_type=content_type,
-                    thumbnail_file_id=thumb_fid,
-                )
-                saved_count += 1
+                    saved = db.save_file(
+                        user_id=user_id,
+                        folder_id=folder_id,
+                        file_id=fid,
+                        file_unique_id=fuid,
+                        file_name=filename,
+                        file_size=size,
+                        file_type=ftype,
+                        mime_type=content_type,
+                        thumbnail_file_id=thumb_fid,
+                    )
+                    if saved:
+                        saved_count += 1
+                    else:
+                        failed_count += 1
+                        failed_files.append({"name": filename, "reason": "Gagal menyimpan database"})
+                except Exception as upload_err:
+                    log.warning("Failed uploading file %s: %s", filename, upload_err)
+                    failed_count += 1
+                    failed_files.append({"name": filename, "reason": "Kesalahan transfer Telegram"})
 
-            self.write(json.dumps({"ok": True, "count": saved_count}))
+            if saved_count == 0 and failed_count > 0:
+                self.set_status(400)
+                first_reason = failed_files[0]["reason"] if failed_files else "Semua berkas gagal diunggah."
+                self.write(json.dumps({
+                    "ok": False,
+                    "error": {
+                        "code": "FILE_TOO_LARGE" if "Ukuran melebihi" in first_reason else "UPLOAD_FAILED",
+                        "message": f"Berkas melebihi batas: {first_reason}",
+                    },
+                    "failed_files": failed_files,
+                }))
+                return
+
+            self.write(json.dumps({
+                "ok": True,
+                "count": saved_count,
+                "failed_count": failed_count,
+                "failed_files": failed_files,
+            }))
         except Exception as e:
             log.exception("Error in ApiUploadHandler: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal memproses unggahan."}}))
 
 
 class ApiFileContentHandler(BaseApiHandler):
-    """Fetches text content for text/code preview."""
+    """Fetches text content preview for owned file asynchronously."""
     async def get(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         file_id_raw = self.get_argument("file_id", None)
         if not file_id_raw or not file_id_raw.isdigit():
             self.set_status(400)
-            self.write(json.dumps({"error": "Invalid file_id"}))
+            self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "Invalid file_id."}}))
             return
 
-        f = db.get_file(int(file_id_raw))
-        if not f:
+        f = db.get_file(int(file_id_raw), user_id=user_id)
+        if not f or f.get("is_trashed"):
             self.set_status(404)
-            self.write(json.dumps({"error": "File not found"}))
+            self.write(json.dumps({"ok": False, "error": {"code": "NOT_FOUND", "message": "Berkas tidak ditemukan."}}))
             return
 
         if f.get("file_size", 0) > 2 * 1024 * 1024:
             self.set_status(400)
-            self.write(json.dumps({"error": "File terlalu besar untuk preview teks (> 2MB)"}))
+            self.write(json.dumps({"ok": False, "error": {"code": "TOO_LARGE", "message": "Berkas terlalu besar untuk pratinjau teks (> 2MB)."}}))
             return
 
         try:
             bot = get_shared_bot()
             tg_file = await bot.get_file(f["file_id"])
             if not tg_file or not tg_file.file_path:
-                self.set_status(500)
-                self.write(json.dumps({"error": "Could not get file path"}))
+                self.set_status(404)
+                self.write(json.dumps({"ok": False, "error": {"code": "CDN_ERROR", "message": "Gagal mengambil jalur berkas."}}))
                 return
 
-            import urllib.request
-            req = urllib.request.Request(tg_file.file_path, headers={"User-Agent": "DarfinStorage"})
-            with urllib.request.urlopen(req) as response:
-                content = response.read().decode("utf-8", errors="replace")
+            client = tornado.httpclient.AsyncHTTPClient()
+            resp = await client.fetch(tg_file.file_path, request_timeout=8.0)
+            content = resp.body.decode("utf-8", errors="replace")
 
             self.write(json.dumps({"ok": True, "content": content[:80000]}))
         except Exception as e:
             log.exception("Error fetching file content: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal membaca isi berkas."}}))
 
 
 class ApiDropzoneInfoHandler(BaseApiHandler):
-    """Fetch folder details by dropzone share token."""
+    """Fetch folder details by exact Dropzone share token."""
     async def get(self):
         token = self.get_argument("token", None)
         if not token:
             self.set_status(400)
-            self.write(json.dumps({"error": "Missing token"}))
+            self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "Token wajib diisi."}}))
             return
 
         folder = db.get_folder_by_share_token(token)
         if not folder:
             self.set_status(404)
-            self.write(json.dumps({"error": "Link Dropzone tidak valid atau telah dinonaktifkan."}))
+            self.write(json.dumps({"ok": False, "error": {"code": "NOT_FOUND", "message": "Tautan Dropzone tidak valid atau telah dinonaktifkan."}}))
             return
 
         user = db.get_user(folder["user_id"])
-        owner_name = user.get("first_name", "Darfin Storage") if user else "Darfin Storage"
+        owner_name = user.get("full_name") or user.get("username") or "Darfin Storage"
 
         self.write(json.dumps({
             "ok": True,
             "folder": {
                 "id": folder["id"],
-                "name": folder["name"],
-                "owner_name": owner_name,
+                "name": escape_html(folder["name"]),
+                "owner_name": escape_html(owner_name),
             }
         }))
 
 
 class ApiDropzoneUploadHandler(BaseApiHandler):
-    """Direct multi-file upload from public Dropzone page."""
+    """Public multi-file upload into Dropzone with strict rate limiting and size caps."""
     async def post(self):
+        # Rate limit by client IP: max 8 uploads per 60 seconds
+        client_ip = self.request.remote_ip or "unknown"
+        if not check_rate_limit(f"dz_up:{client_ip}", max_requests=8, window_seconds=60):
+            self.set_status(429)
+            self.write(json.dumps({"ok": False, "error": {"code": "RATE_LIMITED", "message": "Terlalu banyak permintaan unggah. Tunggu 1 menit."}}))
+            return
+
         try:
             token = self.get_argument("token", None)
-            sender_name = (self.get_argument("sender_name", "") or "").strip() or "Tamu Dropzone"
+            sender_name = sanitize_filename(self.get_argument("sender_name", "") or "").strip() or "Tamu Dropzone"
 
             if not token:
                 self.set_status(400)
-                self.write(json.dumps({"error": "Missing token"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "Token wajib diisi."}}))
                 return
 
             folder = db.get_folder_by_share_token(token)
             if not folder:
                 self.set_status(404)
-                self.write(json.dumps({"error": "Folder Dropzone tidak ditemukan"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "NOT_FOUND", "message": "Folder Dropzone tidak ditemukan."}}))
                 return
 
             user_id = folder["user_id"]
@@ -810,119 +1174,140 @@ class ApiDropzoneUploadHandler(BaseApiHandler):
             uploaded_files = self.request.files.get("files", [])
             if not uploaded_files:
                 self.set_status(400)
-                self.write(json.dumps({"error": "Tidak ada berkas yang diunggah"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "NO_FILES", "message": "Tidak ada berkas yang diunggah."}}))
+                return
+
+            if len(uploaded_files) > MAX_UPLOAD_BATCH_FILES:
+                self.set_status(400)
+                self.write(json.dumps({"ok": False, "error": {"code": "BATCH_LIMIT_EXCEEDED", "message": f"Maksimal {MAX_UPLOAD_BATCH_FILES} berkas sekaligus."}}))
+                return
+
+            max_single_bytes = MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024
+            max_batch_bytes = MAX_UPLOAD_BATCH_MB * 1024 * 1024
+            total_bytes = sum(len(finfo["body"]) for finfo in uploaded_files)
+
+            if total_bytes > max_batch_bytes:
+                self.set_status(400)
+                self.write(json.dumps({"ok": False, "error": {"code": "TOTAL_SIZE_EXCEEDED", "message": f"Total berkas melebihi {MAX_UPLOAD_BATCH_MB} MB."}}))
                 return
 
             bot = get_shared_bot()
             saved_count = 0
-            total_bytes = 0
             file_names_summary = []
 
             for file_info in uploaded_files:
-                filename = file_info["filename"]
+                filename = sanitize_filename(file_info["filename"])
                 body = file_info["body"]
                 size = len(body)
-                total_bytes += size
-                file_names_summary.append(filename)
+                if size > max_single_bytes:
+                    continue
 
+                file_names_summary.append(filename)
                 lower_name = filename.lower()
                 thumb_fid = None
                 caption_note = f"📥 Masuk via Dropzone oleh: {sender_name} ke 📁 {folder_name}"
 
-                if any(lower_name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
-                    ftype = "photo"
-                    msg = await bot.send_photo(chat_id=user_id, photo=body, caption=caption_note)
-                    fid = msg.photo[-1].file_id
-                    fuid = msg.photo[-1].file_unique_id
-                    thumb_fid = msg.photo[0].file_id if len(msg.photo) > 1 else None
-                elif any(lower_name.endswith(ext) for ext in [".mp4", ".mov", ".mkv", ".webm"]):
-                    ftype = "video"
-                    msg = await bot.send_video(chat_id=user_id, video=body, caption=caption_note)
-                    fid = msg.video.file_id
-                    fuid = msg.video.file_unique_id
-                    thumb_fid = msg.video.thumbnail.file_id if msg.video.thumbnail else None
-                elif any(lower_name.endswith(ext) for ext in [".mp3", ".wav", ".flac", ".m4a"]):
-                    ftype = "audio"
-                    msg = await bot.send_audio(chat_id=user_id, audio=body, caption=caption_note)
-                    fid = msg.audio.file_id
-                    fuid = msg.audio.file_unique_id
-                    thumb_fid = msg.audio.thumbnail.file_id if msg.audio.thumbnail else None
-                else:
-                    ftype = "document"
-                    from io import BytesIO
-                    bio = BytesIO(body)
-                    bio.name = filename
-                    msg = await bot.send_document(chat_id=user_id, document=bio, filename=filename, caption=caption_note)
-                    fid = msg.document.file_id
-                    fuid = msg.document.file_unique_id
-                    thumb_fid = msg.document.thumbnail.file_id if msg.document.thumbnail else None
+                try:
+                    if any(lower_name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
+                        ftype = "photo"
+                        msg = await bot.send_photo(chat_id=user_id, photo=body, caption=caption_note)
+                        fid = msg.photo[-1].file_id
+                        fuid = msg.photo[-1].file_unique_id
+                        thumb_fid = msg.photo[0].file_id if len(msg.photo) > 1 else None
+                    elif any(lower_name.endswith(ext) for ext in [".mp4", ".mov", ".mkv", ".webm"]):
+                        ftype = "video"
+                        msg = await bot.send_video(chat_id=user_id, video=body, caption=caption_note)
+                        fid = msg.video.file_id
+                        fuid = msg.video.file_unique_id
+                        thumb_fid = msg.video.thumbnail.file_id if msg.video.thumbnail else None
+                    elif any(lower_name.endswith(ext) for ext in [".mp3", ".wav", ".flac", ".m4a"]):
+                        ftype = "audio"
+                        msg = await bot.send_audio(chat_id=user_id, audio=body, caption=caption_note)
+                        fid = msg.audio.file_id
+                        fuid = msg.audio.file_unique_id
+                        thumb_fid = msg.audio.thumbnail.file_id if msg.audio.thumbnail else None
+                    else:
+                        ftype = "document"
+                        from io import BytesIO
+                        bio = BytesIO(body)
+                        bio.name = filename
+                        msg = await bot.send_document(chat_id=user_id, document=bio, filename=filename, caption=caption_note)
+                        fid = msg.document.file_id
+                        fuid = msg.document.file_unique_id
+                        thumb_fid = msg.document.thumbnail.file_id if msg.document.thumbnail else None
 
-                note = f"Dikirim via Dropzone oleh: {sender_name}"
-                mime_str = f"text/plain;;;{note};;;dropzone"
-                db.save_file(
-                    user_id=user_id,
-                    folder_id=folder_id,
-                    file_id=fid,
-                    file_unique_id=fuid,
-                    file_name=filename,
-                    file_size=size,
-                    file_type=ftype,
-                    mime_type=mime_str,
-                    thumbnail_file_id=thumb_fid,
-                )
-                saved_count += 1
-                await asyncio.sleep(0.2)
+                    note = f"Dikirim via Dropzone oleh: {sender_name}"
+                    mime_str = f"text/plain;;;{note};;;dropzone"
+                    db.save_file(
+                        user_id=user_id,
+                        folder_id=folder_id,
+                        file_id=fid,
+                        file_unique_id=fuid,
+                        file_name=filename,
+                        file_size=size,
+                        file_type=ftype,
+                        mime_type=mime_str,
+                        thumbnail_file_id=thumb_fid,
+                    )
+                    saved_count += 1
+                    await asyncio.sleep(0.2)
+                except Exception as single_err:
+                    log.warning("Dropzone item upload failed: %s", single_err)
 
-            # Send summary notification to owner
-            try:
-                from utils import format_size
-                summary_text = (
-                    f"📥 <b>Dropzone: Berkas Baru Diterima!</b>\n\n"
-                    f"📁 <b>Folder:</b> {folder_name}\n"
-                    f"👤 <b>Pengirim:</b> {sender_name}\n"
-                    f"📦 <b>Jumlah:</b> {saved_count} berkas ({format_size(total_bytes)})\n"
-                    f"📄 <b>Daftar:</b>\n" + "\n".join(f"• {fn}" for fn in file_names_summary[:5])
-                )
-                if len(file_names_summary) > 5:
-                    summary_text += f"\n<i>...dan {len(file_names_summary) - 5} berkas lainnya</i>"
-                await bot.send_message(chat_id=user_id, text=summary_text, parse_mode="HTML")
-            except Exception as alert_err:
-                log.warning("Could not send dropzone notification to owner: %s", alert_err)
+            # Send notification to owner
+            if saved_count > 0:
+                try:
+                    summary_text = (
+                        f"📥 <b>Dropzone: Berkas Baru Diterima!</b>\n\n"
+                        f"📁 <b>Folder:</b> {escape_html(folder_name)}\n"
+                        f"👤 <b>Pengirim:</b> {escape_html(sender_name)}\n"
+                        f"📦 <b>Jumlah:</b> {saved_count} berkas ({format_size(total_bytes)})\n"
+                        f"📄 <b>Daftar:</b>\n" + "\n".join(f"• {escape_html(fn)}" for fn in file_names_summary[:5])
+                    )
+                    if len(file_names_summary) > 5:
+                        summary_text += f"\n<i>...dan {len(file_names_summary) - 5} berkas lainnya</i>"
+                    await bot.send_message(chat_id=user_id, text=summary_text, parse_mode="HTML")
+                except Exception as alert_err:
+                    log.warning("Could not send dropzone notification to owner: %s", alert_err)
 
             self.write(json.dumps({"ok": True, "count": saved_count}))
         except Exception as e:
             log.exception("Error in ApiDropzoneUploadHandler: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal mengunggah berkas ke Dropzone."}}))
 
 
 class ApiFolderDropzoneHandler(BaseApiHandler):
-    """Manage folder Dropzone link (create/get/revoke)."""
+    """Manage folder Dropzone link (get/create/revoke)."""
     async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         try:
             data = json.loads(self.request.body.decode("utf-8"))
-            folder_id = data.get("folder_id")
-            user_id = data.get("user_id")
+            folder_id_raw = data.get("folder_id")
             action = data.get("action", "get")
 
-            if not folder_id or not user_id:
+            if not folder_id_raw or not str(folder_id_raw).isdigit():
                 self.set_status(400)
-                self.write(json.dumps({"error": "Missing parameters"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "folder_id wajib diisi."}}))
                 return
 
-            folder = db.get_folder(int(folder_id))
-            if not folder or folder["user_id"] != int(user_id):
+            folder_id = int(folder_id_raw)
+            folder = db.get_folder(folder_id, user_id=user_id)
+            if not folder:
                 self.set_status(403)
-                self.write(json.dumps({"error": "Folder tidak ditemukan atau akses ditolak"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "FORBIDDEN", "message": "Folder tidak ditemukan atau akses ditolak."}}))
                 return
 
             if action == "revoke":
-                db.revoke_folder_share_token(int(folder_id))
+                db.revoke_folder_share_token(folder_id, user_id=user_id)
                 self.write(json.dumps({"ok": True, "active": False}))
                 return
 
-            token = db.get_or_create_folder_share_token(int(folder_id))
-            base_url = WEBHOOK_URL.rstrip('/') if WEBHOOK_URL else "https://telegram-drive-bot-0upd.onrender.com"
+            token = db.get_or_create_folder_share_token(folder_id, user_id=user_id)
+            base_url = PUBLIC_BASE_URL or f"{self.request.protocol}://{self.request.host}"
             dropzone_url = f"{base_url}/dropzone/{token}"
 
             self.write(json.dumps({
@@ -935,36 +1320,54 @@ class ApiFolderDropzoneHandler(BaseApiHandler):
         except Exception as e:
             log.exception("Error in ApiFolderDropzoneHandler: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal mengatur Dropzone."}}))
 
 
 class ApiFileShareLinkHandler(BaseApiHandler):
-    """Manage file public share link (get/create/revoke)."""
+    """Manage file public share link (get/create/revoke/update_security)."""
     async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         try:
             data = json.loads(self.request.body.decode("utf-8"))
-            file_id = data.get("file_id")
-            user_id = data.get("user_id")
+            file_id_raw = data.get("file_id")
             action = data.get("action", "get")
 
-            if not file_id or not user_id:
+            if not file_id_raw or not str(file_id_raw).isdigit():
                 self.set_status(400)
-                self.write(json.dumps({"error": "Missing file_id or user_id"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "file_id wajib disertakan."}}))
                 return
 
-            f = db.get_file(int(file_id))
-            if not f or int(f.get("user_id", 0)) != int(user_id):
+            file_id = int(file_id_raw)
+            f = db.get_file(file_id, user_id=user_id)
+            if not f or f.get("is_trashed"):
                 self.set_status(403)
-                self.write(json.dumps({"error": "Berkas tidak ditemukan atau akses ditolak"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "FORBIDDEN", "message": "Berkas tidak ditemukan atau akses ditolak."}}))
                 return
 
             if action == "revoke":
-                db.revoke_file_share_token(int(file_id))
+                db.revoke_file_share_token(file_id, user_id=user_id)
                 self.write(json.dumps({"ok": True, "active": False}))
                 return
 
-            token = db.get_or_create_file_share_token(int(file_id))
-            base_url = f"{self.request.protocol}://{self.request.host}" if self.request.host else (WEBHOOK_URL.rstrip('/') if WEBHOOK_URL else "https://telegram-drive-bot-0upd.onrender.com")
+            if action == "set_security":
+                pin = data.get("pin")
+                expires_at = data.get("expires_at")
+                limit = data.get("limit")
+                clear_all = bool(data.get("clear_all", False))
+                db.update_file_share_security(
+                    file_id,
+                    expires_at=expires_at if expires_at is not None else db._UNSET,
+                    pin=pin if pin is not None else db._UNSET,
+                    limit=limit if limit is not None else db._UNSET,
+                    clear_all=clear_all,
+                    user_id=user_id,
+                )
+
+            token = db.get_or_create_file_share_token(file_id, user_id=user_id)
+            base_url = PUBLIC_BASE_URL or f"{self.request.protocol}://{self.request.host}"
             share_url = f"{base_url}/s/{token}"
             direct_dl_url = f"{base_url}/s/{token}?download=1"
 
@@ -981,26 +1384,59 @@ class ApiFileShareLinkHandler(BaseApiHandler):
         except Exception as e:
             log.exception("Error in ApiFileShareLinkHandler: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal mengatur tautan berbagi."}}))
 
 
 class ApiShareFileInfoHandler(BaseApiHandler):
-    """Fetch public file metadata by share token."""
+    """Fetch public file metadata by exact share token with PIN gate enforcement."""
     async def get(self):
         token = self.get_argument("token", None)
+        pin = self.get_argument("pin", None)
+
         if not token:
             self.set_status(400)
-            self.write(json.dumps({"error": "Missing token"}))
+            self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "Token wajib diisi."}}))
             return
 
-        f = db.get_file_by_share_token(token)
-        if not f or f.get("is_trashed"):
+        # Rate limit PIN guesses: max 5 attempts per 60 seconds per IP+token
+        client_ip = self.request.remote_ip or "unknown"
+        if pin and not check_rate_limit(f"pin_try:{client_ip}:{token}", max_requests=5, window_seconds=60):
+            self.set_status(429)
+            self.write(json.dumps({"ok": False, "error": {"code": "RATE_LIMITED", "message": "Terlalu banyak percobaan PIN. Coba lagi dalam 1 menit."}}))
+            return
+
+        f, err = db.validate_public_share(token, pin=pin)
+        if err == "NOT_FOUND" or not f:
             self.set_status(404)
-            self.write(json.dumps({"error": "Berkas tidak ditemukan atau telah dihapus."}))
+            self.write(json.dumps({"ok": False, "error": {"code": "NOT_FOUND", "message": "Berkas tidak ditemukan atau telah dihapus."}}))
             return
 
-        preview_url = None
+        if err in ("EXPIRED", "LIMIT_EXHAUSTED"):
+            self.set_status(410)
+            self.write(json.dumps({"ok": False, "error": {"code": err, "message": "Tautan telah kadaluarsa atau batas unduhan habis."}}))
+            return
+
+        if err == "PIN_REQUIRED":
+            # Tell client PIN is required to unlock
+            self.write(json.dumps({
+                "ok": True,
+                "pin_required": True,
+                "file": {
+                    "name": sanitize_filename(f["file_name"]),
+                    "size_formatted": format_size(f.get("file_size", 0)),
+                    "type": f.get("file_type", "document"),
+                }
+            }))
+            return
+
+        if err == "PIN_INCORRECT":
+            self.set_status(403)
+            self.write(json.dumps({"ok": False, "error": {"code": "PIN_INCORRECT", "message": "PIN yang dimasukkan salah."}}))
+            return
+
         bot = get_shared_bot()
+        preview_url = None
+        # Only provide preview CDN if file type is media and no sensitive restriction remains
         try:
             tg_file = await bot.get_file(f["file_id"])
             if tg_file and tg_file.file_path:
@@ -1013,6 +1449,7 @@ class ApiShareFileInfoHandler(BaseApiHandler):
 
         self.write(json.dumps({
             "ok": True,
+            "pin_required": False,
             "file": {
                 "name": f["file_name"],
                 "size_formatted": format_size(f.get("file_size", 0)),
@@ -1021,23 +1458,21 @@ class ApiShareFileInfoHandler(BaseApiHandler):
                 "mime_type": f.get("mime_type", ""),
                 "created_at": f.get("created_at", "")[:10],
                 "preview_url": preview_url,
-                "download_url": f"/s/{token}?download=1",
+                "download_url": f"/s/{token}?download=1" + (f"&pin={pin}" if pin else ""),
                 "bot_url": f"https://t.me/{bot_username}?start=sf_{token}"
             }
         }))
 
 
 class ApiTrashHandler(BaseApiHandler):
-    """List all trashed files for a user."""
+    """List trashed files for authenticated user."""
     async def get(self):
-        user_id_raw = self.get_argument("user_id", None)
-        if not user_id_raw or not user_id_raw.isdigit():
-            self.set_status(400)
-            self.write(json.dumps({"error": "Invalid user_id"}))
+        user_id = require_authenticated_user(self)
+        if not user_id:
             return
 
-        user_id = int(user_id_raw)
         trash_files = db.get_trash(user_id)
+        media_auth_token = create_session_token(user_id, duration_seconds=3600)
         res_files = []
         for f in trash_files:
             has_thumb = bool(f.get("thumbnail_file_id") or f.get("file_type") == "photo")
@@ -1049,70 +1484,62 @@ class ApiTrashHandler(BaseApiHandler):
                 "file_type": f.get("file_type", "document"),
                 "trashed_at": f.get("trashed_at", "")[:10] if f.get("trashed_at") else "",
                 "has_thumb": has_thumb,
-                "thumb_url": f"/api/thumbnail?file_id={f['id']}" if has_thumb else None,
+                "thumb_url": f"/api/thumbnail?file_id={f['id']}&auth={media_auth_token}" if has_thumb else None,
             })
         self.write(json.dumps({"ok": True, "files": res_files, "count": len(res_files)}))
 
 
 class ApiRestoreHandler(BaseApiHandler):
-    """Restore trashed file(s)."""
+    """Restore owned trashed file(s)."""
     async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
         try:
             data = json.loads(self.request.body.decode("utf-8"))
             file_ids = data.get("file_ids", [])
-            user_id = data.get("user_id")
-
-            if not file_ids or not user_id:
+            if not isinstance(file_ids, list) or not file_ids:
                 self.set_status(400)
-                self.write(json.dumps({"error": "Missing parameters"}))
+                self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "file_ids wajib diisi."}}))
                 return
 
             restored = 0
-            for fid in file_ids:
-                try:
-                    db.restore_file(int(fid))
+            for fid in list(dict.fromkeys(int(f) for f in file_ids if str(f).isdigit()))[:100]:
+                if db.restore_file(fid, user_id=user_id):
                     restored += 1
-                except Exception as ex:
-                    log.warning("Failed restoring file %s: %s", fid, ex)
 
             self.write(json.dumps({"ok": True, "restored_count": restored}))
         except Exception as e:
             log.exception("Error restoring file: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal memulihkan berkas."}}))
 
 
 class ApiEmptyTrashHandler(BaseApiHandler):
-    """Permanently delete all trashed files of user."""
+    """Permanently delete all trashed files of authenticated user."""
     async def post(self):
-        try:
-            data = json.loads(self.request.body.decode("utf-8"))
-            user_id = data.get("user_id")
-            if not user_id:
-                self.set_status(400)
-                self.write(json.dumps({"error": "Missing user_id"}))
-                return
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
 
-            db.empty_trash(int(user_id))
+        try:
+            db.empty_trash(user_id)
             self.write(json.dumps({"ok": True}))
         except Exception as e:
             log.exception("Error emptying trash: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal mengosongkan tempat sampah."}}))
 
 
 class ApiDuplicatesHandler(BaseApiHandler):
-    """Get duplicate files report and potential space savings."""
+    """Get duplicate files report for authenticated user."""
     async def get(self):
-        user_id_raw = self.get_argument("user_id", None)
-        if not user_id_raw or not user_id_raw.isdigit():
-            self.set_status(400)
-            self.write(json.dumps({"error": "Invalid user_id"}))
+        user_id = require_authenticated_user(self)
+        if not user_id:
             return
 
-        user_id = int(user_id_raw)
         health = db.get_storage_health(user_id)
-
         formatted_groups = []
         for grp in health.get("duplicate_groups", []):
             formatted_groups.append({
@@ -1135,31 +1562,32 @@ class ApiDuplicatesHandler(BaseApiHandler):
 
 
 class ApiCleanDuplicatesHandler(BaseApiHandler):
-    """One-click cleanup redundant duplicate copies to trash."""
+    """One-click cleanup redundant duplicate copies to trash for authenticated user."""
     async def post(self):
-        try:
-            data = json.loads(self.request.body.decode("utf-8"))
-            user_id = data.get("user_id")
-            if not user_id:
-                self.set_status(400)
-                self.write(json.dumps({"error": "Missing user_id"}))
-                return
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
 
-            cleaned = db.clean_duplicate_files(int(user_id))
+        try:
+            cleaned = db.clean_duplicate_files(user_id)
             self.write(json.dumps({"ok": True, "cleaned_count": cleaned}))
         except Exception as e:
             log.exception("Error cleaning duplicates: %s", e)
             self.set_status(500)
-            self.write(json.dumps({"error": str(e)}))
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal membersihkan duplikat."}}))
 
 
-def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
-    """Compile all WebApp + Telegram Webhook routes."""
-    import telegram.ext._utils.webhookhandler as wh
-    return [
-        (rf"{webhook_path}/?", wh.TelegramHandler, shared_objects),
+def build_app_routes(webhook_path: str = "", shared_objects: dict | None = None) -> list:
+    """Consolidated single source of truth for all routes."""
+    routes = []
+    if webhook_path and shared_objects:
+        import telegram.ext._utils.webhookhandler as wh
+        routes.append((rf"{webhook_path}/?", wh.TelegramHandler, shared_objects))
+
+    routes.extend([
         (r"/", WebAppPageHandler),
         (r"/webapp/?", WebAppPageHandler),
+        (r"/api/auth/session/?", ApiAuthSessionHandler),
         (r"/api/drive/?", ApiDriveHandler),
         (r"/api/thumbnail/?", ApiThumbnailHandler),
         (r"/api/download/?", ApiDownloadHandler),
@@ -1188,7 +1616,8 @@ def get_webapp_routes(webhook_path: str, shared_objects: dict) -> list[tuple]:
         (r"/api/clean_duplicates/?", ApiCleanDuplicatesHandler),
         (r"/api/ping/?", ApiPingHandler),
         (r"/health/?", ApiPingHandler),
-    ]
+    ])
+    return routes
 
 
 def patch_ptb_webhook_app():
@@ -1203,7 +1632,7 @@ def patch_ptb_webhook_app():
                 "update_queue": update_queue,
                 "secret_token": secret_token,
             }
-            handlers = get_webapp_routes(webhook_path, self.shared_objects)
+            handlers = build_app_routes(webhook_path, self.shared_objects)
             tornado.web.Application.__init__(self, handlers)
 
         def log_request(self, handler):
@@ -1211,46 +1640,15 @@ def patch_ptb_webhook_app():
 
     wh.WebhookAppClass = CustomWebhookApp
     telegram.ext._updater.WebhookAppClass = CustomWebhookApp
-    log.info("Patched PTB WebhookAppClass with Darfin Storage WebApp routes (/webapp, /api/*)")
+    log.info("Patched PTB WebhookAppClass with Darfin Storage WebApp routes")
 
 
 def start_standalone_webapp_server(port: int = 10000):
     """Run standalone WebApp server for local development or polling mode."""
-    routes = [
-        (r"/", WebAppPageHandler),
-        (r"/webapp/?", WebAppPageHandler),
-        (r"/api/drive/?", ApiDriveHandler),
-        (r"/api/thumbnail/?", ApiThumbnailHandler),
-        (r"/api/download/?", ApiDownloadHandler),
-        (r"/api/star/?", ApiStarHandler),
-        (r"/api/send_to_chat/?", ApiSendToChatHandler),
-        (r"/api/all_folders/?", ApiAllFoldersHandler),
-        (r"/api/batch_move/?", ApiBatchMoveHandler),
-        (r"/api/create_folder/?", ApiCreateFolderHandler),
-        (r"/api/rename/?", ApiRenameHandler),
-        (r"/api/batch_delete/?", ApiBatchDeleteHandler),
-        (r"/api/batch_star/?", ApiBatchStarHandler),
-        (r"/api/batch_send_to_chat/?", ApiBatchSendToChatHandler),
-        (r"/api/upload/?", ApiUploadHandler),
-        (r"/api/file_content/?", ApiFileContentHandler),
-        (r"/dropzone/([a-zA-Z0-9_\-]+)/?", DropzonePageHandler),
-        (r"/api/dropzone/info/?", ApiDropzoneInfoHandler),
-        (r"/api/dropzone/upload/?", ApiDropzoneUploadHandler),
-        (r"/api/folder_dropzone/?", ApiFolderDropzoneHandler),
-        (r"/s/([a-zA-Z0-9_\-]+)/?", PublicFileSharePageHandler),
-        (r"/api/file_share_link/?", ApiFileShareLinkHandler),
-        (r"/api/share_file_info/?", ApiShareFileInfoHandler),
-        (r"/api/trash/?", ApiTrashHandler),
-        (r"/api/restore/?", ApiRestoreHandler),
-        (r"/api/empty_trash/?", ApiEmptyTrashHandler),
-        (r"/api/duplicates/?", ApiDuplicatesHandler),
-        (r"/api/clean_duplicates/?", ApiCleanDuplicatesHandler),
-        (r"/api/ping/?", ApiPingHandler),
-        (r"/health/?", ApiPingHandler),
-    ]
+    routes = build_app_routes()
     app = tornado.web.Application(routes)
     try:
         app.listen(port)
-        log.info("Standalone WebApp server listening on http://0.0.0.0:%s/webapp", port)
+        log.info("Standalone WebApp server listening on port %s", port)
     except Exception as e:
         log.warning("Could not start standalone WebApp server on port %s: %s", port, e)
