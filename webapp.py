@@ -700,26 +700,30 @@ async def _send_single_file_to_chat(bot: Bot, user_id: int, f: dict):
                 pass
 
         buf = None
-        if f.get("file_size", 0) <= 15 * 1024 * 1024:
-            try:
-                tg_file = await bot.get_file(fid)
-                buf = await tg_file.download_as_bytearray()
-            except Exception:
-                buf = None
-
-        if not buf and thumb_fid:
+        if thumb_fid:
             try:
                 tg_file = await bot.get_file(thumb_fid)
                 buf = await tg_file.download_as_bytearray()
             except Exception:
                 buf = None
 
+        if not buf and f.get("file_size", 0) <= 15 * 1024 * 1024:
+            try:
+                tg_file = await bot.get_file(fid)
+                raw_buf = await tg_file.download_as_bytearray()
+                buf = optimize_preview_image(bytes(raw_buf), max_dim=1600, quality=88)
+            except Exception:
+                buf = None
+
         if buf:
             try:
-                optimized = optimize_preview_image(bytes(buf), max_dim=1600, quality=88)
-                sent = await bot.send_photo(chat_id=user_id, photo=optimized, caption=caption, parse_mode="HTML", reply_markup=markup)
+                sent = await bot.send_photo(chat_id=user_id, photo=bytes(buf), caption=caption, parse_mode="HTML", reply_markup=markup)
                 if sent and sent.photo:
-                    db.update_file_thumbnail(f["id"], sent.photo[-1].file_id, file_type="photo")
+                    try:
+                        db.update_file_thumbnail(f["id"], sent.photo[-1].file_id, file_type="photo")
+                    except Exception:
+                        pass
+
                 return
             except Exception:
                 pass
