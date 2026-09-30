@@ -1,5 +1,6 @@
 import hashlib
 import html
+import os
 import re
 import secrets
 import unicodedata
@@ -143,11 +144,22 @@ def extract_file_info(message: Message) -> dict | None:
     if message.document:
         d = message.document
         raw_name = d.file_name or f"document_{now}"
+        ext = os.path.splitext(raw_name)[1].lower()
+        mime = (d.mime_type or "").lower()
+        if mime.startswith("image/") or ext in [".jpg", ".jpeg", ".png", ".webp", ".heic", ".bmp", ".tiff"]:
+            detected_type = "photo"
+        elif mime.startswith("video/") or ext in [".mp4", ".mov", ".mkv", ".webm", ".avi"]:
+            detected_type = "video"
+        elif mime.startswith("audio/") or ext in [".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg"]:
+            detected_type = "audio"
+        else:
+            detected_type = "document"
+
         return {
             "file_id": d.file_id,
             "file_unique_id": d.file_unique_id,
             "file_size": d.file_size or 0,
-            "file_type": "document",
+            "file_type": detected_type,
             "file_name": sanitize_filename(raw_name),
             "mime_type": d.mime_type,
             "thumbnail_file_id": d.thumbnail.file_id if d.thumbnail else None,

@@ -543,25 +543,72 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     caption = f"{emoji} <b>{f['file_name']}</b>\n📊 {size} • 📅 {created}{note_line}{tags_line}"
     markup = kb.file_actions(f)
 
-    try:
-        send = {
-            "photo": query.message.reply_photo,
-            "video": query.message.reply_video,
-            "animation": query.message.reply_animation,
-            "audio": query.message.reply_audio,
-            "voice": query.message.reply_voice,
-            "video_note": query.message.reply_video_note,
-            "document": query.message.reply_document,
-        }
+    file_type = f.get("file_type", "document")
+    thumb_fid = f.get("thumbnail_file_id")
 
-        file_type = f["file_type"]
-        sender = send.get(file_type, send["document"])
+    if file_type == "photo":
+        # 1. Try sending directly as native photo file_id
+        try:
+            await query.message.reply_photo(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
+            return
+        except Exception:
+            pass
 
-        if file_type == "video_note":
-            await sender(f["file_id"], reply_markup=markup)
+        # 2. If it was uploaded as uncompressed document, use its PhotoSize thumbnail for visual preview
+        if thumb_fid:
+            try:
+                await query.message.reply_photo(thumb_fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+                return
+            except Exception:
+                pass
+
+        # 3. If thumbnail failed or missing, get direct CDN URL from Telegram
+        try:
+            tg_file = await context.bot.get_file(f["file_id"])
+            if tg_file and tg_file.file_path:
+                await query.message.reply_photo(tg_file.file_path, caption=caption, parse_mode="HTML", reply_markup=markup)
+                return
+        except Exception:
+            pass
+
+        # 4. Fallback to document
+        await query.message.reply_document(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
+        return
+
+    if file_type == "video":
+        try:
+            await query.message.reply_video(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
+            return
+        except Exception:
+            pass
+
+        if thumb_fid:
+            try:
+                await query.message.reply_photo(thumb_fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+                return
+            except Exception:
+                pass
+
+        await query.message.reply_document(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
+        return
+
+    if file_type == "video_note":
+        try:
+            await query.message.reply_video_note(f["file_id"], reply_markup=markup)
             await query.message.reply_text(caption, parse_mode="HTML")
-        else:
-            await sender(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
+            return
+        except Exception:
+            pass
+
+    send = {
+        "animation": query.message.reply_animation,
+        "audio": query.message.reply_audio,
+        "voice": query.message.reply_voice,
+        "document": query.message.reply_document,
+    }
+    sender = send.get(file_type, send["document"])
+    try:
+        await sender(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
     except Exception:
         await query.message.reply_document(f["file_id"], caption=caption,
                                            parse_mode="HTML", reply_markup=markup)

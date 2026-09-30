@@ -1022,10 +1022,10 @@ class ApiUploadHandler(BaseApiHandler):
                 try:
                     if any(lower_name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
                         ftype = "photo"
-                        msg = await bot.send_photo(chat_id=user_id, photo=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
-                        fid = msg.photo[-1].file_id
-                        fuid = msg.photo[-1].file_unique_id
-                        thumb_fid = msg.photo[0].file_id if len(msg.photo) > 1 else None
+                        msg = await bot.send_document(chat_id=user_id, document=body, filename=filename, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
+                        fid = msg.document.file_id
+                        fuid = msg.document.file_unique_id
+                        thumb_fid = msg.document.thumbnail.file_id if msg.document.thumbnail else None
                     elif any(lower_name.endswith(ext) for ext in [".mp4", ".mov", ".mkv", ".webm"]):
                         ftype = "video"
                         msg = await bot.send_video(chat_id=user_id, video=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")

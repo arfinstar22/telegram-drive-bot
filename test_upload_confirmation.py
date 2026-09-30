@@ -161,6 +161,68 @@ class TestUploadConfirmation(unittest.IsolatedAsyncioTestCase):
         # Verified NO duplicate reply_text sent (which caused duplicate bottom keyboard)
         query_update.callback_query.message.reply_text.assert_not_called()
 
+    def test_extract_file_info_detects_photo_in_document(self):
+        from utils import extract_file_info
+        msg = MagicMock()
+        msg.photo = None
+        msg.video = None
+        msg.animation = None
+        msg.audio = None
+        msg.voice = None
+        msg.video_note = None
+        msg.document.file_name = "foto_resolusi_tinggi.png"
+        msg.document.file_size = 15728640  # 15 MB
+        msg.document.mime_type = "image/png"
+        msg.document.file_id = "doc_full_res_123"
+        msg.document.file_unique_id = "uniq_doc_123"
+        msg.document.thumbnail.file_id = "thumb_photo_456"
+
+        info = extract_file_info(msg)
+        self.assertIsNotNone(info)
+        self.assertEqual(info["file_type"], "photo")
+        self.assertEqual(info["file_size"], 15728640)
+        self.assertEqual(info["file_id"], "doc_full_res_123")
+        self.assertEqual(info["thumbnail_file_id"], "thumb_photo_456")
+
+    @patch("handlers.files.db")
+    async def test_preview_photo_document_uses_thumbnail_for_photo_preview(self, mock_db):
+        mock_db.get_file_for_user.return_value = {
+            "id": 99,
+            "folder_id": 10,
+            "file_id": "doc_full_res_123",
+            "file_name": "foto_resolusi_tinggi.png",
+            "file_type": "photo",
+            "file_size": 15728640,
+            "thumbnail_file_id": "thumb_photo_456",
+            "created_at": "2026-10-01T00:00:00",
+            "mime_type": "image/png",
+        }
+
+        query_update = MagicMock()
+        query_update.callback_query.answer = AsyncMock()
+        query_update.callback_query.data = "fi:99"
+        query_update.callback_query.from_user.id = 555
+        # Simulating that reply_photo with doc_full_res_123 fails (as Telegram Bot API does for doc IDs),
+        # but succeeds with thumb_photo_456
+        async def mock_reply_photo(target, **kwargs):
+            if target == "doc_full_res_123":
+                raise Exception("Wrong file identifier")
+            return MagicMock()
+
+        query_update.callback_query.message.reply_photo = AsyncMock(side_effect=mock_reply_photo)
+        query_update.callback_query.message.reply_document = AsyncMock()
+
+        context = MagicMock()
+
+        await files.preview_file(query_update, context)
+
+        # Verified reply_photo called with the Photo thumbnail
+        query_update.callback_query.message.reply_photo.assert_called()
+        last_call_target = query_update.callback_query.message.reply_photo.call_args[0][0]
+        self.assertEqual(last_call_target, "thumb_photo_456")
+        # And reply_document was NOT used because photo preview succeeded
+        query_update.callback_query.message.reply_document.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
