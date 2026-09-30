@@ -1,6 +1,5 @@
 import hashlib
 import html
-import os
 import re
 import secrets
 import unicodedata
@@ -144,22 +143,11 @@ def extract_file_info(message: Message) -> dict | None:
     if message.document:
         d = message.document
         raw_name = d.file_name or f"document_{now}"
-        ext = os.path.splitext(raw_name)[1].lower()
-        mime = (d.mime_type or "").lower()
-        if mime.startswith("image/") or ext in [".jpg", ".jpeg", ".png", ".webp", ".heic", ".bmp", ".tiff"]:
-            detected_type = "photo"
-        elif mime.startswith("video/") or ext in [".mp4", ".mov", ".mkv", ".webm", ".avi"]:
-            detected_type = "video"
-        elif mime.startswith("audio/") or ext in [".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg"]:
-            detected_type = "audio"
-        else:
-            detected_type = "document"
-
         return {
             "file_id": d.file_id,
             "file_unique_id": d.file_unique_id,
             "file_size": d.file_size or 0,
-            "file_type": detected_type,
+            "file_type": "document",
             "file_name": sanitize_filename(raw_name),
             "mime_type": d.mime_type,
             "thumbnail_file_id": d.thumbnail.file_id if d.thumbnail else None,
@@ -320,25 +308,5 @@ def encode_share_token(
     if count:
         result += f"|cnt:{count}"
     return result
-
-
-def optimize_preview_image(raw_bytes: bytes, max_dim: int = 1600, quality: int = 88) -> bytes:
-    """Optimize image for high-speed Telegram photo preview while keeping crisp HD quality."""
-    if not raw_bytes:
-        return raw_bytes
-    try:
-        import io
-        from PIL import Image
-        with Image.open(io.BytesIO(raw_bytes)) as im:
-            w, h = im.size
-            if max(w, h) > max_dim:
-                im.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
-            if im.mode in ("RGBA", "P"):
-                im = im.convert("RGB")
-            out = io.BytesIO()
-            im.save(out, format="JPEG", quality=quality, optimize=True)
-            return out.getvalue()
-    except Exception:
-        return raw_bytes
 
 

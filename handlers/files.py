@@ -14,7 +14,7 @@ import keyboards as kb
 import time
 import secrets
 import zipfile
-from utils import extract_file_info, file_emoji, format_size, parse_file_metadata, parse_share_token, optimize_preview_image
+from utils import extract_file_info, file_emoji, format_size, parse_file_metadata, parse_share_token
 
 log = logging.getLogger(__name__)
 
@@ -534,23 +534,7 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
         return
 
-    file_name = (f.get("file_name") or "").lower()
-    mime_type = (f.get("mime_type") or "").lower()
-    file_type = f.get("file_type", "document")
-    thumb_fid = f.get("thumbnail_file_id")
-
-    image_extensions = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".bmp", ".tiff"}
-    is_image = (
-        file_type == "photo"
-        or mime_type.startswith("image/")
-        or any(file_name.endswith(ext) for ext in image_extensions)
-    )
-
-    if is_image and file_type != "photo":
-        file_type = "photo"
-        f["file_type"] = "photo"
-
-    emoji = file_emoji(file_type)
+    emoji = file_emoji(f["file_type"])
     size = format_size(f.get("file_size", 0))
     created = f.get("created_at", "")[:10]
     _, note, tags = parse_file_metadata(f.get("mime_type"))
@@ -559,112 +543,25 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     caption = f"{emoji} <b>{f['file_name']}</b>\n📊 {size} • 📅 {created}{note_line}{tags_line}"
     markup = kb.file_actions(f)
 
-    if is_image:
-        # Non-blocking visual feedback
-        try:
-            asyncio.create_task(context.bot.send_chat_action(chat_id=query.message.chat_id, action="upload_photo"))
-        except Exception:
-            pass
-
-        # 1. Fast path: If already a native photo ID (starts with AgAC), reply instantly (< 0.2s)
-        native_fid = None
-        fid_val = f.get("file_id") or ""
-        thumb_val = thumb_fid or ""
-        if fid_val.startswith("AgAC"):
-            native_fid = fid_val
-        elif thumb_val.startswith("AgAC"):
-            native_fid = thumb_val
-
-        if native_fid:
-            try:
-                await query.message.reply_photo(native_fid, caption=caption, parse_mode="HTML", reply_markup=markup)
-                return
-            except Exception:
-                pass
-
-        # 2. Ultra-fast path: download lightweight thumbnail (20-40 KB) -> finishes in ~0.2s!
-        try:
-            buf = None
-            if thumb_fid:
-                try:
-                    tg_file = await context.bot.get_file(thumb_fid)
-                    buf = await tg_file.download_as_bytearray()
-                except Exception:
-                    buf = None
-
-            # Fallback to downloading original file only if no thumbnail exists
-            if not buf and f.get("file_size", 0) <= 15 * 1024 * 1024:
-                try:
-                    tg_file = await context.bot.get_file(f["file_id"])
-                    raw_buf = await tg_file.download_as_bytearray()
-                    buf = optimize_preview_image(bytes(raw_buf), max_dim=1600, quality=88)
-                except Exception:
-                    buf = None
-
-            if buf:
-                sent = await query.message.reply_photo(
-                    photo=bytes(buf),
-                    caption=caption,
-                    parse_mode="HTML",
-                    reply_markup=markup,
-                )
-                if sent and sent.photo:
-                    cached_pid = sent.photo[-1].file_id
-                    try:
-                        db.update_file_thumbnail(f["id"], cached_pid, file_type="photo")
-                    except Exception:
-                        pass
-
-                return
-        except Exception as exc:
-            log.warning("Failed to render photo preview for %s: %s", f["file_name"], exc)
-
-        # 3. Fallback to document only if everything fails
-        await query.message.reply_document(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
-        return
-
-    if file_type == "video":
-        try:
-            await query.message.reply_video(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
-            return
-        except Exception:
-            pass
-
-        if thumb_fid:
-            try:
-                await query.message.reply_photo(thumb_fid, caption=caption, parse_mode="HTML", reply_markup=markup)
-                return
-            except Exception:
-                pass
-
-            try:
-                tg_file = await context.bot.get_file(thumb_fid)
-                buf = await tg_file.download_as_bytearray()
-                await query.message.reply_photo(photo=bytes(buf), caption=caption, parse_mode="HTML", reply_markup=markup)
-                return
-            except Exception:
-                pass
-
-        await query.message.reply_document(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
-        return
-
-    if file_type == "video_note":
-        try:
-            await query.message.reply_video_note(f["file_id"], reply_markup=markup)
-            await query.message.reply_text(caption, parse_mode="HTML")
-            return
-        except Exception:
-            pass
-
-    send = {
-        "animation": query.message.reply_animation,
-        "audio": query.message.reply_audio,
-        "voice": query.message.reply_voice,
-        "document": query.message.reply_document,
-    }
-    sender = send.get(file_type, send["document"])
     try:
-        await sender(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
+        send = {
+            "photo": query.message.reply_photo,
+            "video": query.message.reply_video,
+            "animation": query.message.reply_animation,
+            "audio": query.message.reply_audio,
+            "voice": query.message.reply_voice,
+            "video_note": query.message.reply_video_note,
+            "document": query.message.reply_document,
+        }
+
+        file_type = f["file_type"]
+        sender = send.get(file_type, send["document"])
+
+        if file_type == "video_note":
+            await sender(f["file_id"], reply_markup=markup)
+            await query.message.reply_text(caption, parse_mode="HTML")
+        else:
+            await sender(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
     except Exception:
         await query.message.reply_document(f["file_id"], caption=caption,
                                            parse_mode="HTML", reply_markup=markup)

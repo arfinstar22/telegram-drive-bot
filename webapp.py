@@ -654,7 +654,7 @@ class ApiStarHandler(BaseApiHandler):
 
 async def _send_single_file_to_chat(bot: Bot, user_id: int, f: dict):
     import keyboards as kb
-    from utils import file_emoji, format_size, parse_file_metadata, optimize_preview_image
+    from utils import file_emoji, format_size, parse_file_metadata
     emoji = file_emoji(f["file_type"])
     size = format_size(f.get("file_size", 0))
     created = f.get("created_at", "")[:10]
@@ -667,69 +667,9 @@ async def _send_single_file_to_chat(bot: Bot, user_id: int, f: dict):
 
     ftype = f.get("file_type", "document")
     fid = f["file_id"]
-    thumb_fid = f.get("thumbnail_file_id")
 
-    file_name = (f.get("file_name") or "").lower()
-    mime_type = (f.get("mime_type") or "").lower()
-    image_extensions = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".bmp", ".tiff"}
-    is_image = (
-        ftype == "photo"
-        or mime_type.startswith("image/")
-        or any(file_name.endswith(ext) for ext in image_extensions)
-    )
-
-    if is_image:
-        try:
-            await bot.send_chat_action(chat_id=user_id, action="upload_photo")
-        except Exception:
-            pass
-
-        native_fid = None
-        fid_val = fid or ""
-        thumb_val = thumb_fid or ""
-        if fid_val.startswith("AgAC"):
-            native_fid = fid_val
-        elif thumb_val.startswith("AgAC"):
-            native_fid = thumb_val
-
-        if native_fid:
-            try:
-                await bot.send_photo(chat_id=user_id, photo=native_fid, caption=caption, parse_mode="HTML", reply_markup=markup)
-                return
-            except Exception:
-                pass
-
-        buf = None
-        if thumb_fid:
-            try:
-                tg_file = await bot.get_file(thumb_fid)
-                buf = await tg_file.download_as_bytearray()
-            except Exception:
-                buf = None
-
-        if not buf and f.get("file_size", 0) <= 15 * 1024 * 1024:
-            try:
-                tg_file = await bot.get_file(fid)
-                raw_buf = await tg_file.download_as_bytearray()
-                buf = optimize_preview_image(bytes(raw_buf), max_dim=1600, quality=88)
-            except Exception:
-                buf = None
-
-        if buf:
-            try:
-                sent = await bot.send_photo(chat_id=user_id, photo=bytes(buf), caption=caption, parse_mode="HTML", reply_markup=markup)
-                if sent and sent.photo:
-                    try:
-                        db.update_file_thumbnail(f["id"], sent.photo[-1].file_id, file_type="photo")
-                    except Exception:
-                        pass
-
-                return
-            except Exception:
-                pass
-
-        await bot.send_document(chat_id=user_id, document=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
-        return
+    if ftype == "photo":
+        await bot.send_photo(chat_id=user_id, photo=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
     elif ftype == "video":
         await bot.send_video(chat_id=user_id, video=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
     elif ftype == "audio":
@@ -1082,10 +1022,10 @@ class ApiUploadHandler(BaseApiHandler):
                 try:
                     if any(lower_name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
                         ftype = "photo"
-                        msg = await bot.send_document(chat_id=user_id, document=body, filename=filename, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
-                        fid = msg.document.file_id
-                        fuid = msg.document.file_unique_id
-                        thumb_fid = msg.document.thumbnail.file_id if msg.document.thumbnail else None
+                        msg = await bot.send_photo(chat_id=user_id, photo=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
+                        fid = msg.photo[-1].file_id
+                        fuid = msg.photo[-1].file_unique_id
+                        thumb_fid = msg.photo[0].file_id if len(msg.photo) > 1 else None
                     elif any(lower_name.endswith(ext) for ext in [".mp4", ".mov", ".mkv", ".webm"]):
                         ftype = "video"
                         msg = await bot.send_video(chat_id=user_id, video=body, caption=f"📤 Diunggah via WebApp ke 📁 {folder_name}")
