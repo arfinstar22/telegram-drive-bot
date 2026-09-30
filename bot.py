@@ -69,7 +69,7 @@ def main():
     app.add_handler(MessageHandler(filters.Regex(r"^🕒 (Recent|Terbaru)$"), files.recent_files_menu))
     app.add_handler(MessageHandler(filters.Regex(r"^🔍 (Search|Cari)$"), files.search_prompt))
     app.add_handler(MessageHandler(filters.Regex(r"^⚙️ (Settings|Pengaturan)$"), settings.settings_menu))
-    app.add_handler(MessageHandler(filters.Regex(r"^(✅ Done|✅ Selesai)$"), files.done_uploading))
+    app.add_handler(MessageHandler(filters.Regex(r"^(✅ Done|✅ Selesai|✅ Selesai Upload)$"), files.done_uploading))
     app.add_handler(MessageHandler(filters.Regex(r"^(❌ Cancel|❌ Batal)$"), menu.cancel))
     app.add_handler(MessageHandler(filters.Regex(r"^🏠 (Beranda|Menu Utama|Home)$"), menu.go_home))
 
@@ -86,6 +86,8 @@ def main():
     app.add_handler(CallbackQueryHandler(folders.revoke_folder_share, pattern=r"^dsh_rev:\d+$"))
 
     # ── File callbacks ─────────────────────────────────
+    app.add_handler(CallbackQueryHandler(files.btn_done_uploading, pattern=r"^upload_finish:"))
+    app.add_handler(CallbackQueryHandler(files.btn_cancel_upload, pattern=r"^upload_cancel:"))
     app.add_handler(CallbackQueryHandler(files.preview_file, pattern=r"^fi:"))
     app.add_handler(CallbackQueryHandler(files.download_file, pattern=r"^fdl:"))
     app.add_handler(CallbackQueryHandler(files.rename_file_prompt, pattern=r"^fr:"))

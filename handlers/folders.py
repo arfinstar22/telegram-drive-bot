@@ -25,12 +25,16 @@ async def open_folder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
 
     if folder_id == 0:
-        await _show_root(query, user_id)
+        if hasattr(context, "user_data"):
+            context.user_data["current_folder_id"] = None
+        await _show_root(query, user_id, context)
     else:
         await _show_folder_contents(query, context, folder_id, user_id)
 
 
-async def _show_root(query, user_id: int):
+async def _show_root(query, user_id: int, context: ContextTypes.DEFAULT_TYPE | None = None):
+    if context and hasattr(context, "user_data"):
+        context.user_data["current_folder_id"] = None
     folders = db.get_folders(user_id, parent_id=None)
     if not folders:
         text = "📁 <b>My Files</b>\n\nBelum ada folder. Buat folder pertama!"
@@ -47,6 +51,9 @@ async def _show_folder_contents(query, context, folder_id: int, user_id: int, pa
     if not folder:
         await query.edit_message_text("❌ Folder tidak ditemukan.")
         return
+
+    if hasattr(context, "user_data"):
+        context.user_data["current_folder_id"] = folder_id
 
     path = db.get_folder_path(folder_id)
     breadcrumb = " > ".join(["🏠"] + [f["name"] for f in path])
@@ -95,6 +102,8 @@ async def _show_folder_contents(query, context, folder_id: int, user_id: int, pa
 
 async def _show_folder_view(update_or_query, context, parent_id, user_id, send_new=False):
     """Shared helper to show a folder listing (root or subfolder contents)."""
+    if hasattr(context, "user_data"):
+        context.user_data["current_folder_id"] = parent_id
     if parent_id:
         folder = db.get_folder(parent_id)
         if not folder:
@@ -230,7 +239,7 @@ async def confirm_delete_folder(update: Update, context: ContextTypes.DEFAULT_TY
     if parent_id:
         await _show_folder_contents(query, context, parent_id, user_id)
     else:
-        await _show_root(query, user_id)
+        await _show_root(query, user_id, context)
 
 
 async def file_page(update: Update, context: ContextTypes.DEFAULT_TYPE):

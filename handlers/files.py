@@ -91,7 +91,7 @@ async def _auto_delete_worker(bot, chat_id: int, message_id: int, delay: float):
         _auto_delete_tasks.pop((chat_id, message_id), None)
 
 
-async def _debounce_flush(user_id: int, context: ContextTypes.DEFAULT_TYPE, delay: float = 1.8):
+async def _debounce_flush(user_id: int, context: ContextTypes.DEFAULT_TYPE, delay: float = 60.0):
     try:
         await asyncio.sleep(delay)
         await _flush_upload_batch(user_id, context)
@@ -119,47 +119,32 @@ async def _flush_upload_batch(user_id: int, context: ContextTypes.DEFAULT_TYPE):
     total_size = sum(f.get("size", 0) for f in files)
     dup_count = batch.get("dup_count", 0)
 
-    # Exactly 1 file
-    if len(files) == 1 and dup_count == 0:
-        f = files[0]
-        emoji = file_emoji(f["type"])
-        size_str = format_size(f["size"])
-        text = (
-            f"{emoji} <b>{f['name']}</b> ({size_str})\n"
-            f"📁 Disimpan ke <b>{folder_name}</b> ✅\n"
-            f"<i>⏱ Pesan ini otomatis bersih dalam 5 detik...</i>"
-        )
-        keyboard = kb.single_upload_keyboard(folder_id, f["id"])
-        delay = 5.0
-    else:
-        # Multiple files in batch
-        count = len(files)
-        preview_lines = ""
-        for f in files[-4:]:
-            em = file_emoji(f["type"])
-            sz = format_size(f["size"])
-            name_cut = f["name"][:25] + "..." if len(f["name"]) > 28 else f["name"]
-            preview_lines += f"  • {em} <code>{name_cut}</code> ({sz})\n"
+    count = len(files)
+    preview_lines = ""
+    for f in files[-4:]:
+        em = file_emoji(f["type"])
+        sz = format_size(f["size"])
+        name_cut = f["name"][:25] + "..." if len(f["name"]) > 28 else f["name"]
+        preview_lines += f"  • {em} <code>{name_cut}</code> ({sz})\n"
 
-        more_count = count - 4
-        if more_count > 0:
-            preview_lines += f"  <i>(+ {more_count} file lainnya)</i>\n"
+    more_count = count - 4
+    if more_count > 0:
+        preview_lines += f"  <i>(+ {more_count} file lainnya)</i>\n"
 
-        dup_info = f"\n⚠️ <i>({dup_count} file duplikat dilewati)</i>" if dup_count > 0 else ""
+    dup_info = f"\n⚠️ <i>({dup_count} file duplikat dilewati)</i>" if dup_count > 0 else ""
 
-        text = (
-            f"📦 <b>Batch Upload Selesai!</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"✅ <b>{count} file</b> berhasil disimpan!\n"
-            f"💾 Total: <b>{format_size(total_size)}</b>\n"
-            f"📁 Folder: <b>{folder_name}</b>{dup_info}\n\n"
-            f"📋 <b>Rincian File:</b>\n{preview_lines}"
-        )
+    text = (
+        f"📦 <b>Batch Upload Selesai!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"✅ <b>{count} file</b> berhasil disimpan!\n"
+        f"💾 Total: <b>{format_size(total_size)}</b>\n"
+        f"📁 Folder: <b>{folder_name}</b>{dup_info}\n\n"
+        f"📋 <b>Rincian File:</b>\n{preview_lines}"
+    )
 
-        batch_id = secrets.token_hex(4)
-        context.user_data[f"batch_files_{batch_id}"] = [f["id"] for f in files]
-        keyboard = kb.batch_upload_keyboard(folder_id, batch_id, can_smart_sort=True)
-        delay = None
+    batch_id = secrets.token_hex(4)
+    context.user_data[f"batch_files_{batch_id}"] = [f["id"] for f in files]
+    keyboard = kb.batch_upload_keyboard(folder_id, batch_id, can_smart_sort=is_inbox)
 
     if msg_id:
         try:
@@ -170,30 +155,26 @@ async def _flush_upload_batch(user_id: int, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML",
                 reply_markup=keyboard,
             )
-            if delay:
-                schedule_auto_delete(context.bot, chat_id, msg_id, delay=delay)
             return
         except Exception:
             pass
 
     try:
-        sent = await context.bot.send_message(
+        await context.bot.send_message(
             chat_id=chat_id,
             text=text,
             parse_mode="HTML",
             reply_markup=keyboard,
         )
-        if delay:
-            schedule_auto_delete(context.bot, chat_id, sent.message_id, delay=delay)
     except Exception as exc:
         log.warning("Could not send final upload batch summary: %s", exc)
 
 
 async def done_uploading(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Reply Keyboard: ✅ Done — exit upload mode."""
+    """Reply Keyboard: ✅ Done / ✅ Selesai / ✅ Selesai Upload — exit upload mode."""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    folder_id = context.user_data.get("upload_folder_id")
+    folder_id = context.user_data.get("upload_folder_id") or context.user_data.get("current_folder_id")
     context.user_data["state"] = "idle"
     context.user_data.pop("upload_folder_id", None)
 
@@ -204,7 +185,7 @@ async def done_uploading(update: Update, context: ContextTypes.DEFAULT_TYPE):
             b["task"].cancel()
         await _flush_upload_batch(user_id, context)
 
-    # Delete incoming "✅ Done" text message from user to keep chat clean
+    # Delete incoming text message from user to keep chat clean
     try:
         if update.message:
             await update.message.delete()
@@ -223,6 +204,59 @@ async def done_uploading(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _show_folder_view(update, context, folder_id, user_id, send_new=True)
 
 
+async def btn_done_uploading(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback upload_finish:{user_id} — user manually confirms upload batch is done."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    folder_id = context.user_data.get("upload_folder_id") or context.user_data.get("current_folder_id")
+    context.user_data["state"] = "idle"
+    context.user_data.pop("upload_folder_id", None)
+
+    if user_id in _upload_batches:
+        b = _upload_batches[user_id]
+        if b.get("task"):
+            b["task"].cancel()
+        await _flush_upload_batch(user_id, context)
+
+    try:
+        temp_msg = await query.message.reply_text("✅ Selesai upload!", reply_markup=kb.main_menu())
+        schedule_auto_delete(context.bot, query.message.chat_id, temp_msg.message_id, delay=3.0)
+    except Exception:
+        pass
+
+
+async def btn_cancel_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback upload_cancel:{user_id} — user cancels upload batch."""
+    query = update.callback_query
+    await query.answer("Upload dibatalkan")
+    user_id = query.from_user.id
+    context.user_data["state"] = "idle"
+    context.user_data.pop("upload_folder_id", None)
+
+    batch = _upload_batches.pop(user_id, None)
+    if batch:
+        if batch.get("task"):
+            batch["task"].cancel()
+        for f in batch.get("files", []):
+            try:
+                db.trash_file(f["id"], user_id=user_id)
+            except Exception:
+                pass
+
+    try:
+        await query.edit_message_text("❌ Upload dibatalkan.")
+        schedule_auto_delete(context.bot, query.message.chat_id, query.message.message_id, delay=3.0)
+    except Exception:
+        pass
+
+    try:
+        temp_msg = await query.message.reply_text("Upload dibatalkan.", reply_markup=kb.main_menu())
+        schedule_auto_delete(context.bot, query.message.chat_id, temp_msg.message_id, delay=3.0)
+    except Exception:
+        pass
+
+
 async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming file upload with intelligent batch buffering and anti-spam."""
     info = extract_file_info(update.message)
@@ -233,11 +267,21 @@ async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
 
-    if state == "uploading":
-        folder_id = context.user_data.get("upload_folder_id")
-        f_obj = db.get_folder(folder_id) if folder_id else None
-        folder_name = f_obj["name"] if f_obj else "Folder"
-        is_inbox = False
+    upload_folder_id = context.user_data.get("upload_folder_id")
+    current_folder_id = context.user_data.get("current_folder_id")
+    target_folder_id = upload_folder_id or current_folder_id
+
+    if target_folder_id:
+        f_obj = db.get_folder(target_folder_id, user_id=user_id)
+        if f_obj:
+            folder_id = f_obj["id"]
+            folder_name = f_obj["name"]
+            is_inbox = bool(f_obj.get("is_system")) or (folder_name == "📥 File Masuk")
+        else:
+            inbox = db.get_or_create_inbox_folder(user_id)
+            folder_id = inbox["id"]
+            folder_name = "📥 File Masuk"
+            is_inbox = True
     else:
         inbox = db.get_or_create_inbox_folder(user_id)
         folder_id = inbox["id"]
@@ -272,7 +316,7 @@ async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
             batch["dup_count"] += 1
             if batch["task"]:
                 batch["task"].cancel()
-            batch["task"] = asyncio.create_task(_debounce_flush(user_id, context, delay=1.8))
+            batch["task"] = asyncio.create_task(_debounce_flush(user_id, context, delay=60.0))
             return
 
     # Save to database
@@ -308,27 +352,43 @@ async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     now = time.time()
     count = len(batch["files"])
+    total_sz = sum(f["size"] for f in batch["files"])
+    dup_info = f"\n⚠️ <i>({batch['dup_count']} file duplikat dilewati)</i>" if batch.get("dup_count", 0) > 0 else ""
+
+    progress_text = (
+        f"⏳ <b>Sedang Mengunggah Berkas...</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📁 Folder: <b>{folder_name}</b>\n"
+        f"📥 Diterima: <b>{count} file</b>\n"
+        f"💾 Total: <b>{format_size(total_sz)}</b>{dup_info}\n\n"
+        f"<i>Kirim file lainnya, atau tekan tombol di bawah jika sudah selesai upload:</i>"
+    )
+    progress_keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"✅ Selesai Upload ({count} file)", callback_data=f"upload_finish:{user_id}")],
+        [InlineKeyboardButton("❌ Batal", callback_data=f"upload_cancel:{user_id}")],
+    ])
 
     if batch["msg_id"] is None:
         try:
             m = await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"⏳ <b>Menyimpan file ke {folder_name}...</b> (1 file)",
+                text=progress_text,
                 parse_mode="HTML",
+                reply_markup=progress_keyboard,
             )
             batch["msg_id"] = m.message_id
             batch["last_edit"] = now
         except Exception as exc:
             log.warning("Could not send initial upload status message: %s", exc)
     else:
-        if now - batch["last_edit"] >= 1.2:
-            total_sz = sum(f["size"] for f in batch["files"])
+        if now - batch["last_edit"] >= 1.0:
             try:
                 await context.bot.edit_message_text(
                     chat_id=chat_id,
                     message_id=batch["msg_id"],
-                    text=f"⏳ <b>Mengunggah batch ({count} file tersimpan)...</b>\n💾 Total: {format_size(total_sz)}",
+                    text=progress_text,
                     parse_mode="HTML",
+                    reply_markup=progress_keyboard,
                 )
                 batch["last_edit"] = now
             except Exception:
@@ -336,7 +396,7 @@ async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if batch["task"]:
         batch["task"].cancel()
-    batch["task"] = asyncio.create_task(_debounce_flush(user_id, context, delay=1.8))
+    batch["task"] = asyncio.create_task(_debounce_flush(user_id, context, delay=60.0))
 
 
 async def batch_smart_sort(update: Update, context: ContextTypes.DEFAULT_TYPE):

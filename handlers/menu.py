@@ -43,6 +43,8 @@ WELCOME = WELCOME_ID
 def _reset(context: ContextTypes.DEFAULT_TYPE):
     context.user_data["state"] = "idle"
     context.user_data.pop("pending_file", None)
+    context.user_data.pop("upload_folder_id", None)
+    context.user_data.pop("current_folder_id", None)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -313,6 +315,13 @@ async def go_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _reset(context)
     user_id = update.effective_user.id
+    try:
+        from handlers.files import _upload_batches
+        batch = _upload_batches.pop(user_id, None)
+        if batch and batch.get("task"):
+            batch["task"].cancel()
+    except Exception:
+        pass
     from utils import get_user_lang
     lang = get_user_lang(context, user_id)
     msg = "❌ Cancelled." if lang == "en" else "❌ Dibatalkan."

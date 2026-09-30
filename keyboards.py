@@ -44,7 +44,7 @@ def upload_mode(lang: str = "id"):
             resize_keyboard=True,
         )
     return ReplyKeyboardMarkup(
-        [["✅ Selesai", "❌ Batal"],
+        [["✅ Selesai Upload", "❌ Batal"],
          ["🏠 Beranda"]],
         resize_keyboard=True,
     )
