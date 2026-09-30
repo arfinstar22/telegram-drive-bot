@@ -54,6 +54,7 @@ log = logging.getLogger(__name__)
 TEMPLATE_PATH = Path(__file__).parent / "templates" / "webapp.html"
 DROPZONE_TEMPLATE_PATH = Path(__file__).parent / "templates" / "dropzone.html"
 SHARE_FILE_TEMPLATE_PATH = Path(__file__).parent / "templates" / "share_file.html"
+STATIC_DIR = Path(__file__).parent / "static"
 
 # In-memory rate limiter
 # Format: {key: [timestamps]}
@@ -2305,6 +2306,32 @@ class ApiAuthMeHandler(BaseApiHandler):
         }))
 
 
+class FaviconHandler(tornado.web.RequestHandler):
+    """Serve favicon.ico with caching."""
+    def get(self):
+        fav_path = STATIC_DIR / "favicon.ico"
+        if fav_path.is_file():
+            self.set_header("Content-Type", "image/x-icon")
+            self.set_header("Cache-Control", "public, max-age=86400")
+            with open(fav_path, "rb") as f:
+                self.write(f.read())
+        else:
+            self.set_status(404)
+
+
+class FaviconPngHandler(tornado.web.RequestHandler):
+    """Serve favicon.png with caching."""
+    def get(self):
+        fav_path = STATIC_DIR / "favicon.png"
+        if fav_path.is_file():
+            self.set_header("Content-Type", "image/png")
+            self.set_header("Cache-Control", "public, max-age=86400")
+            with open(fav_path, "rb") as f:
+                self.write(f.read())
+        else:
+            self.set_status(404)
+
+
 def build_app_routes(webhook_path: str = "", shared_objects: dict | None = None) -> list:
     """Consolidated single source of truth for all routes."""
     routes = []
@@ -2313,6 +2340,9 @@ def build_app_routes(webhook_path: str = "", shared_objects: dict | None = None)
         routes.append((rf"{webhook_path}/?", wh.TelegramHandler, shared_objects))
 
     routes.extend([
+        (r"/favicon\.ico", FaviconHandler),
+        (r"/favicon\.png", FaviconPngHandler),
+        (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": str(STATIC_DIR)}),
         (r"/", WebAppPageHandler),
         (r"/webapp/?", WebAppPageHandler),
         (r"/auth/telegram/start/?", OidcStartHandler),

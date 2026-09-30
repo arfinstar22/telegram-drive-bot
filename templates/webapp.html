@@ -6,6 +6,10 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#090D16">
   <title>Darfin Storage - Cloud Drive</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -90,11 +94,21 @@
       width: 42px;
       height: 42px;
       border-radius: 12px;
-      background: linear-gradient(135deg, #0284C7, #6366F1);
+      background: #09131d;
+      border: 1px solid rgba(255, 255, 255, 0.12);
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 16px var(--accent-glow);
+      box-shadow: 0 4px 16px rgba(2, 132, 199, 0.35);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .logo-badge img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
 
     .brand-title {
@@ -2702,10 +2716,8 @@
   <!-- Standalone Browser Login Card (Task 6A) -->
   <div id="browserNoticeCard" style="display: none; min-height: 80vh; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; position: relative; z-index: 10;">
     <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 36px 28px; max-width: 400px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.5); backdrop-filter: blur(12px);">
-      <div style="width: 64px; height: 64px; margin: 0 auto 20px; background: linear-gradient(135deg, #0284c7, #38bdf8); border-radius: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(56, 189, 248, 0.3);">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
-        </svg>
+      <div style="width: 72px; height: 72px; margin: 0 auto 20px; border-radius: 20px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 28px rgba(56, 189, 248, 0.35); border: 1px solid rgba(255, 255, 255, 0.15); background: #09131d;">
+        <img src="/static/darfin_logo.png" alt="DARFIN Logo" style="width: 100%; height: 100%; object-fit: cover; display: block;">
       </div>
       <h2 style="font-size: 1.35rem; font-weight: 700; color: #F8FAFC; margin-bottom: 6px; letter-spacing: -0.02em;">DARFIN</h2>
       <p style="font-size: 0.88rem; color: #94A3B8; line-height: 1.5; margin-bottom: 20px;">Personal Cloud Storage</p>
@@ -2733,9 +2745,7 @@
     <header>
       <div class="brand-wrap">
         <div class="logo-badge">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
-          </svg>
+          <img src="/static/darfin_logo.png" alt="Darfin Storage Logo" width="42" height="42">
         </div>
         <div>
           <h1 class="brand-title">Darfin Storage</h1>
