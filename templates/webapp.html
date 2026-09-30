@@ -2707,34 +2707,457 @@
       background: rgba(255, 255, 255, 0.1);
       color: #fff;
     }
+
+    /* ── Standalone Browser Login Showcase (UI/UX Pro Max) ── */
+    body.in-auth-mode {
+      padding-bottom: 0 !important;
+      overflow-x: hidden;
+    }
+
+    #browserNoticeCard {
+      min-height: 100vh;
+      width: 100%;
+      position: relative;
+      overflow-x: hidden;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 32px 20px 24px;
+      z-index: 10;
+      box-sizing: border-box;
+    }
+
+    .auth-bg-grid {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        radial-gradient(circle at center, rgba(56, 189, 248, 0.08) 0%, transparent 70%),
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+      background-size: 100% 100%, 40px 40px, 40px 40px;
+      mask-image: radial-gradient(ellipse at 50% 50%, black 40%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse at 50% 50%, black 40%, transparent 80%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .auth-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .auth-orb-1 {
+      top: 5%;
+      left: 15%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(2, 132, 199, 0.45) 0%, rgba(56, 189, 248, 0.12) 60%, transparent 80%);
+      animation: orbFloat1 14s ease-in-out infinite alternate;
+    }
+
+    .auth-orb-2 {
+      bottom: 5%;
+      right: 15%;
+      width: 540px;
+      height: 540px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, rgba(168, 85, 247, 0.12) 60%, transparent 80%);
+      animation: orbFloat2 16s ease-in-out infinite alternate;
+    }
+
+    @keyframes orbFloat1 {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(50px, 40px) scale(1.12); }
+    }
+
+    @keyframes orbFloat2 {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(-45px, -50px) scale(1.15); }
+    }
+
+    .auth-topbar {
+      width: 100%;
+      max-width: 1040px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      z-index: 2;
+      padding: 0 4px;
+    }
+
+    .auth-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .auth-brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: #09131d;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+      flex-shrink: 0;
+    }
+
+    .auth-brand-name {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+
+    .auth-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #34d399;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .auth-status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    .auth-card-container {
+      width: 100%;
+      max-width: 440px;
+      margin: auto 0;
+      position: relative;
+      z-index: 2;
+    }
+
+    .auth-card {
+      background: rgba(15, 23, 42, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      padding: 38px 30px 30px;
+      box-shadow: 
+        0 25px 60px -15px rgba(0, 0, 0, 0.75),
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        0 0 45px -5px rgba(56, 189, 248, 0.18);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      text-align: center;
+      position: relative;
+    }
+
+    .auth-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      border-radius: 9999px;
+      color: #38bdf8;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    .auth-logo-halo {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 18px;
+    }
+
+    .auth-logo-glow {
+      position: absolute;
+      inset: -8px;
+      border-radius: 28px;
+      background: linear-gradient(135deg, #0284c7, #6366f1);
+      filter: blur(16px);
+      opacity: 0.6;
+      animation: pulseGlow 3.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      from { opacity: 0.45; transform: scale(0.96); }
+      to { opacity: 0.8; transform: scale(1.05); }
+    }
+
+    .auth-logo-box {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      border-radius: 22px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: #09131d;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .auth-title {
+      font-size: 1.55rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 6px;
+      letter-spacing: -0.025em;
+    }
+
+    .auth-desc {
+      font-size: 0.86rem;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 22px;
+    }
+
+    .auth-features-list {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      margin-bottom: 22px;
+      text-align: left;
+    }
+
+    .auth-feature-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      font-size: 0.78rem;
+      color: #cbd5e1;
+    }
+
+    .auth-feature-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .auth-login-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 14px 24px;
+      background: linear-gradient(135deg, #0284c7, #0ea5e9);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.95rem;
+      border-radius: 14px;
+      text-decoration: none;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 
+        0 4px 20px rgba(14, 165, 233, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+      box-sizing: border-box;
+    }
+
+    .auth-login-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 
+        0 8px 28px rgba(14, 165, 233, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+
+    .auth-login-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 10px rgba(14, 165, 233, 0.35);
+    }
+
+    .auth-telegram-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 16px;
+      font-size: 0.78rem;
+      color: #64748b;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .auth-telegram-link:hover {
+      color: #94a3b8;
+    }
+
+    .auth-footer {
+      width: 100%;
+      max-width: 1040px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 4px 0;
+      font-size: 0.74rem;
+      color: #64748b;
+      position: relative;
+      z-index: 2;
+    }
+
+    .auth-footer-badges {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .auth-footer-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    @media (max-width: 640px) {
+      #browserNoticeCard {
+        padding: 24px 16px 20px;
+        justify-content: flex-start;
+        gap: 24px;
+      }
+      .auth-card {
+        padding: 28px 18px 24px;
+        border-radius: 20px;
+      }
+      .auth-title {
+        font-size: 1.35rem;
+      }
+      .auth-footer {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 12px;
+        padding-top: 10px;
+      }
+      .auth-footer-badges {
+        justify-content: center;
+      }
+    }
   </style>
 </head>
 <body>
   <!-- Unauthorized Screen (Non-blocking) -->
   <div id="unauthorizedOverlay" style="display:none !important;"></div>
 
-  <!-- Standalone Browser Login Card (Task 6A) -->
-  <div id="browserNoticeCard" style="display: none; min-height: 80vh; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; position: relative; z-index: 10;">
-    <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 36px 28px; max-width: 400px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.5); backdrop-filter: blur(12px);">
-      <div style="width: 72px; height: 72px; margin: 0 auto 20px; border-radius: 20px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 28px rgba(56, 189, 248, 0.35); border: 1px solid rgba(255, 255, 255, 0.15); background: #09131d;">
-        <img src="/static/darfin_logo.png" alt="DARFIN Logo" style="width: 100%; height: 100%; object-fit: cover; display: block;">
-      </div>
-      <h2 style="font-size: 1.35rem; font-weight: 700; color: #F8FAFC; margin-bottom: 6px; letter-spacing: -0.02em;">DARFIN</h2>
-      <p style="font-size: 0.88rem; color: #94A3B8; line-height: 1.5; margin-bottom: 20px;">Personal Cloud Storage</p>
+  <!-- Standalone Browser Login Showcase (Task 6A / UI/UX Pro Max) -->
+  <div id="browserNoticeCard" style="display: none;">
+    <!-- Ambient Depth Background -->
+    <div class="auth-bg-grid"></div>
+    <div class="auth-orb auth-orb-1"></div>
+    <div class="auth-orb auth-orb-2"></div>
 
-      <div id="authErrorAlert" style="display: none; background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 10px; padding: 10px 14px; font-size: 0.82rem; color: #fb7185; margin-bottom: 18px; text-align: left;">
-        <span id="authErrorMsg">Login dibatalkan atau gagal.</span>
+    <!-- Top Brand Header Bar -->
+    <div class="auth-topbar">
+      <div class="auth-brand">
+        <div class="auth-brand-logo">
+          <img src="/static/darfin_logo.png" alt="DARFIN Logo" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+        </div>
+        <span class="auth-brand-name">DARFIN STORAGE</span>
       </div>
+      <div class="auth-status-pill">
+        <span class="auth-status-dot"></span>
+        <span>Sistem Cloud Online</span>
+      </div>
+    </div>
 
-      <a id="tgOidcLoginBtn" href="/auth/telegram/start" style="display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 13px 20px; background: linear-gradient(135deg, #0284c7, #0ea5e9); color: #fff; font-weight: 600; font-size: 0.95rem; border-radius: 12px; text-decoration: none; transition: transform 0.15s, box-shadow 0.15s; box-shadow: 0 4px 16px rgba(14, 165, 233, 0.35);">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z"/>
-        </svg>
-        Continue with Telegram
-      </a>
-      <div style="margin-top: 14px;">
-        <a href="https://t.me/darfinstoragebot" style="font-size: 0.78rem; color: #64748B; text-decoration: none;">Atau buka langsung di aplikasi Telegram &rarr;</a>
+    <!-- Central Hero Login Card -->
+    <div class="auth-card-container">
+      <div class="auth-card">
+        <div class="auth-eyebrow">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Personal Cloud Storage
+        </div>
+
+        <div class="auth-logo-halo">
+          <div class="auth-logo-glow"></div>
+          <div class="auth-logo-box">
+            <img src="/static/darfin_logo.png" alt="DARFIN Logo" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+          </div>
+        </div>
+
+        <h1 class="auth-title">Masuk ke DARFIN</h1>
+        <p class="auth-desc">Cloud storage pribadi terhubung ke Telegram. Akses berkas dan dokumen Anda langsung dari web browser.</p>
+
+        <!-- Value Prop Pillars -->
+        <div class="auth-features-list">
+          <div class="auth-feature-item">
+            <div class="auth-feature-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+            </div>
+            <span>Penyimpanan Telegram tanpa batas kuota lokal</span>
+          </div>
+          <div class="auth-feature-item">
+            <div class="auth-feature-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <span>Otentikasi aman OIDC resmi Telegram tanpa password</span>
+          </div>
+          <div class="auth-feature-item">
+            <div class="auth-feature-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <span>Akses & streaming berkas langsung super cepat</span>
+          </div>
+        </div>
+
+        <div id="authErrorAlert" style="display: none; background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 12px; padding: 10px 14px; font-size: 0.82rem; color: #fb7185; margin-bottom: 18px; text-align: left;">
+          <span id="authErrorMsg">Login dibatalkan atau gagal.</span>
+        </div>
+
+        <a id="tgOidcLoginBtn" class="auth-login-btn" href="/auth/telegram/start">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z"/>
+          </svg>
+          Continue with Telegram
+        </a>
+
+        <div>
+          <a class="auth-telegram-link" href="https://t.me/darfinstoragebot">
+            Atau buka langsung di aplikasi Telegram Mini App &rarr;
+          </a>
+        </div>
       </div>
+    </div>
+
+    <!-- Bottom Footer Trust Indicators -->
+    <div class="auth-footer">
+      <div class="auth-footer-badges">
+        <div class="auth-footer-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>SSL 256-bit Enkripsi</span>
+        </div>
+        <div class="auth-footer-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+          <span>Cluster Node Online</span>
+        </div>
+      </div>
+      <div>© 2026 DARFIN Storage • Telegram Cloud Engine</div>
     </div>
   </div>
 
@@ -3667,6 +4090,7 @@
     }
 
     function showBrowserNotice(reason) {
+      document.body.classList.add('in-auth-mode');
       const container = document.querySelector('.container');
       if (container) container.style.display = 'none';
       const notice = document.getElementById('browserNoticeCard');
@@ -3710,6 +4134,7 @@
     }
 
     function hideBrowserNotice() {
+      document.body.classList.remove('in-auth-mode');
       const notice = document.getElementById('browserNoticeCard');
       if (notice) notice.style.display = 'none';
       const container = document.querySelector('.container');

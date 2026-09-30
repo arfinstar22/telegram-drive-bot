@@ -2259,7 +2259,8 @@ class ApiAuthMeHandler(BaseApiHandler):
         if (not display_name or not username) and user_id:
             try:
                 bot = get_shared_bot()
-                chat = await bot.get_chat(user_id)
+                if bot:
+                    chat = await asyncio.wait_for(bot.get_chat(user_id), timeout=1.5)
                 if chat:
                     if not display_name:
                         b_first = (getattr(chat, "first_name", None) or "").strip()
