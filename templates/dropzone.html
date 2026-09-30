@@ -585,8 +585,24 @@
     }
 
     function addFilesToQueue(files) {
+      const MAX_SINGLE_MB = 50;
+      const oversized = [];
       for (let i = 0; i < files.length; i++) {
-        queuedFiles.push(files[i]);
+        if (files[i].size > MAX_SINGLE_MB * 1024 * 1024) {
+          const szMB = (files[i].size / (1024 * 1024)).toFixed(1);
+          oversized.push(`• ${files[i].name} (${szMB} MB)`);
+        } else {
+          queuedFiles.push(files[i]);
+        }
+      }
+
+      if (oversized.length > 0) {
+        alert(
+          `⚠️ Berkas Melebihi Batas 50 MB\n\n` +
+          `Telegram Bot API membatasi unggahan berkas maksimal 50 MB.\n` +
+          `Berkas berikut dilewati:\n` +
+          oversized.join('\n')
+        );
       }
       renderFileQueue();
     }
@@ -676,8 +692,21 @@
         };
 
         xhr.onload = () => {
+          let res;
+          try {
+            res = JSON.parse(xhr.responseText);
+          } catch (e) {
+            if (xhr.status === 413) {
+              alert('Gagal mengunggah: Ukuran berkas terlalu besar untuk server (HTTP 413). Batas maksimal 50 MB per berkas.');
+            } else {
+              alert(`Gagal mengunggah berkas (Server status: ${xhr.status})`);
+            }
+            btn.disabled = false;
+            renderFileQueue();
+            return;
+          }
+
           if (xhr.status >= 200 && xhr.status < 300) {
-            const res = JSON.parse(xhr.responseText);
             if (res.ok) {
               progressFill.style.width = '100%';
               setTimeout(() => {
@@ -686,12 +715,14 @@
                 document.getElementById('successDesc').innerText = `${res.count || queuedFiles.length} berkas berhasil diunggah ke folder "${folderData.name}". Pemilik penyimpanan telah mendapatkan notifikasi.`;
               }, 400);
             } else {
-              alert('Gagal mengunggah berkas: ' + (res.error || 'Unknown error'));
+              const errMsg = res.error?.message || res.error || 'Unknown error';
+              alert('Gagal mengunggah berkas: ' + errMsg);
               btn.disabled = false;
               renderFileQueue();
             }
           } else {
-            alert('Gagal mengunggah berkas (Server status: ' + xhr.status + ')');
+            const errMsg = res.error?.message || res.error || ('Server status: ' + xhr.status);
+            alert('Gagal mengunggah berkas: ' + errMsg);
             btn.disabled = false;
             renderFileQueue();
           }

@@ -6223,6 +6223,49 @@
       if (!files || !files.length) return;
       triggerHaptic();
 
+      const MAX_SINGLE_MB = 50;
+      const MAX_BATCH_MB = 100;
+      const MAX_BATCH_FILES = 20;
+
+      if (files.length > MAX_BATCH_FILES) {
+        alert(`Maksimal ${MAX_BATCH_FILES} berkas sekaligus per unggahan.`);
+        event.target.value = '';
+        return;
+      }
+
+      let totalBytes = 0;
+      const oversizedFiles = [];
+      for (let i = 0; i < files.length; i++) {
+        totalBytes += files[i].size;
+        if (files[i].size > MAX_SINGLE_MB * 1024 * 1024) {
+          const szMB = (files[i].size / (1024 * 1024)).toFixed(1);
+          oversizedFiles.push(`• ${files[i].name} (${szMB} MB)`);
+        }
+      }
+
+      if (oversizedFiles.length > 0) {
+        alert(
+          `⚠️ Berkas Terlalu Besar untuk WebApp\n\n` +
+          `Telegram Bot API membatasi unggahan via WebApp maksimal ${MAX_SINGLE_MB} MB per berkas.\n\n` +
+          `Berkas berikut melebihi batas:\n` +
+          oversizedFiles.join('\n') + '\n\n' +
+          `💡 Tips: Untuk berkas besar hingga 2 GB, kirimkan langsung melalui chat aplikasi Telegram ke bot @darfinstoragebot.`
+        );
+        event.target.value = '';
+        return;
+      }
+
+      if (totalBytes > MAX_BATCH_MB * 1024 * 1024) {
+        const totalMB = (totalBytes / (1024 * 1024)).toFixed(1);
+        alert(
+          `⚠️ Total Ukuran Melebihi Batas\n\n` +
+          `Total ukuran batch (${totalMB} MB) melebihi batas maksimal ${MAX_BATCH_MB} MB.\n\n` +
+          `Silakan pilih lebih sedikit berkas atau unggah secara bertahap.`
+        );
+        event.target.value = '';
+        return;
+      }
+
       const card = document.getElementById('uploadProgressCard');
       const title = document.getElementById('upcTitle');
       const sub = document.getElementById('upcSub');
@@ -6244,15 +6287,30 @@
           method: 'POST',
           body: formData
         });
-        const data = await res.json();
+
+        let data;
+        const text = await res.text();
+        try {
+          data = JSON.parse(text);
+        } catch (parseErr) {
+          if (res.status === 413) {
+            throw new Error(`Ukuran berkas melebihi batas server (HTTP 413). Batas maksimal 50 MB per berkas.`);
+          } else if (res.status >= 500) {
+            throw new Error(`Server sedang sibuk atau mengalami kendala (HTTP ${res.status}). Silakan coba sesaat lagi.`);
+          } else {
+            throw new Error(`Respon server tidak valid (${res.status}): ${text.slice(0, 100)}`);
+          }
+        }
+
         if (data.ok) {
           showToast(`✅ Berhasil mengunggah ${data.count} berkas!`);
           await loadDriveData();
         } else {
-          alert('Gagal mengunggah: ' + (data.error || 'Unknown error'));
+          const errMsg = data.error?.message || data.error || 'Terjadi kesalahan pada server.';
+          alert('Gagal mengunggah: ' + errMsg);
         }
       } catch (err) {
-        alert('Gagal mengunggah: ' + err);
+        alert('Gagal mengunggah: ' + (err.message || err));
       } finally {
         card.classList.remove('active');
         event.target.value = '';
