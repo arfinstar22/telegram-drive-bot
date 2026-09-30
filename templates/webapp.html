@@ -2219,7 +2219,7 @@
       color: #030712;
       border: none;
       box-shadow: 0 6px 20px rgba(56, 189, 248, 0.45);
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
       cursor: pointer;
@@ -3505,7 +3505,7 @@
   </div>
 
   <!-- Upload FAB & Hidden Input -->
-  <button class="upload-fab" id="uploadFab" onclick="triggerWebUpload()" title="Unggah Berkas">
+  <button class="upload-fab" id="uploadFab" onclick="triggerWebUpload()" title="Unggah Berkas" style="display: none;">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
       <line x1="12" y1="5" x2="12" y2="19"></line>
       <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -3642,6 +3642,8 @@
     }
 
     async function handleLogout() {
+      const uploadFab = document.getElementById('uploadFab');
+      if (uploadFab) uploadFab.style.display = 'none';
       try {
         await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
       } catch (e) {
@@ -3659,6 +3661,8 @@
       driveData = { folders: [], files: [] };
       document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
       closeUserProfileMenu();
+      const uploadFab = document.getElementById('uploadFab');
+      if (uploadFab) uploadFab.style.display = 'none';
       showBrowserNotice('expired');
     }
 
@@ -3669,6 +3673,8 @@
       if (notice) notice.style.display = 'flex';
       const overlay = document.getElementById('unauthorizedOverlay');
       if (overlay) overlay.style.display = 'none';
+      const uploadFab = document.getElementById('uploadFab');
+      if (uploadFab) uploadFab.style.display = 'none';
 
       // Check query params for auth feedback
       const params = new URLSearchParams(window.location.search);
@@ -3708,6 +3714,8 @@
       if (notice) notice.style.display = 'none';
       const container = document.querySelector('.container');
       if (container) container.style.display = 'block';
+      const uploadFab = document.getElementById('uploadFab');
+      if (uploadFab && !isTrashMode) uploadFab.style.display = 'flex';
     }
 
     function showUnauthorizedScreen(message) {

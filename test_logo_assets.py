@@ -72,6 +72,17 @@ class TestLogoMarkupInTemplates(unittest.TestCase):
         self.assertIn('<link rel="icon" type="image/x-icon" href="/favicon.ico">', content)
         self.assertIn('<img src="/static/darfin_logo.png" alt="Darfin Storage Logo"', content)
 
+    def test_upload_fab_hidden_unauthenticated(self):
+        """Verify upload FAB is hidden by default in markup/CSS and hidden during browser notice."""
+        with open("templates/webapp.html", "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # HTML element must have style="display: none;"
+        self.assertIn('id="uploadFab" onclick="triggerWebUpload()" title="Unggah Berkas" style="display: none;"', content)
+        # showBrowserNotice must hide uploadFab
+        self.assertIn("const uploadFab = document.getElementById('uploadFab');", content)
+        self.assertIn("if (uploadFab) uploadFab.style.display = 'none';", content)
+
 
 if __name__ == "__main__":
     unittest.main()
