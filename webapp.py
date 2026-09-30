@@ -2135,9 +2135,33 @@ class OidcCallbackHandler(tornado.web.RequestHandler):
 
         # Provision / update Telegram user in database (same account model as bot/TMA)
         try:
-            username = claims.get("preferred_username")
-            name = claims.get("name")
-            db.upsert_user(user_id=user_id, username=username, full_name=name)
+            full_name = (claims.get("name") or "").strip()
+            first_name = (claims.get("given_name") or claims.get("first_name") or "").strip()
+            last_name = (claims.get("family_name") or claims.get("last_name") or "").strip()
+            if not full_name and (first_name or last_name):
+                full_name = f"{first_name} {last_name}".strip()
+
+            username = claims.get("preferred_username") or claims.get("username")
+            if username:
+                username = str(username).lstrip("@").strip()
+
+            # Fallback to Telegram Bot chat if name or username not in claims
+            if (not full_name or not username) and user_id:
+                try:
+                    bot = get_shared_bot()
+                    chat = await bot.get_chat(user_id)
+                    if chat:
+                        if not full_name:
+                            b_first = (chat.first_name or "").strip()
+                            b_last = (chat.last_name or "").strip()
+                            if b_first or b_last:
+                                full_name = f"{b_first} {b_last}".strip()
+                        if not username and chat.username:
+                            username = chat.username.lstrip("@").strip()
+                except Exception:
+                    pass
+
+            db.upsert_user(user_id=user_id, username=username or None, full_name=full_name or None)
             db.get_or_create_inbox_folder(user_id)
         except Exception as e:
             log.error("Error syncing user record for Telegram user %s: %s", user_id, e)
@@ -2207,14 +2231,75 @@ class ApiAuthMeHandler(BaseApiHandler):
 
         user_id = user["user_id"]
         u = db.get_user(user_id)
+
+        display_name = ""
+        username = ""
+
+        if u:
+            display_name = (u.get("full_name") or "").strip()
+            username = (u.get("username") or "").strip()
+            if not display_name:
+                u_first = (u.get("first_name") or "").strip()
+                u_last = (u.get("last_name") or "").strip()
+                if u_first or u_last:
+                    display_name = f"{u_first} {u_last}".strip()
+
+        # If Mini App or session has user details, use them if display_name is missing
+        if not display_name:
+            first = (user.get("first_name") or "").strip()
+            last = (user.get("last_name") or "").strip()
+            if first or last:
+                display_name = f"{first} {last}".strip()
+
+        if not username and user.get("username"):
+            username = str(user["username"]).lstrip("@").strip()
+
+        # Query Telegram bot chat as fallback if name or username still missing
+        if (not display_name or not username) and user_id:
+            try:
+                bot = get_shared_bot()
+                chat = await bot.get_chat(user_id)
+                if chat:
+                    if not display_name:
+                        b_first = (getattr(chat, "first_name", None) or "").strip()
+                        b_last = (getattr(chat, "last_name", None) or "").strip()
+                        if b_first or b_last:
+                            display_name = f"{b_first} {b_last}".strip()
+                    if not username and getattr(chat, "username", None):
+                        username = str(chat.username).lstrip("@").strip()
+                    if display_name or username:
+                        db.upsert_user(user_id=user_id, username=username or None, full_name=display_name or None)
+            except Exception:
+                pass
+
+        # Fallback hierarchy per Requirement 3:
+        # 1. full_name
+        # 2. first_name + last_name
+        # 3. username
+        # 4. safe generic "Telegram User"
+        if not display_name:
+            display_name = username or "Telegram User"
+
+        clean_username = username.lstrip("@").strip() if username else None
+        picture = None
+        if u and u.get("picture"):
+            picture = u.get("picture")
+        elif user.get("picture"):
+            picture = user.get("picture")
+        elif user.get("photo_url"):
+            picture = user.get("photo_url")
+
         self.write(json.dumps({
             "ok": True,
             "authenticated": True,
             "user": {
                 "id": user_id,
                 "user_id": user_id,
-                "username": u.get("username") if u else user.get("username"),
-                "first_name": u.get("full_name") if u else user.get("first_name", "User"),
+                "name": display_name,
+                "full_name": display_name,
+                "first_name": display_name,
+                "username": clean_username,
+                "picture": picture,
                 "auth_type": user.get("auth_type", "session"),
             },
         }))

@@ -225,7 +225,7 @@ def get_jwks(
     except Exception as e:
         log.error("Failed to fetch Telegram JWKS from %s: %s", url, e)
         # If cache exists from earlier, return stale cache as fallback
-        if _JWKS_CACHE["keys"]:
+        if _JWKS_CACHE.get("keys"):
             log.warning("Serving stale JWKS cache following fetch error")
             return _JWKS_CACHE["keys"]
         raise

@@ -161,6 +161,16 @@
       font-weight: 700;
       color: #fff;
       flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .user-avatar-badge img,
+    .user-avatar-large img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
     }
 
     .user-profile-dropdown {
@@ -209,6 +219,7 @@
       font-weight: 700;
       color: #fff;
       flex-shrink: 0;
+      overflow: hidden;
     }
 
     .user-full-name {
@@ -2733,17 +2744,17 @@
       </div>
       <div class="header-user-section">
         <div class="user-pill" id="userPill" onclick="toggleUserProfileMenu(event)" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUserProfileMenu(event)" role="button" aria-haspopup="true" aria-expanded="false" tabindex="0" title="Profil Pengguna">
-          <span class="user-avatar-badge" id="userAvatarBadge">U</span>
-          <span id="userName">User</span>
+          <span class="user-avatar-badge" id="userAvatarBadge">TU</span>
+          <span id="userName">Akun Saya</span>
           <svg class="chevron-down-icon" id="userPillChevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transition: transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
         <!-- User Profile Dropdown Menu -->
         <div class="user-profile-dropdown" id="userProfileDropdown" role="menu" aria-label="Menu Pengguna">
           <div class="user-profile-header">
-            <div class="user-avatar-large" id="userAvatarLarge">U</div>
+            <div class="user-avatar-large" id="userAvatarLarge">TU</div>
             <div style="min-width: 0; flex: 1;">
-              <div class="user-full-name" id="userDropdownName">User</div>
-              <div class="user-handle" id="userDropdownHandle">@telegram</div>
+              <div class="user-full-name" id="userDropdownName">Akun Saya</div>
+              <div class="user-handle" id="userDropdownHandle" style="display: none;"></div>
               <div class="user-status-tag">
                 <span class="status-dot"></span>
                 <span style="font-size: 0.68rem; color: #34d399; font-weight: 600;">Telegram Verified</span>
@@ -3553,26 +3564,70 @@
     function updateUserUI(user) {
       if (!user) return;
       currentUser = user;
-      const displayName = user.first_name || user.full_name || user.name || 'User';
-      const username = user.username ? `@${user.username}` : '';
-      const initial = (displayName.charAt(0) || 'U').toUpperCase();
 
+      // Fallback hierarchy per Requirement 3:
+      // 1. full_name
+      // 2. first_name + last_name
+      // 3. username
+      // 4. safe generic "Telegram User"
+      let displayName = (user.full_name || user.name || '').trim();
+      if (!displayName && (user.first_name || user.last_name)) {
+        displayName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+      }
+      if (!displayName && user.username) {
+        displayName = String(user.username).replace(/^@/, '').trim();
+      }
+      if (!displayName || displayName.toLowerCase() === 'user') {
+        displayName = 'Telegram User';
+      }
+
+      const rawUsername = user.username ? String(user.username).replace(/^@/, '').trim() : '';
+      const handleText = rawUsername ? `@${rawUsername}` : '';
+
+      // Compute initials from display name (e.g. "Tuan Darfin" -> "TD")
+      const words = displayName.split(/\s+/).filter(w => w.length > 0);
+      let initials = 'TU';
+      if (words.length >= 2) {
+        initials = (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
+      } else if (words.length === 1) {
+        initials = words[0].slice(0, 2).toUpperCase();
+      }
+      const safeInitials = (initials || 'TU').replace(/[^A-Za-z0-9]/g, '') || 'TU';
+
+      // Safe DOM text rendering (prevents XSS)
       const userNameEl = document.getElementById('userName');
       if (userNameEl) userNameEl.innerText = displayName;
-
-      const userAvatarBadge = document.getElementById('userAvatarBadge');
-      if (userAvatarBadge) userAvatarBadge.innerText = initial;
-
-      const userAvatarLarge = document.getElementById('userAvatarLarge');
-      if (userAvatarLarge) userAvatarLarge.innerText = initial;
 
       const userDropdownName = document.getElementById('userDropdownName');
       if (userDropdownName) userDropdownName.innerText = displayName;
 
       const userDropdownHandle = document.getElementById('userDropdownHandle');
       if (userDropdownHandle) {
-        userDropdownHandle.innerText = username;
-        userDropdownHandle.style.display = username ? 'block' : 'none';
+        userDropdownHandle.innerText = handleText;
+        userDropdownHandle.style.display = handleText ? 'block' : 'none';
+      }
+
+      // Safe Avatar Rendering
+      const pictureUrl = user.picture && (user.picture.startsWith('https://') || user.picture.startsWith('http://'))
+        ? user.picture
+        : null;
+
+      const userAvatarBadge = document.getElementById('userAvatarBadge');
+      if (userAvatarBadge) {
+        if (pictureUrl) {
+          userAvatarBadge.innerHTML = `<img src="${escapeHtml(pictureUrl)}" alt="${escapeHtml(displayName)}" class="user-avatar-img" onerror="this.parentElement.innerText='${safeInitials}'">`;
+        } else {
+          userAvatarBadge.innerText = safeInitials;
+        }
+      }
+
+      const userAvatarLarge = document.getElementById('userAvatarLarge');
+      if (userAvatarLarge) {
+        if (pictureUrl) {
+          userAvatarLarge.innerHTML = `<img src="${escapeHtml(pictureUrl)}" alt="${escapeHtml(displayName)}" class="user-avatar-img" onerror="this.parentElement.innerText='${safeInitials}'">`;
+        } else {
+          userAvatarLarge.innerText = safeInitials;
+        }
       }
     }
 

@@ -39,12 +39,19 @@ def _now() -> str:
 
 def upsert_user(user_id: int, username: str | None = None, full_name: str | None = None):
     try:
-        return db.table("users").upsert({
+        payload = {
             "id": user_id,
-            "username": username,
-            "full_name": full_name,
             "last_active": _now(),
-        }).execute()
+        }
+        if username is not None:
+            clean_u = username.lstrip("@").strip() if isinstance(username, str) else username
+            if clean_u:
+                payload["username"] = clean_u
+        if full_name is not None:
+            clean_fn = full_name.strip() if isinstance(full_name, str) else full_name
+            if clean_fn:
+                payload["full_name"] = clean_fn
+        return db.table("users").upsert(payload).execute()
     except Exception as exc:
         log.error("Failed to upsert user %s: %s", user_id, exc)
         return None
