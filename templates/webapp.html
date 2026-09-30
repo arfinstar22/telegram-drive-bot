@@ -2085,13 +2085,86 @@
     }
 
     /* Move Folder Picker Modal */
+    .move-picker-breadcrumb-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 12px;
+      font-size: 0.78rem;
+    }
+
+    .move-crumbs-track {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      white-space: nowrap;
+      scrollbar-width: none;
+      flex: 1;
+    }
+    .move-crumbs-track::-webkit-scrollbar {
+      display: none;
+    }
+
+    .move-picker-back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent);
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .move-picker-back-btn:active {
+      transform: scale(0.95);
+    }
+
+    .move-crumb-item {
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .move-crumb-item:hover {
+      text-decoration: underline;
+    }
+
+    .move-crumb-sep {
+      color: var(--text-muted);
+      opacity: 0.4;
+      font-size: 0.75rem;
+    }
+
+    .move-crumb-current {
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .move-section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin: 10px 0 6px;
+    }
+
     .folder-picker-list {
       display: flex;
       flex-direction: column;
       gap: 8px;
       max-height: 280px;
       overflow-y: auto;
-      margin: 14px 0;
+      margin: 10px 0 14px;
       padding-right: 4px;
     }
 
@@ -2117,9 +2190,48 @@
     }
 
     .folder-picker-item.disabled {
-      opacity: 0.4;
+      opacity: 0.45;
       cursor: not-allowed;
       pointer-events: none;
+    }
+
+    .folder-picker-item.subfolder-row {
+      background: rgba(255, 255, 255, 0.025);
+      border-color: rgba(255, 255, 255, 0.06);
+    }
+    .folder-picker-item.subfolder-row:hover {
+      background: rgba(56, 189, 248, 0.08);
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+
+    .fpi-arrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--accent);
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+
+    .fpi-badge-current {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: normal;
+      margin-left: 4px;
+    }
+
+    .move-empty-sub {
+      text-align: center;
+      padding: 16px 8px;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px dashed rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
     }
 
     .fpi-left {
@@ -3487,6 +3599,9 @@
         <span class="sel-count-pill" id="moveCountBadge">1 Berkas</span>
       </div>
       <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 12px;">Pilih folder tujuan di bawah ini:</p>
+
+      <!-- Move Picker Breadcrumb Bar -->
+      <div class="move-picker-breadcrumb-bar" id="movePickerBreadcrumbs"></div>
 
       <div class="folder-picker-list" id="folderPickerList">
         <!-- Rendered dynamically -->
@@ -5994,7 +6109,11 @@
       }
     }
 
-    // Move Folder Dialog & API Handlers
+    // Move Folder Dialog & Hierarchical Drill-Down Handlers
+    let allUserFolders = [];
+    let movePickerCurrentParentId = null;
+    let movePickerBreadcrumbs = [];
+
     async function openMoveModal(customFileIds = null) {
       triggerHaptic();
       pendingMoveFileIds = customFileIds || Array.from(selectedFileIds);
@@ -6002,9 +6121,15 @@
 
       document.getElementById('moveCountBadge').innerText = `${pendingMoveFileIds.length} Berkas`;
       targetMoveFolderId = null;
+      movePickerCurrentParentId = null;
+      movePickerBreadcrumbs = [{ id: null, name: 'Root' }];
+
       const btnConfirm = document.getElementById('btnConfirmMove');
       btnConfirm.disabled = true;
       btnConfirm.style.opacity = '0.5';
+
+      const crumbsEl = document.getElementById('movePickerBreadcrumbs');
+      if (crumbsEl) crumbsEl.innerHTML = '';
 
       const listEl = document.getElementById('folderPickerList');
       listEl.innerHTML = `<div style="text-align:center; padding: 24px; color: var(--text-muted); font-size:0.85rem;">Memuat daftar folder...</div>`;
@@ -6013,51 +6138,177 @@
       try {
         const res = await authFetch('/api/all_folders');
         const data = await res.json();
-        const folders = data.folders || [];
-        
-        let html = `
-          <div class="folder-picker-item ${currentFolderId === null ? 'disabled' : ''}" onclick="selectTargetFolder(0, this)">
-            <div class="fpi-left">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-              <div>
-                <div class="fpi-name">🏠 Root / Berkas Utama ${currentFolderId === null ? '<span style="font-size:0.75rem; color:var(--text-muted);">(Saat ini)</span>' : ''}</div>
-              </div>
-            </div>
-            <div class="fpi-radio"></div>
-          </div>
-        `;
-
-        folders.forEach(f => {
-          const isCurrent = currentFolderId === f.id;
-          html += `
-            <div class="folder-picker-item ${isCurrent ? 'disabled' : ''}" onclick="selectTargetFolder(${f.id}, this)">
-              <div class="fpi-left">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent)"><path d="M20 18H4V8h16v10zm0-12h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></svg>
-                <div>
-                  <div class="fpi-name">${escapeHtml(f.name)} ${isCurrent ? '<span style="font-size:0.75rem; color:var(--text-muted);">(Saat ini)</span>' : ''}</div>
-                  <div class="fpi-count">${f.file_count || 0} berkas</div>
-                </div>
-              </div>
-              <div class="fpi-radio"></div>
-            </div>
-          `;
-        });
-
-        listEl.innerHTML = html;
+        allUserFolders = data.folders || [];
+        renderMoveFolderPicker();
       } catch (err) {
         listEl.innerHTML = `<div style="text-align:center; padding: 24px; color:#ef4444;">Gagal memuat folder: ${escapeHtml(err.message || String(err))}</div>`;
       }
     }
 
+    function renderMoveFolderPicker() {
+      const crumbsEl = document.getElementById('movePickerBreadcrumbs');
+      const listEl = document.getElementById('folderPickerList');
+      const btnConfirm = document.getElementById('btnConfirmMove');
+
+      // 1. Render Breadcrumbs & Back Button
+      if (crumbsEl) {
+        let crumbsHtml = '';
+        if (movePickerBreadcrumbs.length > 1) {
+          crumbsHtml += `
+            <button class="move-picker-back-btn" onclick="navigateMovePickerUp()" title="Kembali ke folder sebelumnya">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+              <span>Kembali</span>
+            </button>
+          `;
+        }
+
+        crumbsHtml += `<div class="move-crumbs-track">`;
+        movePickerBreadcrumbs.forEach((crumb, idx) => {
+          const isLast = idx === movePickerBreadcrumbs.length - 1;
+          if (idx > 0) {
+            crumbsHtml += `<span class="move-crumb-sep">/</span>`;
+          }
+          if (isLast) {
+            crumbsHtml += `<span class="move-crumb-current">${escapeHtml(crumb.name)}</span>`;
+          } else {
+            crumbsHtml += `<span class="move-crumb-item" onclick="navigateMovePickerToCrumb(${idx})">${escapeHtml(crumb.name)}</span>`;
+          }
+        });
+        crumbsHtml += `</div>`;
+        crumbsEl.innerHTML = crumbsHtml;
+      }
+
+      // 2. Identify Current Viewed Folder Target
+      let curFolder = null;
+      let targetId = 0;
+      let curName = 'Root / Berkas Utama';
+      let isAlreadyHere = false;
+
+      if (movePickerCurrentParentId === null) {
+        targetId = 0;
+        curName = 'Root / Berkas Utama';
+        isAlreadyHere = (currentFolderId === null || currentFolderId === 0);
+      } else {
+        curFolder = allUserFolders.find(f => f.id === movePickerCurrentParentId);
+        targetId = movePickerCurrentParentId;
+        curName = curFolder ? curFolder.name : 'Folder Ini';
+        isAlreadyHere = (currentFolderId !== null && currentFolderId === movePickerCurrentParentId);
+      }
+
+      // Auto-select current viewed folder if not yet chosen or if matching view
+      if (targetMoveFolderId === null && !isAlreadyHere) {
+        targetMoveFolderId = targetId;
+      }
+
+      const isCurSelected = targetMoveFolderId === targetId;
+
+      let html = `
+        <div class="move-section-label">Lokasi Tujuan:</div>
+        <div class="folder-picker-item ${isAlreadyHere ? 'disabled' : ''} ${isCurSelected ? 'selected' : ''}" onclick="selectTargetFolder(${targetId}, this)">
+          <div class="fpi-left">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="color: ${movePickerCurrentParentId === null ? '#38BDF8' : '#F59E0B'}">
+              ${movePickerCurrentParentId === null 
+                ? '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>' 
+                : '<path d="M20 18H4V8h16v10zm0-12h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/>'}
+            </svg>
+            <div>
+              <div class="fpi-name">
+                Pindahkan ke ${escapeHtml(curName)}
+                ${isAlreadyHere ? '<span class="fpi-badge-current">(Folder saat ini)</span>' : ''}
+              </div>
+              <div class="fpi-count">${curFolder ? `${curFolder.file_count || 0} berkas` : 'Penyimpanan utama'}</div>
+            </div>
+          </div>
+          <div class="fpi-radio"></div>
+        </div>
+      `;
+
+      // 3. Find Child Subfolders
+      const subfolders = allUserFolders.filter(f => {
+        const pid = (!f.parent_id || f.parent_id === 0) ? null : Number(f.parent_id);
+        return pid === movePickerCurrentParentId;
+      });
+
+      html += `<div class="move-section-label" style="margin-top: 14px;">Sub-folder di ${movePickerCurrentParentId === null ? 'Root' : `"${escapeHtml(curName)}"`}:</div>`;
+
+      if (subfolders.length === 0) {
+        html += `
+          <div class="move-empty-sub">
+            <span style="opacity: 0.6;">📁</span> Tidak ada sub-folder di dalam folder ini.
+          </div>
+        `;
+      } else {
+        html += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
+        subfolders.forEach(sub => {
+          html += `
+            <div class="folder-picker-item subfolder-row" onclick="navigateMovePickerDown(${sub.id}, '${escapeHtml(sub.name)}')">
+              <div class="fpi-left">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent)">
+                  <path d="M20 18H4V8h16v10zm0-12h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/>
+                </svg>
+                <div>
+                  <div class="fpi-name">${escapeHtml(sub.name)}</div>
+                  <div class="fpi-count">${sub.file_count || 0} berkas</div>
+                </div>
+              </div>
+              <div class="fpi-arrow" title="Buka ${escapeHtml(sub.name)}">
+                <span>Buka</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              </div>
+            </div>
+          `;
+        });
+        html += `</div>`;
+      }
+
+      listEl.innerHTML = html;
+
+      // 4. Update Confirm Button
+      const targetIsCurrent = (targetMoveFolderId === 0 && (currentFolderId === null || currentFolderId === 0)) ||
+                              (targetMoveFolderId !== null && targetMoveFolderId !== 0 && targetMoveFolderId === currentFolderId);
+
+      if (targetMoveFolderId === null || targetIsCurrent) {
+        btnConfirm.disabled = true;
+        btnConfirm.style.opacity = '0.5';
+      } else {
+        btnConfirm.disabled = false;
+        btnConfirm.style.opacity = '1';
+      }
+    }
+
+    function navigateMovePickerDown(folderId, folderName) {
+      triggerHaptic();
+      movePickerBreadcrumbs.push({ id: folderId, name: folderName });
+      movePickerCurrentParentId = folderId;
+      targetMoveFolderId = folderId;
+      renderMoveFolderPicker();
+    }
+
+    function navigateMovePickerUp() {
+      triggerHaptic();
+      if (movePickerBreadcrumbs.length <= 1) return;
+      movePickerBreadcrumbs.pop();
+      const parent = movePickerBreadcrumbs[movePickerBreadcrumbs.length - 1];
+      movePickerCurrentParentId = parent.id;
+      targetMoveFolderId = parent.id === null ? 0 : parent.id;
+      renderMoveFolderPicker();
+    }
+
+    function navigateMovePickerToCrumb(index) {
+      triggerHaptic();
+      if (index < 0 || index >= movePickerBreadcrumbs.length) return;
+      movePickerBreadcrumbs = movePickerBreadcrumbs.slice(0, index + 1);
+      const parent = movePickerBreadcrumbs[index];
+      movePickerCurrentParentId = parent.id;
+      targetMoveFolderId = parent.id === null ? 0 : parent.id;
+      renderMoveFolderPicker();
+    }
+
     function selectTargetFolder(folderId, el) {
-      if (el.classList.contains('disabled')) return;
+      if (el && el.classList.contains('disabled')) return;
       triggerHaptic();
       targetMoveFolderId = folderId;
-      document.querySelectorAll('.folder-picker-item').forEach(i => i.classList.remove('selected'));
-      el.classList.add('selected');
-      const btn = document.getElementById('btnConfirmMove');
-      btn.disabled = false;
-      btn.style.opacity = '1';
+      renderMoveFolderPicker();
     }
 
     function closeMoveModal(e) {
@@ -6065,6 +6316,8 @@
         document.getElementById('moveFolderModal').classList.remove('active');
         pendingMoveFileIds = [];
         targetMoveFolderId = null;
+        movePickerCurrentParentId = null;
+        movePickerBreadcrumbs = [];
       }
     }
 
