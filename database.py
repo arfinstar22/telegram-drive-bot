@@ -440,6 +440,18 @@ def rename_file(file_id: int, name: str, user_id: int | None = None) -> bool:
     except Exception as exc:
         log.error("Failed to rename file %s: %s", file_id, exc)
         return False
+def update_file_thumbnail(file_id: int, thumbnail_file_id: str, file_type: str | None = None) -> bool:
+    """Update thumbnail_file_id and optionally file_type for cached native preview."""
+    try:
+        payload = {"thumbnail_file_id": thumbnail_file_id, "updated_at": _now()}
+        if file_type:
+            payload["file_type"] = file_type
+        db.table("files").update(payload).eq("id", file_id).execute()
+        return True
+    except Exception as exc:
+        log.warning("Failed to update file thumbnail/type for %s: %s", file_id, exc)
+        return False
+
 
 
 def move_file(file_id: int, folder_id: int, user_id: int | None = None) -> bool:

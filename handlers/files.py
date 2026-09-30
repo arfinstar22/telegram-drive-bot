@@ -534,7 +534,24 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("File tidak ditemukan atau akses ditolak", show_alert=True)
         return
 
-    emoji = file_emoji(f["file_type"])
+    file_name = (f.get("file_name") or "").lower()
+    mime_type = (f.get("mime_type") or "").lower()
+    file_type = f.get("file_type", "document")
+    thumb_fid = f.get("thumbnail_file_id")
+
+    image_extensions = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".bmp", ".tiff"}
+    is_image = (
+        file_type == "photo"
+        or mime_type.startswith("image/")
+        or any(file_name.endswith(ext) for ext in image_extensions)
+    )
+
+    if is_image and file_type != "photo":
+        file_type = "photo"
+        f["file_type"] = "photo"
+        db.update_file_thumbnail(f["id"], thumb_fid, file_type="photo")
+
+    emoji = file_emoji(file_type)
     size = format_size(f.get("file_size", 0))
     created = f.get("created_at", "")[:10]
     _, note, tags = parse_file_metadata(f.get("mime_type"))
@@ -543,10 +560,7 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     caption = f"{emoji} <b>{f['file_name']}</b>\n📊 {size} • 📅 {created}{note_line}{tags_line}"
     markup = kb.file_actions(f)
 
-    file_type = f.get("file_type", "document")
-    thumb_fid = f.get("thumbnail_file_id")
-
-    if file_type == "photo":
+    if is_image:
         # 1. Try sending directly as native photo file_id
         try:
             await query.message.reply_photo(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
@@ -554,7 +568,7 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
 
-        # 2. If it was uploaded as uncompressed document, use its PhotoSize thumbnail for visual preview
+        # 2. Try thumbnail_file_id (if already cached native photo or valid photo ID)
         if thumb_fid:
             try:
                 await query.message.reply_photo(thumb_fid, caption=caption, parse_mode="HTML", reply_markup=markup)
@@ -562,16 +576,38 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
 
-        # 3. If thumbnail failed or missing, get direct CDN URL from Telegram
+        # 3. Download bytes from Telegram CDN and reply as native photo (guarantees Gambar 2 preview)
         try:
-            tg_file = await context.bot.get_file(f["file_id"])
-            if tg_file and tg_file.file_path:
-                await query.message.reply_photo(tg_file.file_path, caption=caption, parse_mode="HTML", reply_markup=markup)
-                return
-        except Exception:
-            pass
+            buf = None
+            if f.get("file_size", 0) <= 20 * 1024 * 1024:
+                try:
+                    tg_file = await context.bot.get_file(f["file_id"])
+                    buf = await tg_file.download_as_bytearray()
+                except Exception:
+                    buf = None
 
-        # 4. Fallback to document
+            if not buf and thumb_fid:
+                try:
+                    tg_file = await context.bot.get_file(thumb_fid)
+                    buf = await tg_file.download_as_bytearray()
+                except Exception:
+                    buf = None
+
+            if buf:
+                sent = await query.message.reply_photo(
+                    photo=bytes(buf),
+                    caption=caption,
+                    parse_mode="HTML",
+                    reply_markup=markup,
+                )
+                if sent and sent.photo:
+                    cached_pid = sent.photo[-1].file_id
+                    db.update_file_thumbnail(f["id"], cached_pid, file_type="photo")
+                return
+        except Exception as exc:
+            log.warning("Failed to reply_photo with bytes for %s: %s", f["file_name"], exc)
+
+        # 4. Fallback to document only if everything fails (e.g. >20MB image without thumbnail)
         await query.message.reply_document(f["file_id"], caption=caption, parse_mode="HTML", reply_markup=markup)
         return
 
@@ -585,6 +621,14 @@ async def preview_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if thumb_fid:
             try:
                 await query.message.reply_photo(thumb_fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+                return
+            except Exception:
+                pass
+
+            try:
+                tg_file = await context.bot.get_file(thumb_fid)
+                buf = await tg_file.download_as_bytearray()
+                await query.message.reply_photo(photo=bytes(buf), caption=caption, parse_mode="HTML", reply_markup=markup)
                 return
             except Exception:
                 pass

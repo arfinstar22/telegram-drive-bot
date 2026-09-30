@@ -224,5 +224,60 @@ class TestUploadConfirmation(unittest.IsolatedAsyncioTestCase):
         query_update.callback_query.message.reply_document.assert_not_called()
 
 
+    @patch("handlers.files.db")
+    async def test_preview_photo_document_downloads_bytes_when_ids_fail(self, mock_db):
+        mock_db.get_file_for_user.return_value = {
+            "id": 101,
+            "folder_id": 10,
+            "file_id": "doc_uncompressed_raw_101",
+            "file_name": "IMG_20261001_011546_071.jpg",
+            "file_type": "document",  # even if legacy stored as document
+            "file_size": 3145728,  # 3.0 MB
+            "thumbnail_file_id": "doc_thumb_101",
+            "created_at": "2026-10-01T00:00:00",
+            "mime_type": "image/jpeg",
+        }
+        mock_db.update_file_thumbnail = MagicMock()
+
+        query_update = MagicMock()
+        query_update.callback_query.answer = AsyncMock()
+        query_update.callback_query.data = "fi:101"
+        query_update.callback_query.from_user.id = 555
+
+        # Simulating that direct reply_photo with string file IDs fails
+        async def mock_reply_photo(*args, **kwargs):
+            photo = kwargs.get("photo") or (args[0] if args else None)
+            if isinstance(photo, str):
+                raise Exception("Wrong file identifier")
+            mock_msg = MagicMock()
+            mock_photo = MagicMock()
+            mock_photo.file_id = "new_native_photo_id_777"
+            mock_msg.photo = [mock_photo]
+            return mock_msg
+
+        query_update.callback_query.message.reply_photo = AsyncMock(side_effect=mock_reply_photo)
+        query_update.callback_query.message.reply_document = AsyncMock()
+
+        mock_tg_file = MagicMock()
+        mock_tg_file.download_as_bytearray = AsyncMock(return_value=bytearray(b"JPEG_HEADER_RAW_BYTES"))
+
+        context = MagicMock()
+        context.bot.get_file = AsyncMock(return_value=mock_tg_file)
+
+        await files.preview_file(query_update, context)
+
+        # 1. reply_photo was called with raw bytes to render native photo preview (Gambar 2)
+        query_update.callback_query.message.reply_photo.assert_called()
+        last_kwargs = query_update.callback_query.message.reply_photo.call_args[1]
+        self.assertEqual(last_kwargs.get("photo"), b"JPEG_HEADER_RAW_BYTES")
+
+        # 2. reply_document was NOT called (Gambar 1 avoided)
+        query_update.callback_query.message.reply_document.assert_not_called()
+
+        # 3. Thumbnail was cached with new native photo id
+        mock_db.update_file_thumbnail.assert_called_with(101, "new_native_photo_id_777", file_type="photo")
+
+
 if __name__ == "__main__":
     unittest.main()
+

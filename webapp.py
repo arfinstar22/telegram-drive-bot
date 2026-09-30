@@ -667,9 +667,57 @@ async def _send_single_file_to_chat(bot: Bot, user_id: int, f: dict):
 
     ftype = f.get("file_type", "document")
     fid = f["file_id"]
+    thumb_fid = f.get("thumbnail_file_id")
 
-    if ftype == "photo":
-        await bot.send_photo(chat_id=user_id, photo=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+    file_name = (f.get("file_name") or "").lower()
+    mime_type = (f.get("mime_type") or "").lower()
+    image_extensions = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".bmp", ".tiff"}
+    is_image = (
+        ftype == "photo"
+        or mime_type.startswith("image/")
+        or any(file_name.endswith(ext) for ext in image_extensions)
+    )
+
+    if is_image:
+        try:
+            await bot.send_photo(chat_id=user_id, photo=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+            return
+        except Exception:
+            pass
+
+        if thumb_fid:
+            try:
+                await bot.send_photo(chat_id=user_id, photo=thumb_fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+                return
+            except Exception:
+                pass
+
+        buf = None
+        if f.get("file_size", 0) <= 20 * 1024 * 1024:
+            try:
+                tg_file = await bot.get_file(fid)
+                buf = await tg_file.download_as_bytearray()
+            except Exception:
+                buf = None
+
+        if not buf and thumb_fid:
+            try:
+                tg_file = await bot.get_file(thumb_fid)
+                buf = await tg_file.download_as_bytearray()
+            except Exception:
+                buf = None
+
+        if buf:
+            try:
+                sent = await bot.send_photo(chat_id=user_id, photo=bytes(buf), caption=caption, parse_mode="HTML", reply_markup=markup)
+                if sent and sent.photo:
+                    db.update_file_thumbnail(f["id"], sent.photo[-1].file_id, file_type="photo")
+                return
+            except Exception:
+                pass
+
+        await bot.send_document(chat_id=user_id, document=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
+        return
     elif ftype == "video":
         await bot.send_video(chat_id=user_id, video=fid, caption=caption, parse_mode="HTML", reply_markup=markup)
     elif ftype == "audio":
