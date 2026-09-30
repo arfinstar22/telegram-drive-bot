@@ -26,12 +26,12 @@ from config import (
 log = logging.getLogger(__name__)
 
 def get_telegram_secret_key(bot_token: Optional[str] = None) -> bytes:
-    token = bot_token or config.BOT_TOKEN
+    token = (bot_token or config.BOT_TOKEN).strip()
     return hmac.new(b"WebAppData", token.encode("utf-8"), hashlib.sha256).digest()
 
 
 def get_session_secret(bot_token: Optional[str] = None) -> bytes:
-    token = bot_token or config.BOT_TOKEN
+    token = (bot_token or config.BOT_TOKEN).strip()
     return hmac.new(token.encode("utf-8"), b"DarfinStorageSessionKey_v1", hashlib.sha256).digest()
 
 
