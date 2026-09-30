@@ -131,6 +131,36 @@ class TestUploadConfirmation(unittest.IsolatedAsyncioTestCase):
         all_cb = [b.callback_data for row in final_markup.inline_keyboard for b in row]
         self.assertTrue(any(cb.startswith("bsm:") for cb in all_cb))
 
+    @patch("handlers.files.db")
+    async def test_upload_to_folder_no_duplicate_reply_keyboard(self, mock_db):
+        mock_db.get_folder.return_value = {"id": 88, "name": "KKN Desa Rahia 2026"}
+
+        query_update = MagicMock()
+        query_update.callback_query.answer = AsyncMock()
+        query_update.callback_query.data = "up:88"
+        query_update.callback_query.from_user.id = 555
+        query_update.callback_query.edit_message_text = AsyncMock()
+        query_update.callback_query.message.reply_text = AsyncMock()
+
+        context = MagicMock()
+        context.user_data = {}
+
+        await files.upload_to_folder(query_update, context)
+
+        # Verified state & folder tracking
+        self.assertEqual(context.user_data["state"], "uploading")
+        self.assertEqual(context.user_data["upload_folder_id"], 88)
+        self.assertEqual(context.user_data["current_folder_id"], 88)
+
+        # Verified single edit_message_text called
+        query_update.callback_query.edit_message_text.assert_called_once()
+        text_arg = query_update.callback_query.edit_message_text.call_args[0][0]
+        self.assertIn("KKN Desa Rahia 2026", text_arg)
+        self.assertIn("Mode Upload", text_arg)
+
+        # Verified NO duplicate reply_text sent (which caused duplicate bottom keyboard)
+        query_update.callback_query.message.reply_text.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

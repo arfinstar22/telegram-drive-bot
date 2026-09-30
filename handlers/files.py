@@ -45,6 +45,7 @@ async def upload_to_folder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     folder_id = int(query.data.split(":")[1])
+    user_id = query.from_user.id
 
     folder = db.get_folder(folder_id)
     if not folder:
@@ -53,14 +54,19 @@ async def upload_to_folder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data["state"] = "uploading"
     context.user_data["upload_folder_id"] = folder_id
+    context.user_data["current_folder_id"] = folder_id
+
+    cancel_btn = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ Batal", callback_data=f"upload_cancel:{user_id}")]
+    ])
 
     await query.edit_message_text(
-        f"📤 Upload mode: <b>{folder['name']}</b>\n\n"
-        f"Kirim file, foto, video, audio — semuanya.\n"
-        f"Tekan <b>✅ Done</b> jika selesai.",
+        f"📤 <b>Mode Upload: {folder['name']}</b>\n\n"
+        f"Silakan kirim file, foto, video, atau dokumen langsung ke chat ini.\n"
+        f"Tekan tombol <b>✅ Selesai Upload</b> pada notifikasi jika sudah selesai.",
         parse_mode="HTML",
+        reply_markup=cancel_btn,
     )
-    await query.message.reply_text("📤 Kirim file sekarang:", reply_markup=kb.upload_mode())
 
 
 _upload_batches: dict[int, dict] = {}
