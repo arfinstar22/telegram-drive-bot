@@ -15,4 +15,12 @@ services:
         sync: false
       - key: PORT
         value: "10000"
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: TELEGRAM_OIDC_CLIENT_ID
+        sync: false
+      - key: TELEGRAM_OIDC_CLIENT_SECRET
+        sync: false
+      - key: TELEGRAM_OIDC_REDIRECT_URI
+        sync: false
 

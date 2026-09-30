@@ -17,6 +17,7 @@ import tornado.httputil
 import tornado.httpclient
 from telegram import Bot
 
+import config
 from config import (
     BOT_TOKEN,
     PORT,
@@ -43,6 +44,10 @@ from auth import (
     validate_telegram_init_data,
     create_session_token,
 )
+import auth
+from darfin_intelligence.search.service import _mask_sensitive_text
+import oidc
+import secrets
 
 log = logging.getLogger(__name__)
 
@@ -101,6 +106,8 @@ class BaseApiHandler(tornado.web.RequestHandler):
         self.set_header("X-Content-Type-Options", "nosniff")
         self.set_header("X-Frame-Options", "SAMEORIGIN")
         self.set_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        self.set_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.set_header("Pragma", "no-cache")
 
     def options(self, *args, **kwargs):
         self.set_status(204)
@@ -143,6 +150,9 @@ class WebAppPageHandler(tornado.web.RequestHandler):
     def set_default_headers(self):
         self.set_header("X-Content-Type-Options", "nosniff")
         self.set_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        self.set_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.set_header("Pragma", "no-cache")
+        self.set_header("Expires", "0")
         # Allow embedding in Telegram WebApp
         self.set_header(
             "Content-Security-Policy",
@@ -311,14 +321,24 @@ class ApiAuthSessionHandler(BaseApiHandler):
             db.get_or_create_inbox_folder(user_id)
 
             token = create_session_token(user_id, duration_seconds=86400)
-            # Set secure cookie
+            csrf_token = secrets.token_hex(16)
+            is_secure = (self.request.protocol == "https") or ("onrender.com" in self.request.host)
+            # Set secure session cookie
             self.set_cookie(
                 "tma_session",
                 token,
                 expires_days=1,
                 httponly=True,
-                secure=self.request.protocol == "https",
-                samesite="Lax" if self.request.protocol != "https" else "None",
+                secure=is_secure,
+                samesite="Lax" if not is_secure else "None",
+            )
+            self.set_cookie(
+                "tma_csrf",
+                csrf_token,
+                expires_days=1,
+                httponly=False,
+                secure=is_secure,
+                samesite="Lax" if not is_secure else "None",
             )
 
             self.write(json.dumps({
@@ -1040,6 +1060,24 @@ class ApiUploadHandler(BaseApiHandler):
                     )
                     if saved:
                         saved_count += 1
+                        # Task 1 Read-only Intelligence Analysis hook (non-blocking)
+                        try:
+                            from darfin_intelligence import analyze as run_intelligence
+                            intel_res = run_intelligence(
+                                filename=filename,
+                                mime_type=content_type,
+                                file_type=ftype,
+                                file_id=saved.get("id") if isinstance(saved, dict) else None,
+                            )
+                            log.info(
+                                "Intelligence analyzed file_id=%s parser=%s status=%s family=%s",
+                                saved.get("id") if isinstance(saved, dict) else None,
+                                intel_res.parser_name,
+                                intel_res.status,
+                                intel_res.file_type.family if intel_res.file_type else None,
+                            )
+                        except Exception as intel_err:
+                            log.warning("Intelligence analysis failed (non-blocking) for %s: %s", filename, intel_err)
                     else:
                         failed_count += 1
                         failed_files.append({"name": filename, "reason": "Gagal menyimpan database"})
@@ -1579,6 +1617,609 @@ class ApiCleanDuplicatesHandler(BaseApiHandler):
             self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal membersihkan duplikat."}}))
 
 
+class ApiOrganizerPreviewHandler(BaseApiHandler):
+    """Generate dry-run smart organization suggestions for authenticated user."""
+    async def get(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
+        try:
+            from darfin_intelligence.organizer import SafeOrganizer
+            folders = db.get_all_folders(user_id)
+            files = db.get_all_user_files(user_id, limit=100)
+            user_prefs = db.get_user_preferences(user_id)
+
+            plan = SafeOrganizer.preview(
+                files=files,
+                folders=folders,
+                user_id=user_id,
+                user_preferences=user_prefs,
+            )
+            self.write(json.dumps({
+                "ok": True,
+                "plan": plan.to_dict(),
+            }))
+        except Exception as e:
+            log.exception("Error generating smart organizer plan: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({
+                "ok": False,
+                "error": {"code": "SERVER_ERROR", "message": "Gagal menganalisis saran penataan."},
+            }))
+
+
+class ApiPreferencesFeedbackHandler(BaseApiHandler):
+    """Record user feedback (accepted, rejected, corrected) on folder suggestions."""
+    async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            file_id = data.get("file_id")
+            action = data.get("action", "accepted")
+            suggested_folder_id = data.get("suggested_folder_id")
+            correct_folder_id = data.get("correct_folder_id")
+
+            if not file_id:
+                self.set_status(400)
+                self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "file_id wajib diisi."}}))
+                return
+
+            # 1. Verify file ownership
+            f = db.get_file(int(file_id), user_id=user_id)
+            if not f:
+                self.set_status(403)
+                self.write(json.dumps({"ok": False, "error": {"code": "FORBIDDEN", "message": "Berkas tidak ditemukan atau bukan milik Anda."}}))
+                return
+
+            # 2. Determine target folder and verify ownership
+            target_folder_id = correct_folder_id if action == "corrected" else suggested_folder_id
+            if target_folder_id is not None:
+                target_folder_id = int(target_folder_id)
+                dest = db.get_folder(target_folder_id, user_id=user_id)
+                if not dest:
+                    self.set_status(403)
+                    self.write(json.dumps({"ok": False, "error": {"code": "FORBIDDEN", "message": "Folder tujuan tidak ditemukan atau bukan milik Anda."}}))
+                    return
+            else:
+                self.set_status(400)
+                self.write(json.dumps({"ok": False, "error": {"code": "BAD_REQUEST", "message": "Folder tujuan wajib ditentukan."}}))
+                return
+
+            # 3. Extract normalized pattern from file name
+            from darfin_intelligence.preferences import extract_reusable_patterns
+            patterns = extract_reusable_patterns(f.get("file_name", ""))
+            pattern = patterns[0] if patterns else f.get("file_name", "").lower()[:20]
+
+            # 4. Record preference (strictly scoped to authenticated user)
+            pref = db.record_user_preference(
+                user_id=user_id,
+                pattern=pattern,
+                target_folder_id=target_folder_id,
+                action=action,
+            )
+
+            self.write(json.dumps({
+                "ok": True,
+                "action": action,
+                "pattern": pattern,
+                "target_folder_id": target_folder_id,
+                "preference": pref,
+            }))
+        except Exception as e:
+            log.exception("Error recording user preference feedback: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({"ok": False, "error": {"code": "SERVER_ERROR", "message": "Gagal menyimpan preferensi."}}))
+
+
+class ApiOrganizerExecuteHandler(BaseApiHandler):
+    """Execute verified smart reorganization moves with security rechecks."""
+    async def post(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
+        try:
+            data = json.loads(self.request.body.decode("utf-8"))
+            items = data.get("items")
+            if not items and data.get("file_id") and data.get("target_folder_id") is not None:
+                items = [data]
+
+            if not items:
+                self.set_status(400)
+                self.write(json.dumps({
+                    "ok": False,
+                    "error": {"code": "BAD_REQUEST", "message": "Item pemindahan tidak ditemukan."},
+                }))
+                return
+
+            from darfin_intelligence.organizer import SafeOrganizer
+            res = SafeOrganizer.execute_batch(items=items, user_id=user_id)
+
+            if not res["ok"]:
+                self.set_status(207 if res["summary"]["moved"] > 0 else 400)
+
+            self.write(json.dumps(res))
+        except Exception as e:
+            log.exception("Error executing smart organizer moves: %s", e)
+            self.set_status(500)
+            self.write(json.dumps({
+                "ok": False,
+                "error": {"code": "SERVER_ERROR", "message": "Gagal menjalankan pemindahan berkas."},
+            }))
+
+
+class ApiSearchHandler(BaseApiHandler):
+    """Execute authenticated search query using Task 4 SearchService."""
+
+    async def get(self):
+        await self._handle_search()
+
+    async def post(self):
+        await self._handle_search()
+
+    async def _handle_search(self):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
+        try:
+            query = ""
+            limit = 25
+            offset = 0
+            sort_by = "relevance"
+            ext = None
+            fam = None
+            folder_id = None
+            domain = None
+            doc_type = None
+            merchant = None
+            has_ocr = None
+
+            if self.request.method == "POST" and self.request.body:
+                try:
+                    body = json.loads(self.request.body.decode("utf-8"))
+                    query = body.get("query", body.get("q", ""))
+                    limit = int(body.get("limit", 25))
+                    offset = int(body.get("offset", 0))
+                    sort_by = body.get("sort_by", "relevance")
+                    ext = body.get("ext")
+                    fam = body.get("type", body.get("family"))
+                    folder_id = body.get("folder_id")
+                    domain = body.get("domain")
+                    doc_type = body.get("document_type")
+                    merchant = body.get("merchant")
+                    has_ocr = body.get("has_ocr")
+                except Exception:
+                    pass
+
+            if not query:
+                query = self.get_argument("q", self.get_argument("query", ""))
+            if self.get_argument("limit", None):
+                try:
+                    limit = int(self.get_argument("limit"))
+                except ValueError:
+                    pass
+            if self.get_argument("offset", None):
+                try:
+                    offset = int(self.get_argument("offset"))
+                except ValueError:
+                    pass
+            if self.get_argument("sort_by", None):
+                sort_by = self.get_argument("sort_by")
+            if self.get_argument("ext", None):
+                ext = self.get_argument("ext")
+            if self.get_argument("type", None):
+                fam = self.get_argument("type")
+            if self.get_argument("folder_id", None):
+                try:
+                    folder_id = int(self.get_argument("folder_id"))
+                except ValueError:
+                    pass
+            if self.get_argument("domain", None):
+                domain = self.get_argument("domain")
+            if self.get_argument("document_type", None):
+                doc_type = self.get_argument("document_type")
+            if self.get_argument("merchant", None):
+                merchant = self.get_argument("merchant")
+            if self.get_argument("has_ocr", None):
+                has_ocr = self.get_argument("has_ocr").lower() in ("true", "1", "yes")
+
+            from darfin_intelligence.search import search, SearchFilters
+            filters = SearchFilters(
+                extension=ext,
+                family=fam,
+                folder_id=folder_id,
+                domain=domain,
+                document_type=doc_type,
+                merchant=merchant,
+                has_ocr=has_ocr,
+            )
+
+            user_prefs = db.get_user_preferences(user_id)
+            search_result = search(
+                user_id=user_id,
+                query=query,
+                filters=filters,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                preferences=user_prefs,
+            )
+
+            media_auth_token = create_session_token(user_id, duration_seconds=3600)
+            res_dict = search_result.as_dict()
+
+            for item in res_dict.get("items", []):
+                fdata = item.get("file_data", {})
+                fid = item.get("asset_id")
+                ftype = fdata.get("file_type", "document")
+                fsize = fdata.get("file_size", 0) or 0
+                fdata["file_size_formatted"] = format_size(fsize)
+                has_thumb = bool(fdata.get("thumbnail_file_id") or ftype == "photo")
+                fdata["has_thumb"] = has_thumb
+                fdata["thumb_url"] = f"/api/thumbnail?file_id={fid}&auth={media_auth_token}" if has_thumb else None
+                fdata["stream_url"] = f"/api/download?file_id={fid}&auth={media_auth_token}" if ftype == "photo" else None
+                fdata["download_url"] = f"/api/download?file_id={fid}&auth={media_auth_token}"
+                fld = fdata.get("folders")
+                if isinstance(fld, dict):
+                    fdata["folder_name"] = fld.get("name")
+                elif isinstance(fld, str):
+                    fdata["folder_name"] = fld
+                elif not fdata.get("folder_name"):
+                    fdata["folder_name"] = None
+
+            self.write(json.dumps({
+                "ok": True,
+                "result": res_dict,
+            }))
+        except Exception as e:
+            log.exception("Error executing search for user %s: %s", user_id, e)
+            self.set_status(500)
+            self.write(json.dumps({
+                "ok": False,
+                "error": {"code": "SERVER_ERROR", "message": "Terjadi kesalahan saat mencari berkas."},
+            }))
+
+
+class ApiFileIntelligenceHandler(BaseApiHandler):
+    """Retrieve full structured intelligence metadata for a specific file."""
+
+    async def get(self, file_id_param: Optional[str] = None):
+        user_id = require_authenticated_user(self)
+        if not user_id:
+            return
+
+        fid_str = file_id_param or self.get_argument("file_id", None)
+        if not fid_str or not fid_str.isdigit():
+            self.set_status(400)
+            self.write(json.dumps({
+                "ok": False,
+                "error": {"code": "BAD_REQUEST", "message": "Parameter file_id tidak valid."},
+            }))
+            return
+
+        file_id = int(fid_str)
+        f = db.get_file(file_id, user_id=user_id)
+        if not f:
+            self.set_status(404)
+            self.write(json.dumps({
+                "ok": False,
+                "error": {"code": "NOT_FOUND", "message": "Berkas tidak ditemukan."},
+            }))
+            return
+
+        try:
+            import darfin_intelligence
+
+            # 1. Base Intelligence (Task 1)
+            intel = darfin_intelligence.analyze(
+                filename=f.get("file_name", ""),
+                mime_type=f.get("mime_type"),
+                file_type=f.get("file_type"),
+                file_id=f.get("id"),
+            )
+
+            # 2. Domain Classification (Task 2A)
+            classification = darfin_intelligence.classify(intel)
+
+            # 3. Smart Folder Mapping (Task 2B)
+            folders = db.get_all_folders(user_id)
+            suggestion = darfin_intelligence.organizer.map_folder(classification, folders)
+
+            # 4. OCR / Screenshot / Document analysis (Tasks 3A, 3B, 3C)
+            meta = f.get("metadata") if isinstance(f.get("metadata"), dict) else {}
+            ocr_text = f.get("ocr_text") or meta.get("ocr_text") or ""
+            ocr_conf = float(f.get("ocr_confidence") or meta.get("ocr_confidence") or 0.0)
+
+            screenshot_info = None
+            doc_info = None
+            if ocr_text:
+                ss_res = darfin_intelligence.analyze_screenshot(ocr_text)
+                screenshot_info = ss_res.to_dict()
+                doc_res = darfin_intelligence.analyze_document(ocr_text, screenshot_result=ss_res)
+                doc_info = doc_res.to_dict() if hasattr(doc_res, "to_dict") else doc_res.as_dict()
+
+            conf_val = classification.confidence
+            if classification.status == "ambiguous":
+                conf_label = "Perlu ditinjau"
+            elif conf_val >= 0.75:
+                conf_label = "Tinggi"
+            elif conf_val >= 0.50:
+                conf_label = "Sedang"
+            else:
+                conf_label = "Rendah"
+
+            sug_payload = None
+            if suggestion and suggestion.target_folder_id is not None:
+                s_conf = suggestion.confidence
+                if suggestion.status == "ambiguous":
+                    s_label = "Perlu ditinjau"
+                elif s_conf >= 0.75:
+                    s_label = "Tinggi"
+                elif s_conf >= 0.50:
+                    s_label = "Sedang"
+                else:
+                    s_label = "Rendah"
+
+                sug_payload = {
+                    "status": suggestion.status,
+                    "folder_id": suggestion.target_folder_id,
+                    "folder_name": suggestion.target_folder_name,
+                    "folder_path": suggestion.target_folder_path,
+                    "confidence": round(suggestion.confidence, 2),
+                    "confidence_label": s_label,
+                    "reason": " • ".join(suggestion.reasons) if suggestion.reasons else "",
+                    "target": {
+                        "id": suggestion.target_folder_id,
+                        "name": suggestion.target_folder_name,
+                        "path": suggestion.target_folder_path,
+                    },
+                }
+            elif suggestion:
+                sug_payload = suggestion.to_dict()
+
+            payload = {
+                "file_id": f["id"],
+                "file_name": f.get("file_name", ""),
+                "file_size": f.get("file_size", 0),
+                "file_size_formatted": format_size(f.get("file_size", 0)),
+                "file_type": f.get("file_type", "document"),
+                "created_at": f.get("created_at", ""),
+                "classification": {
+                    "family": intel.file_type.family if intel.file_type else f.get("file_type", "other"),
+                    "domain": classification.domain,
+                    "category": classification.category,
+                    "confidence": round(classification.confidence, 2),
+                    "confidence_label": conf_label,
+                    "status": classification.status,
+                    "explain": classification.explain() if callable(classification.explain) else str(classification.explain),
+                },
+                "suggestion": sug_payload,
+                "ocr": {
+                    "available": bool(ocr_text),
+                    "confidence": round(ocr_conf, 2),
+                    "text_preview": (
+                        _mask_sensitive_text(
+                            ocr_text[:300] + ("..." if len(ocr_text) > 300 else "")
+                        )
+                    ) if ocr_text else None,
+                },
+                "screenshot": screenshot_info,
+                "document": doc_info,
+            }
+
+            self.write(json.dumps({
+                "ok": True,
+                "intelligence": payload,
+            }))
+        except Exception as e:
+            log.exception("Error analyzing file intelligence for file %s: %s", file_id, e)
+            self.set_status(500)
+            self.write(json.dumps({
+                "ok": False,
+                "error": {"code": "SERVER_ERROR", "message": "Gagal menganalisis informasi intelligence."},
+            }))
+
+
+# ── Task 6A Telegram OIDC Standalone Browser Authentication Handlers ──
+
+class OidcStartHandler(tornado.web.RequestHandler):
+    """Initiate Telegram OpenID Connect login with PKCE and state protection."""
+
+    def set_default_headers(self):
+        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_header("Referrer-Policy", "strict-origin-when-cross-origin")
+
+    async def get(self):
+        client_ip = self.request.headers.get("X-Forwarded-For", self.request.remote_ip or "127.0.0.1").split(",")[0].strip()
+        if not check_rate_limit(f"oidc_start:{client_ip}", max_requests=20, window_seconds=60):
+            self.set_status(429)
+            self.write("Terlalu banyak permintaan login. Silakan tunggu beberapa saat.")
+            return
+
+        if not config.TELEGRAM_OIDC_CLIENT_ID or not config.TELEGRAM_OIDC_CLIENT_SECRET or not config.TELEGRAM_OIDC_REDIRECT_URI:
+            log.error("Telegram OIDC credentials not configured in environment")
+            self.set_status(503)
+            self.set_header("Content-Type", "text/html; charset=utf-8")
+            self.write("<h3>Login Telegram melalui browser belum dikonfigurasi pada server.</h3>")
+            return
+
+        next_path = oidc.sanitize_redirect_path(self.get_argument("next", "/"))
+        verifier = oidc.generate_code_verifier()
+        challenge = oidc.generate_code_challenge(verifier)
+        state = oidc.generate_state()
+        nonce = oidc.generate_nonce()
+
+        cookie_val = oidc.create_state_cookie_value(state, verifier, nonce, next_path=next_path, max_age=600)
+        is_secure = (self.request.protocol == "https") or ("onrender.com" in self.request.host)
+        self.set_cookie(
+            "tg_oidc_state",
+            cookie_val,
+            httponly=True,
+            secure=is_secure,
+            samesite="Lax",
+            path="/auth/telegram",
+            max_age=600,
+        )
+
+        auth_url = oidc.build_authorization_url(state=state, code_challenge=challenge, nonce=nonce)
+        log.info("Redirecting browser to Telegram OIDC login (IP: %s)", client_ip)
+        self.redirect(auth_url)
+
+
+class OidcCallbackHandler(tornado.web.RequestHandler):
+    """Handle Telegram OpenID Connect authorization callback, validate tokens, and establish session."""
+
+    def set_default_headers(self):
+        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_header("Referrer-Policy", "strict-origin-when-cross-origin")
+
+    async def get(self):
+        client_ip = self.request.headers.get("X-Forwarded-For", self.request.remote_ip or "127.0.0.1").split(",")[0].strip()
+        if not check_rate_limit(f"oidc_callback:{client_ip}", max_requests=20, window_seconds=60):
+            self.set_status(429)
+            self.write("Terlalu banyak permintaan. Silakan coba lagi nanti.")
+            return
+
+        # Handle user cancellation / denied authorization
+        error = self.get_argument("error", None)
+        if error:
+            log.warning("Telegram OIDC returned error: %s (%s)", error, self.get_argument("error_description", ""))
+            self.clear_cookie("tg_oidc_state", path="/auth/telegram")
+            self.redirect("/?auth_error=cancelled")
+            return
+
+        code = self.get_argument("code", None)
+        state = self.get_argument("state", None)
+        if not code or not state:
+            log.warning("Telegram OIDC callback missing code or state parameter")
+            self.clear_cookie("tg_oidc_state", path="/auth/telegram")
+            self.redirect("/?auth_error=missing_params")
+            return
+
+        # Validate state cookie to prevent CSRF and replay attacks
+        cookie_val = self.get_cookie("tg_oidc_state")
+        state_data = oidc.verify_state_cookie_value(cookie_val, expected_state=state)
+        # Clear single-use state cookie immediately
+        self.clear_cookie("tg_oidc_state", path="/auth/telegram")
+
+        if not state_data:
+            log.warning("Telegram OIDC state verification failed (invalid, expired, or mismatched)")
+            self.redirect("/?auth_error=invalid_state")
+            return
+
+        verifier = state_data["verifier"]
+        nonce = state_data["nonce"]
+        next_path = state_data["next_path"]
+
+        # Exchange authorization code for tokens
+        try:
+            tokens = oidc.exchange_code_for_tokens(code=code, code_verifier=verifier)
+        except Exception as e:
+            log.error("Telegram OIDC token exchange failed: %s", e)
+            self.redirect("/?auth_error=token_exchange_failed")
+            return
+
+        # Validate ID token signature and claims
+        try:
+            claims = oidc.validate_id_token(tokens["id_token"], expected_nonce=nonce)
+            user_id = oidc.resolve_telegram_user_id(claims)
+        except Exception as e:
+            log.error("Telegram OIDC ID token validation failed: %s", e)
+            self.redirect("/?auth_error=token_validation_failed")
+            return
+
+        # Provision / update Telegram user in database (same account model as bot/TMA)
+        try:
+            username = claims.get("preferred_username")
+            name = claims.get("name")
+            db.upsert_user(user_id=user_id, username=username, full_name=name)
+            db.get_or_create_inbox_folder(user_id)
+        except Exception as e:
+            log.error("Error syncing user record for Telegram user %s: %s", user_id, e)
+
+        # Issue DARFIN session token and CSRF token
+        session_token = auth.create_session_token(user_id=user_id, duration_seconds=86400)
+        csrf_token = secrets.token_hex(16)
+        is_secure = (self.request.protocol == "https") or ("onrender.com" in self.request.host)
+
+        self.set_cookie(
+            "tma_session",
+            session_token,
+            httponly=True,
+            secure=is_secure,
+            samesite="Lax",
+            path="/",
+            max_age=86400,
+        )
+        self.set_cookie(
+            "tma_csrf",
+            csrf_token,
+            httponly=False,
+            secure=is_secure,
+            samesite="Lax",
+            path="/",
+            max_age=86400,
+        )
+        log.info("Telegram OIDC login successful for user %s. Redirecting to %s", user_id, next_path)
+        self.redirect(next_path)
+
+
+class OidcLogoutHandler(tornado.web.RequestHandler):
+    """Log out authenticated browser session and clear cookies."""
+
+    def set_default_headers(self):
+        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_header("Referrer-Policy", "strict-origin-when-cross-origin")
+
+    async def get(self):
+        self._perform_logout()
+
+    async def post(self):
+        self._perform_logout()
+
+    def _perform_logout(self):
+        self.clear_cookie("tma_session", path="/")
+        self.clear_cookie("tma_csrf", path="/")
+        if "application/json" in self.request.headers.get("Accept", ""):
+            self.set_header("Content-Type", "application/json; charset=utf-8")
+            self.write(json.dumps({"ok": True, "message": "Berhasil keluar."}))
+        else:
+            self.redirect("/?logged_out=1")
+
+
+class ApiAuthMeHandler(BaseApiHandler):
+    """Retrieve profile and authentication status of current user."""
+
+    async def get(self):
+        user = auth.get_authenticated_user(self)
+        if not user or not user.get("user_id"):
+            self.write(json.dumps({
+                "ok": True,
+                "authenticated": False,
+                "user": None,
+            }))
+            return
+
+        user_id = user["user_id"]
+        u = db.get_user(user_id)
+        self.write(json.dumps({
+            "ok": True,
+            "authenticated": True,
+            "user": {
+                "id": user_id,
+                "user_id": user_id,
+                "username": u.get("username") if u else user.get("username"),
+                "first_name": u.get("full_name") if u else user.get("first_name", "User"),
+                "auth_type": user.get("auth_type", "session"),
+            },
+        }))
+
+
 def build_app_routes(webhook_path: str = "", shared_objects: dict | None = None) -> list:
     """Consolidated single source of truth for all routes."""
     routes = []
@@ -1589,8 +2230,15 @@ def build_app_routes(webhook_path: str = "", shared_objects: dict | None = None)
     routes.extend([
         (r"/", WebAppPageHandler),
         (r"/webapp/?", WebAppPageHandler),
+        (r"/auth/telegram/start/?", OidcStartHandler),
+        (r"/auth/telegram/callback/?", OidcCallbackHandler),
+        (r"/auth/logout/?", OidcLogoutHandler),
+        (r"/api/auth/me/?", ApiAuthMeHandler),
         (r"/api/auth/session/?", ApiAuthSessionHandler),
         (r"/api/drive/?", ApiDriveHandler),
+        (r"/api/search/?", ApiSearchHandler),
+        (r"/api/file_intelligence/?", ApiFileIntelligenceHandler),
+        (r"/api/files/([0-9]+)/intelligence/?", ApiFileIntelligenceHandler),
         (r"/api/thumbnail/?", ApiThumbnailHandler),
         (r"/api/download/?", ApiDownloadHandler),
         (r"/api/star/?", ApiStarHandler),
@@ -1616,6 +2264,9 @@ def build_app_routes(webhook_path: str = "", shared_objects: dict | None = None)
         (r"/api/empty_trash/?", ApiEmptyTrashHandler),
         (r"/api/duplicates/?", ApiDuplicatesHandler),
         (r"/api/clean_duplicates/?", ApiCleanDuplicatesHandler),
+        (r"/api/organizer/preview/?", ApiOrganizerPreviewHandler),
+        (r"/api/organizer/execute/?", ApiOrganizerExecuteHandler),
+        (r"/api/preferences/feedback/?", ApiPreferencesFeedbackHandler),
         (r"/api/ping/?", ApiPingHandler),
         (r"/health/?", ApiPingHandler),
     ])

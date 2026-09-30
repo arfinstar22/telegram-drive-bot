@@ -1118,3 +1118,99 @@ def transfer_user_data(old_user_id: int, new_user_id: int) -> dict:
 
     get_or_create_inbox_folder(new_user_id)
     return get_storage_info(new_user_id)
+
+
+# ── User Classification Preferences (Task 2D) ───────────────
+_USER_PREFERENCES: dict[int, list[dict]] = {}
+
+
+def get_user_preferences(user_id: int) -> list[dict]:
+    """Retrieve personal classification preferences for authenticated user."""
+    try:
+        res = db.table("user_classification_preferences").select("*").eq("user_id", user_id).execute()
+        if res.data:
+            return res.data
+    except Exception as exc:
+        log.debug("Falling back to local preference store for user %s: %s", user_id, exc)
+    return list(_USER_PREFERENCES.get(user_id, []))
+
+
+def record_user_preference(
+    user_id: int,
+    pattern: str,
+    target_folder_id: int,
+    action: str = "accepted",
+    domain: str | None = None,
+    category: str | None = None,
+) -> dict | None:
+    """Record or update user preference feedback with positive/negative counts."""
+    dest = get_folder(target_folder_id, user_id=user_id)
+    if not dest or dest.get("user_id") != user_id:
+        log.warning("Unauthorized folder %s for user preference %s", target_folder_id, user_id)
+        return None
+
+    pattern_clean = pattern.strip().lower()
+    if not pattern_clean:
+        return None
+
+    prefs = _USER_PREFERENCES.setdefault(user_id, [])
+    existing = None
+    for p in prefs:
+        if p["pattern"] == pattern_clean and p["target_folder_id"] == target_folder_id:
+            existing = p
+            break
+
+    now = _now()
+    if not existing:
+        pos = 1 if action in ("accepted", "corrected") else 0
+        neg = 1 if action == "rejected" else 0
+        conf = 0.5 if pos > 0 else 0.0
+        record = {
+            "id": len(prefs) + 1,
+            "user_id": user_id,
+            "pattern": pattern_clean,
+            "target_folder_id": target_folder_id,
+            "domain": domain,
+            "category": category,
+            "positive_count": pos,
+            "negative_count": neg,
+            "confidence": conf,
+            "created_at": now,
+            "updated_at": now,
+        }
+        prefs.append(record)
+    else:
+        if action in ("accepted", "corrected"):
+            existing["positive_count"] += 1
+        elif action == "rejected":
+            existing["negative_count"] += 1
+
+        total = existing["positive_count"] + existing["negative_count"]
+        ratio = existing["positive_count"] / max(1, total)
+        if existing["positive_count"] >= 5 and ratio >= 0.85:
+            existing["confidence"] = 0.90
+        elif existing["positive_count"] >= 3 and ratio >= 0.75:
+            existing["confidence"] = 0.75
+        elif existing["positive_count"] >= 1:
+            existing["confidence"] = min(0.60, round(ratio * 0.7, 2))
+        else:
+            existing["confidence"] = 0.0
+
+        existing["updated_at"] = now
+        record = existing
+
+    try:
+        db.table("user_classification_preferences").upsert(record).execute()
+    except Exception as exc:
+        log.debug("Remote preference upsert bypassed: %s", exc)
+
+    return dict(record)
+
+
+def clear_user_preferences(user_id: int | None = None) -> None:
+    """Clear in-memory user preferences (useful for test resets)."""
+    if user_id is None:
+        _USER_PREFERENCES.clear()
+    else:
+        _USER_PREFERENCES.pop(user_id, None)
+

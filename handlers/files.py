@@ -280,6 +280,25 @@ async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not saved:
         return
 
+    # Task 1 Read-only Intelligence Analysis hook (non-blocking)
+    try:
+        from darfin_intelligence import analyze as run_intelligence
+        intel_res = run_intelligence(
+            filename=info.get("file_name", ""),
+            mime_type=info.get("mime_type"),
+            file_type=info.get("file_type"),
+            file_id=saved.get("id"),
+        )
+        log.info(
+            "Intelligence bot analyzed file_id=%s parser=%s status=%s family=%s",
+            saved.get("id"),
+            intel_res.parser_name,
+            intel_res.status,
+            intel_res.file_type.family if intel_res.file_type else None,
+        )
+    except Exception as intel_err:
+        log.warning("Intelligence bot analysis failed (non-blocking) for %s: %s", info.get("file_name"), intel_err)
+
     batch["files"].append({
         "id": saved["id"],
         "name": info["file_name"],

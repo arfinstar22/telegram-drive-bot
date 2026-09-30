@@ -251,11 +251,38 @@ def get_authenticated_user(handler: tornado.web.RequestHandler) -> Optional[dict
     return user
 
 
+def validate_csrf_token(handler: tornado.web.RequestHandler) -> bool:
+    """Validate CSRF token for state-changing browser cookie requests.
+
+    Mini App requests (authenticated via Authorization header or X-Telegram-Init-Data)
+    are not vulnerable to cross-site request forgery and do not require a CSRF token.
+    """
+    user = get_authenticated_user(handler)
+    if not user:
+        return True  # Let require_authenticated_user handle 401
+
+    # Only cookie-based sessions require CSRF verification
+    if user.get("auth_type") != "cookie":
+        return True
+
+    if handler.request.method in ("GET", "HEAD", "OPTIONS"):
+        return True
+
+    csrf_header = handler.request.headers.get("X-CSRF-Token", "").strip()
+    csrf_cookie = handler.get_cookie("tma_csrf", "").strip()
+
+    if not csrf_header or not csrf_cookie:
+        return False
+
+    return hmac.compare_digest(csrf_header, csrf_cookie)
+
+
 def require_authenticated_user(handler: tornado.web.RequestHandler) -> Optional[int]:
-    """Enforce authentication on private endpoints.
+    """Enforce authentication and CSRF protection on private endpoints.
 
     If authenticated, returns integer user_id.
     If unauthenticated, sends 401 Unauthorized JSON error and finishes request.
+    If cookie-authenticated but CSRF check fails, sends 403 Forbidden.
     """
     user = get_authenticated_user(handler)
     if not user or not user.get("user_id"):
@@ -271,4 +298,22 @@ def require_authenticated_user(handler: tornado.web.RequestHandler) -> Optional[
             })
         )
         return None
+
+    # Enforce CSRF protection for cookie-based state-changing requests
+    if not validate_csrf_token(handler):
+        log.warning("CSRF token validation failed for user %s on %s", user.get("user_id"), handler.request.path)
+        handler.set_status(403)
+        handler.set_header("Content-Type", "application/json; charset=utf-8")
+        handler.finish(
+            json.dumps({
+                "ok": False,
+                "error": {
+                    "code": "CSRF_ERROR",
+                    "message": "Validasi CSRF gagal. Muat ulang halaman.",
+                },
+            })
+        )
+        return None
+
     return user["user_id"]
+

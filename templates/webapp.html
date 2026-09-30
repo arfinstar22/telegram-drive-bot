@@ -123,18 +123,154 @@
       box-shadow: 0 0 8px var(--emerald);
     }
 
+    .header-user-section {
+      position: relative;
+    }
+
     .user-pill {
       background: var(--surface);
       border: 1px solid var(--border);
       backdrop-filter: blur(12px);
-      padding: 6px 12px;
+      -webkit-backdrop-filter: blur(12px);
+      padding: 5px 12px;
       border-radius: 20px;
-      font-size: 0.75rem;
+      font-size: 0.78rem;
       font-weight: 600;
-      color: var(--text-muted);
+      color: var(--text);
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .user-pill:hover {
+      background: var(--surface-hover);
+      border-color: rgba(56, 189, 248, 0.35);
+    }
+
+    .user-avatar-badge {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0284C7, #38BDF8);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .user-profile-dropdown {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: calc(100% + 8px);
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 14px;
+      width: 240px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      z-index: 100;
+      transform-origin: top right;
+      animation: dropdownFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .user-profile-dropdown.open {
+      display: block;
+    }
+
+    @keyframes dropdownFadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .user-profile-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .user-avatar-large {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0284C7, #6366F1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .user-full-name {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #fff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .user-handle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .user-status-tag {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 3px;
+    }
+
+    .status-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--emerald);
+      display: inline-block;
+      box-shadow: 0 0 6px var(--emerald);
+    }
+
+    .dropdown-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.08);
+      margin: 8px 0 10px;
+    }
+
+    .dropdown-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: rgba(244, 63, 94, 0.1);
+      border: 1px solid rgba(244, 63, 94, 0.25);
+      border-radius: 8px;
+      color: #fda4af;
+      cursor: pointer;
+      padding: 9px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .dropdown-item:hover {
+      background: rgba(244, 63, 94, 0.2);
+      border-color: rgba(244, 63, 94, 0.4);
+      color: #fff;
     }
 
     .storage-bar-card {
@@ -438,10 +574,10 @@
       margin-top: 10px;
     }
 
-    /* Search & Filter */
+    /* Search & Filter - Enhanced for Task 5 */
     .search-box {
       position: relative;
-      margin-bottom: 14px;
+      margin-bottom: 8px;
     }
 
     .search-input {
@@ -449,7 +585,7 @@
       background: var(--surface);
       border: 1px solid var(--border);
       backdrop-filter: blur(12px);
-      padding: 12px 14px 12px 42px;
+      padding: 12px 78px 12px 42px;
       border-radius: 12px;
       font-family: inherit;
       font-size: 0.9rem;
@@ -474,6 +610,466 @@
       transform: translateY(-50%);
       color: #64748B;
       pointer-events: none;
+    }
+
+    .search-clear-btn {
+      position: absolute;
+      right: 44px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      transition: background 0.15s, color 0.15s;
+    }
+    .search-clear-btn:hover {
+      background: rgba(255, 255, 255, 0.16);
+      color: #fff;
+    }
+
+    .search-filter-btn {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 9px;
+      width: 32px;
+      height: 32px;
+      color: var(--accent);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, transform 0.15s;
+    }
+    .search-filter-btn:active {
+      transform: translateY(-50%) scale(0.95);
+    }
+    .filter-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: var(--rose);
+      color: #fff;
+      font-size: 0.6rem;
+      font-weight: 800;
+      border-radius: 10px;
+      padding: 1px 5px;
+      line-height: 1;
+    }
+
+    /* Quick search pills */
+    .search-quick-pills {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+      scrollbar-width: none;
+    }
+    .search-quick-pills::-webkit-scrollbar {
+      display: none;
+    }
+    .quick-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .quick-pill:hover, .quick-pill:active {
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent);
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+
+    /* Search State Banner */
+    .search-state-header {
+      background: var(--surface);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      backdrop-filter: blur(12px);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      margin-bottom: 14px;
+    }
+    .search-state-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .search-state-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+    }
+    .search-state-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #fff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .search-state-close-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
+    }
+    .search-state-close-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.15);
+    }
+    .search-state-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .search-state-count {
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+    .search-scope-badge {
+      background: rgba(168, 85, 247, 0.15);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      color: #c084fc;
+      border-radius: 6px;
+      padding: 1px 6px;
+      font-size: 0.68rem;
+    }
+    .search-active-chips {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    .search-chip-tag {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: #cbd5e1;
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-size: 0.68rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .search-chip-tag button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.65rem;
+      padding: 0;
+      line-height: 1;
+    }
+
+    /* Intelligence Badges */
+    .intel-badges-wrap {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .intel-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      line-height: 1.2;
+    }
+    .badge-domain {
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+    .badge-ocr {
+      background: rgba(56, 189, 248, 0.15);
+      color: #7dd3fc;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .badge-receipt {
+      background: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .badge-doc {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fcd34d;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .badge-screenshot {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fda4af;
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    /* Confidence labels */
+    .conf-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .conf-high {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .conf-med {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .conf-review {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .conf-low {
+      background: rgba(148, 163, 184, 0.15);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+
+    /* Search Match Reasons */
+    .search-match-reason {
+      font-size: 0.68rem;
+      color: #94a3b8;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 6px;
+      padding: 3px 6px;
+      margin-top: 5px;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .search-folder-link {
+      font-size: 0.7rem;
+      color: var(--accent);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      margin-top: 4px;
+      text-decoration: none;
+    }
+    .search-folder-link:hover {
+      text-decoration: underline;
+    }
+
+    /* Pagination */
+    .search-pagination-wrap {
+      display: flex;
+      justify-content: center;
+      margin: 18px 0 8px;
+    }
+    .btn-load-more {
+      background: var(--surface);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent);
+      padding: 9px 20px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s, transform 0.15s;
+    }
+    .btn-load-more:active {
+      transform: scale(0.97);
+    }
+
+    /* Modal Intelligence Details Section */
+    .modal-intel-section {
+      margin-top: 14px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .intel-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .intel-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .intel-card-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .intel-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      font-size: 0.74rem;
+    }
+    .intel-item-label {
+      color: var(--text-muted);
+      font-size: 0.68rem;
+      margin-bottom: 1px;
+    }
+    .intel-item-val {
+      color: #fff;
+      font-weight: 600;
+      word-break: break-word;
+    }
+    .intel-explain-text {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+      padding: 6px 8px;
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+    .intel-ocr-box {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: #cbd5e1;
+      max-height: 100px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      user-select: text;
+    }
+
+    /* Filter Drawer / Form styles */
+    .filter-group {
+      margin-bottom: 14px;
+    }
+    .filter-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: block;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .filter-options-grid {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .filter-opt-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .filter-opt-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: rgba(56, 189, 248, 0.4);
+      color: var(--accent);
+    }
+    .filter-select {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: #fff;
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      font-family: inherit;
+      outline: none;
+    }
+    .filter-select:focus {
+      border-color: var(--accent);
+    }
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .toggle-switch .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--border);
+      transition: .2s;
+      border-radius: 24px;
+    }
+    .toggle-switch .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #94a3b8;
+      transition: .2s;
+      border-radius: 50%;
+    }
+    .toggle-switch input:checked + .slider {
+      background-color: rgba(56, 189, 248, 0.25);
+      border-color: var(--accent);
+    }
+    .toggle-switch input:checked + .slider:before {
+      transform: translateX(20px);
+      background-color: var(--accent);
     }
 
     .filter-chips {
@@ -1335,6 +1931,134 @@
       }
     }
 
+    /* ── Responsive Layout & Breakpoints (Task 6B) ── */
+
+    /* Small Mobile (320px - 375px) */
+    @media (max-width: 375px) {
+      .container {
+        padding: 10px;
+      }
+      .brand-title {
+        font-size: 1.02rem;
+      }
+      .quick-pill {
+        font-size: 0.72rem;
+        padding: 4px 8px;
+      }
+      .folders-grid {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 8px;
+      }
+      .files-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 8px;
+      }
+      .modal-sheet {
+        padding: 16px 14px calc(20px + var(--safe-bottom));
+      }
+    }
+
+    /* Tablet (641px - 1024px) */
+    @media (min-width: 641px) and (max-width: 1024px) {
+      .container {
+        max-width: 860px;
+        padding: 24px 20px;
+      }
+      .folders-grid {
+        grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+        gap: 12px;
+      }
+      .files-grid {
+        grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+        gap: 14px;
+      }
+      .modal-overlay {
+        align-items: center;
+        padding: 24px;
+      }
+      .modal-sheet {
+        border-radius: 20px;
+        max-width: 600px;
+        transform: scale(0.96);
+        max-height: 80vh;
+      }
+      .modal-overlay.active .modal-sheet {
+        transform: scale(1);
+      }
+      .sheet-handle {
+        display: none;
+      }
+    }
+
+    /* Desktop (1025px - 1439px) */
+    @media (min-width: 1025px) {
+      .container {
+        max-width: 1200px;
+        padding: 32px 24px;
+      }
+      .folders-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 14px;
+      }
+      .files-grid {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 16px;
+      }
+      .modal-overlay {
+        align-items: center;
+        padding: 32px;
+      }
+      .modal-sheet {
+        border-radius: 20px;
+        max-width: 680px;
+        transform: scale(0.96);
+        max-height: 82vh;
+      }
+      .modal-overlay.active .modal-sheet {
+        transform: scale(1);
+      }
+      .sheet-handle {
+        display: none;
+      }
+      .storage-bar-card {
+        padding: 16px 20px;
+      }
+    }
+
+    /* Large Desktop / Ultrawide (>= 1440px) */
+    @media (min-width: 1440px) {
+      .container {
+        max-width: 1380px;
+        padding: 40px 32px;
+      }
+      .folders-grid {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 16px;
+      }
+      .files-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 18px;
+      }
+    }
+
+    /* Accessibility Focus Rings */
+    button:focus-visible,
+    input:focus-visible,
+    a:focus-visible,
+    [tabindex="0"]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Minimum touch target for interactive controls */
+    .btn, .btn-primary, .btn-secondary, .btn-danger,
+    .btn-new-folder, .search-filter-btn, .search-clear-btn,
+    .chip, .crumb-item, .sort-btn, .view-toggle button {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+    }
+
     /* Move Folder Picker Modal */
     .folder-picker-list {
       display: flex;
@@ -1964,7 +2688,7 @@
   <!-- Unauthorized Screen (Non-blocking) -->
   <div id="unauthorizedOverlay" style="display:none !important;"></div>
 
-  <!-- Direct Browser Access Notice (shown only when opened outside Telegram without valid Telegram context) -->
+  <!-- Standalone Browser Login Card (Task 6A) -->
   <div id="browserNoticeCard" style="display: none; min-height: 80vh; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; position: relative; z-index: 10;">
     <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 36px 28px; max-width: 400px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.5); backdrop-filter: blur(12px);">
       <div style="width: 64px; height: 64px; margin: 0 auto 20px; background: linear-gradient(135deg, #0284c7, #38bdf8); border-radius: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(56, 189, 248, 0.3);">
@@ -1972,14 +2696,22 @@
           <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
         </svg>
       </div>
-      <h2 style="font-size: 1.35rem; font-weight: 700; color: #F8FAFC; margin-bottom: 8px; letter-spacing: -0.02em;">DARFIN STORAGE</h2>
-      <p style="font-size: 0.95rem; color: #94A3B8; line-height: 1.5; margin-bottom: 24px;">Aplikasi ini harus dibuka melalui Telegram.</p>
-      <a href="https://t.me/darfinstoragebot" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px 20px; background: linear-gradient(135deg, #0284c7, #0ea5e9); color: #fff; font-weight: 600; font-size: 0.95rem; border-radius: 12px; text-decoration: none; transition: transform 0.15s, box-shadow 0.15s; box-shadow: 0 4px 16px rgba(14, 165, 233, 0.35);">
+      <h2 style="font-size: 1.35rem; font-weight: 700; color: #F8FAFC; margin-bottom: 6px; letter-spacing: -0.02em;">DARFIN</h2>
+      <p style="font-size: 0.88rem; color: #94A3B8; line-height: 1.5; margin-bottom: 20px;">Personal Cloud Storage</p>
+
+      <div id="authErrorAlert" style="display: none; background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 10px; padding: 10px 14px; font-size: 0.82rem; color: #fb7185; margin-bottom: 18px; text-align: left;">
+        <span id="authErrorMsg">Login dibatalkan atau gagal.</span>
+      </div>
+
+      <a id="tgOidcLoginBtn" href="/auth/telegram/start" style="display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 13px 20px; background: linear-gradient(135deg, #0284c7, #0ea5e9); color: #fff; font-weight: 600; font-size: 0.95rem; border-radius: 12px; text-decoration: none; transition: transform 0.15s, box-shadow 0.15s; box-shadow: 0 4px 16px rgba(14, 165, 233, 0.35);">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z"/>
         </svg>
-        Buka di Telegram
+        Continue with Telegram
       </a>
+      <div style="margin-top: 14px;">
+        <a href="https://t.me/darfinstoragebot" style="font-size: 0.78rem; color: #64748B; text-decoration: none;">Atau buka langsung di aplikasi Telegram &rarr;</a>
+      </div>
     </div>
   </div>
 
@@ -1999,8 +2731,35 @@
           <div class="brand-sub">Cloud Unlimited • Terhubung</div>
         </div>
       </div>
-      <div class="user-pill" id="userPill">
-        <span id="userName">User</span>
+      <div class="header-user-section">
+        <div class="user-pill" id="userPill" onclick="toggleUserProfileMenu(event)" onkeydown="if(event.key==='Enter'||event.key===' ')toggleUserProfileMenu(event)" role="button" aria-haspopup="true" aria-expanded="false" tabindex="0" title="Profil Pengguna">
+          <span class="user-avatar-badge" id="userAvatarBadge">U</span>
+          <span id="userName">User</span>
+          <svg class="chevron-down-icon" id="userPillChevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transition: transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <!-- User Profile Dropdown Menu -->
+        <div class="user-profile-dropdown" id="userProfileDropdown" role="menu" aria-label="Menu Pengguna">
+          <div class="user-profile-header">
+            <div class="user-avatar-large" id="userAvatarLarge">U</div>
+            <div style="min-width: 0; flex: 1;">
+              <div class="user-full-name" id="userDropdownName">User</div>
+              <div class="user-handle" id="userDropdownHandle">@telegram</div>
+              <div class="user-status-tag">
+                <span class="status-dot"></span>
+                <span style="font-size: 0.68rem; color: #34d399; font-weight: 600;">Telegram Verified</span>
+              </div>
+            </div>
+          </div>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item dropdown-logout-btn" id="logoutBtn" onclick="handleLogout()" role="menuitem">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            Keluar dari Akun
+          </button>
+        </div>
       </div>
     </header>
 
@@ -2013,6 +2772,10 @@
         </span>
         <div style="display: flex; align-items: center; gap: 8px;">
           <span class="storage-used" id="storageSummary">0 MB • 0 File</span>
+          <button class="btn-clean-dup" onclick="event.stopPropagation(); openSmartOrganizerModal();" title="Smart Organizer - Saran Penataan Berkas" style="background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.25); color: var(--accent);">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/></svg>
+            Organize
+          </button>
           <button class="btn-clean-dup" onclick="event.stopPropagation(); openDuplicatesModal();" title="Pindai & Bersihkan Berkas Duplikat">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             Duplikat
@@ -2030,13 +2793,44 @@
       </div>
     </div>
 
-    <!-- Search Input -->
+    <!-- Search Input & Filter Toolbar -->
     <div class="search-box">
       <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8"></circle>
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
       </svg>
-      <input type="text" class="search-input" id="searchInput" placeholder="Cari nama berkas, tag (#kantor), tahun..." autocomplete="off">
+      <input type="text" class="search-input" id="searchInput" placeholder="Cari nama berkas, tag, OCR, indomaret, ext:pdf..." autocomplete="off">
+      <button class="search-clear-btn" id="searchClearBtn" style="display: none;" onclick="clearSearch()" title="Hapus Pencarian" aria-label="Hapus Pencarian">✕</button>
+      <button class="search-filter-btn" id="searchFilterBtn" onclick="openSearchFilterModal()" title="Filter Pencarian" aria-label="Filter Pencarian">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        <span class="filter-badge" id="filterActiveBadge" style="display: none;">0</span>
+      </button>
+    </div>
+
+    <!-- Quick Search Suggestions / Query Pills -->
+    <div class="search-quick-pills" id="searchQuickPills">
+      <span class="quick-pill" onclick="applyQuickQuery('receipt indomaret')">🧾 Struk Indomaret</span>
+      <span class="quick-pill" onclick="applyQuickQuery('tugas semester 5')">🎓 Tugas Kuliah</span>
+      <span class="quick-pill" onclick="applyQuickQuery('ext:pdf')">📄 ext:pdf</span>
+      <span class="quick-pill" onclick="applyQuickQuery('1080p')">🎬 1080p</span>
+      <span class="quick-pill" onclick="applyQuickQuery('domain:finance')">💰 Finance</span>
+      <span class="quick-pill" onclick="applyQuickQuery('ocr:true')">📝 OCR</span>
+    </div>
+
+    <!-- Search State Header (Visible when in Search Mode) -->
+    <div id="searchStateHeader" class="search-state-header" style="display: none;">
+      <div class="search-state-top">
+        <div class="search-state-title-wrap">
+          <span style="font-size: 1rem;">🔎</span>
+          <span class="search-state-title" id="searchStateTitle">Pencarian Cerdas</span>
+        </div>
+        <button class="search-state-close-btn" onclick="clearSearch()" title="Tutup Pencarian">✕ Keluar</button>
+      </div>
+      <div class="search-state-meta">
+        <span id="searchResultCount" class="search-state-count">Memuat hasil...</span>
+        <span id="searchScopeBadge" class="search-scope-badge" style="display: none;"></span>
+      </div>
+      <div class="search-active-chips" id="searchActiveChips"></div>
     </div>
 
     <!-- Category Filter Chips -->
@@ -2136,6 +2930,12 @@
       <div class="file-card skeleton" style="height: 180px;"></div>
       <div class="file-card skeleton" style="height: 180px;"></div>
     </div>
+    <div id="searchPaginationWrap" class="search-pagination-wrap" style="display: none;">
+      <button class="btn-load-more" id="btnLoadMoreSearch" onclick="loadMoreSearchResults()">
+        <span>Muat Lebih Banyak</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+    </div>
   </div>
 
   <!-- Floating Audio Player Bar -->
@@ -2169,6 +2969,9 @@
       </div>
 
       <div id="modalTagsWrap" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;"></div>
+
+      <!-- Intelligence Details Section (Task 5) -->
+      <div id="modalIntelligenceWrap" class="modal-intel-section" style="display: none;"></div>
 
       <div class="sheet-actions">
         <button class="btn btn-send-chat" id="modalSendChatBtn" onclick="sendFileToChat()">
@@ -2513,6 +3316,122 @@
     </div>
   </div>
 
+  <!-- Smart Organizer Modal Sheet (Task 2C) -->
+  <div class="modal-overlay" id="smartOrganizerModal" onclick="closeSmartOrganizerModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <h3 class="sheet-title" style="margin-bottom: 0;">🧠 Smart Organizer</h3>
+        <span class="tag-pill" id="orgCountBadge" style="color: var(--accent); border-color: rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.1);">Memindai...</span>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 14px;" id="orgModalSub">
+        Saran penataan otomatis berkas ke folder berdasarkan analisis cerdas tanpa mengubah data sensitif.
+      </p>
+
+      <div id="orgListContainer" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+        <div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 0.8rem;">Memuat saran penataan...</div>
+      </div>
+
+      <div class="sheet-actions">
+        <button class="btn btn-secondary" onclick="closeSmartOrganizerModal()">Tutup</button>
+        <button class="btn btn-primary" id="btnExecuteOrgAll" onclick="executeSmartOrganizeBatch()" disabled>
+          Pindahkan Semua
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Filter Drawer / Bottom Sheet (Task 5) -->
+  <div class="modal-overlay" id="searchFilterModal" onclick="closeSearchFilterModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <h3 class="sheet-title" style="margin-bottom: 0;">🔍 Filter Pencarian Cerdas</h3>
+        <button class="btn-sel-text" onclick="resetSearchFilters()" style="color: var(--accent); font-size: 0.75rem;">Reset</button>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Tipe Berkas</label>
+        <div class="filter-options-grid" id="filterTypeOptions">
+          <button class="filter-opt-btn active" data-val="" onclick="setFilterOption('family', '', this)">Semua</button>
+          <button class="filter-opt-btn" data-val="photo" onclick="setFilterOption('family', 'photo', this)">🖼 Foto</button>
+          <button class="filter-opt-btn" data-val="document" onclick="setFilterOption('family', 'document', this)">📄 Dokumen</button>
+          <button class="filter-opt-btn" data-val="video" onclick="setFilterOption('family', 'video', this)">🎬 Video</button>
+          <button class="filter-opt-btn" data-val="audio" onclick="setFilterOption('family', 'audio', this)">🎵 Audio</button>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Domain Berkas</label>
+        <div class="filter-options-grid" id="filterDomainOptions">
+          <button class="filter-opt-btn active" data-val="" onclick="setFilterOption('domain', '', this)">Semua</button>
+          <button class="filter-opt-btn" data-val="education" onclick="setFilterOption('domain', 'education', this)">🎓 Kuliah / Sekolah</button>
+          <button class="filter-opt-btn" data-val="finance" onclick="setFilterOption('domain', 'finance', this)">💰 Keuangan / Struk</button>
+          <button class="filter-opt-btn" data-val="work" onclick="setFilterOption('domain', 'work', this)">💼 Pekerjaan</button>
+          <button class="filter-opt-btn" data-val="media" onclick="setFilterOption('domain', 'media', this)">🎬 Media / Film</button>
+          <button class="filter-opt-btn" data-val="system" onclick="setFilterOption('domain', 'system', this)">⚙️ Sistem / Arsip</button>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Jenis Dokumen / Bukti</label>
+        <div class="filter-options-grid" id="filterDocTypeOptions">
+          <button class="filter-opt-btn active" data-val="" onclick="setFilterOption('document_type', '', this)">Semua</button>
+          <button class="filter-opt-btn" data-val="receipt" onclick="setFilterOption('document_type', 'receipt', this)">🧾 Struk / Nota</button>
+          <button class="filter-opt-btn" data-val="invoice" onclick="setFilterOption('document_type', 'invoice', this)">📑 Faktur / Invoice</button>
+          <button class="filter-opt-btn" data-val="official_letter" onclick="setFilterOption('document_type', 'official_letter', this)">📜 Surat Resmi</button>
+          <button class="filter-opt-btn" data-val="form" onclick="setFilterOption('document_type', 'form', this)">📋 Formulir</button>
+          <button class="filter-opt-btn" data-val="report" onclick="setFilterOption('document_type', 'report', this)">📊 Laporan</button>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Ekstensi Berkas</label>
+        <div class="filter-options-grid" id="filterExtOptions">
+          <button class="filter-opt-btn active" data-val="" onclick="setFilterOption('ext', '', this)">Semua</button>
+          <button class="filter-opt-btn" data-val="pdf" onclick="setFilterOption('ext', 'pdf', this)">PDF</button>
+          <button class="filter-opt-btn" data-val="jpg" onclick="setFilterOption('ext', 'jpg', this)">JPG</button>
+          <button class="filter-opt-btn" data-val="png" onclick="setFilterOption('ext', 'png', this)">PNG</button>
+          <button class="filter-opt-btn" data-val="mp4" onclick="setFilterOption('ext', 'mp4', this)">MP4</button>
+          <button class="filter-opt-btn" data-val="zip" onclick="setFilterOption('ext', 'zip', this)">ZIP</button>
+          <button class="filter-opt-btn" data-val="xlsx" onclick="setFilterOption('ext', 'xlsx', this)">Excel</button>
+        </div>
+      </div>
+
+      <div class="filter-group" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0;">
+        <div>
+          <div style="font-size: 0.85rem; font-weight: 600; color: #fff;">Hanya berkas dengan teks (OCR)</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);">Tampilkan hanya berkas yang memiliki teks hasil deteksi OCR</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="filterOcrOnlyToggle" onchange="toggleFilterOcr(this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Urutan Hasil</label>
+        <select class="filter-select" id="filterSortSelect" onchange="setFilterSort(this.value)">
+          <option value="relevance">Paling Relevan</option>
+          <option value="newest">Terbaru Diunggah</option>
+          <option value="oldest">Terlama</option>
+          <option value="name_asc">Nama (A - Z)</option>
+          <option value="size_desc">Ukuran Terbesar</option>
+        </select>
+      </div>
+
+      <div class="sheet-actions" style="margin-top: 14px;">
+        <div class="sheet-action-row">
+          <button class="btn btn-secondary" onclick="closeSearchFilterModal()">Tutup</button>
+          <button class="btn btn-primary" onclick="applySearchFilters()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Terapkan Filter
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Server Cold-Start Wakeup Countdown Overlay -->
   <div class="wakeup-overlay" id="serverWakeupOverlay">
     <div class="wakeup-card" onclick="event.stopPropagation()">
@@ -2604,13 +3523,119 @@
       return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[s]);
     }
 
-    function showBrowserNotice() {
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
+      return match ? decodeURIComponent(match[3]) : null;
+    }
+
+    function toggleUserProfileMenu(event) {
+      if (event) event.stopPropagation();
+      const dropdown = document.getElementById('userProfileDropdown');
+      const pill = document.getElementById('userPill');
+      const chevron = document.getElementById('userPillChevron');
+      if (!dropdown) return;
+
+      const isOpen = dropdown.classList.toggle('open');
+      if (pill) pill.setAttribute('aria-expanded', String(isOpen));
+      if (chevron) chevron.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+      triggerHaptic();
+    }
+
+    function closeUserProfileMenu() {
+      const dropdown = document.getElementById('userProfileDropdown');
+      const pill = document.getElementById('userPill');
+      const chevron = document.getElementById('userPillChevron');
+      if (dropdown) dropdown.classList.remove('open');
+      if (pill) pill.setAttribute('aria-expanded', 'false');
+      if (chevron) chevron.style.transform = 'rotate(0deg)';
+    }
+
+    function updateUserUI(user) {
+      if (!user) return;
+      currentUser = user;
+      const displayName = user.first_name || user.full_name || user.name || 'User';
+      const username = user.username ? `@${user.username}` : '';
+      const initial = (displayName.charAt(0) || 'U').toUpperCase();
+
+      const userNameEl = document.getElementById('userName');
+      if (userNameEl) userNameEl.innerText = displayName;
+
+      const userAvatarBadge = document.getElementById('userAvatarBadge');
+      if (userAvatarBadge) userAvatarBadge.innerText = initial;
+
+      const userAvatarLarge = document.getElementById('userAvatarLarge');
+      if (userAvatarLarge) userAvatarLarge.innerText = initial;
+
+      const userDropdownName = document.getElementById('userDropdownName');
+      if (userDropdownName) userDropdownName.innerText = displayName;
+
+      const userDropdownHandle = document.getElementById('userDropdownHandle');
+      if (userDropdownHandle) {
+        userDropdownHandle.innerText = username;
+        userDropdownHandle.style.display = username ? 'block' : 'none';
+      }
+    }
+
+    async function handleLogout() {
+      try {
+        await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
+      } catch (e) {
+        console.warn('Logout error:', e);
+      }
+      authToken = null;
+      currentUser = null;
+      driveData = { folders: [], files: [] };
+      window.location.href = '/?logged_out=1';
+    }
+
+    function handleSessionExpired() {
+      authToken = null;
+      currentUser = null;
+      driveData = { folders: [], files: [] };
+      document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+      closeUserProfileMenu();
+      showBrowserNotice('expired');
+    }
+
+    function showBrowserNotice(reason) {
       const container = document.querySelector('.container');
       if (container) container.style.display = 'none';
       const notice = document.getElementById('browserNoticeCard');
       if (notice) notice.style.display = 'flex';
       const overlay = document.getElementById('unauthorizedOverlay');
       if (overlay) overlay.style.display = 'none';
+
+      // Check query params for auth feedback
+      const params = new URLSearchParams(window.location.search);
+      const authErr = params.get('auth_error');
+      const isLoggedOut = params.get('logged_out') === '1';
+      const authErrorAlert = document.getElementById('authErrorAlert');
+      const authErrorMsg = document.getElementById('authErrorMsg');
+
+      if (reason === 'expired') {
+        if (authErrorAlert && authErrorMsg) {
+          authErrorMsg.innerText = 'Sesi Anda telah berakhir. Silakan masuk kembali dengan Telegram.';
+          authErrorAlert.style.borderColor = 'rgba(244, 63, 94, 0.3)';
+          authErrorAlert.style.background = 'rgba(244, 63, 94, 0.12)';
+          authErrorAlert.style.color = '#fb7185';
+          authErrorAlert.style.display = 'block';
+        }
+      } else if (isLoggedOut) {
+        if (authErrorAlert && authErrorMsg) {
+          authErrorMsg.innerText = 'Anda telah berhasil keluar dari DARFIN.';
+          authErrorAlert.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+          authErrorAlert.style.background = 'rgba(56, 189, 248, 0.1)';
+          authErrorAlert.style.color = '#38bdf8';
+          authErrorAlert.style.display = 'block';
+        }
+      } else if (authErr && authErrorAlert && authErrorMsg) {
+        let msg = 'Login Telegram dibatalkan atau gagal.';
+        if (authErr === 'cancelled') msg = 'Login dibatalkan oleh pengguna.';
+        else if (authErr === 'invalid_state') msg = 'Sesi login kedaluwarsa atau tidak valid. Silakan coba lagi.';
+        else if (authErr === 'token_validation_failed') msg = 'Verifikasi keamanan token Telegram gagal.';
+        authErrorMsg.innerText = msg;
+        authErrorAlert.style.display = 'block';
+      }
     }
 
     function hideBrowserNotice() {
@@ -2626,6 +3651,22 @@
     }
 
     async function initSession() {
+      // 1. Check existing browser session via /api/auth/me
+      try {
+        const meRes = await fetch('/api/auth/me', { credentials: 'same-origin' });
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (meData.ok && meData.authenticated && meData.user) {
+            updateUserUI(meData.user);
+            hideBrowserNotice();
+            return true;
+          }
+        }
+      } catch (e) {
+        console.debug('No existing browser session:', e);
+      }
+
+      // 2. Telegram Mini App handshake
       let initData = window.Telegram?.WebApp?.initData || '';
       if (!initData && window.location.hash) {
         try {
@@ -2637,7 +3678,6 @@
       }
 
       if (!initData) {
-        // Direct browser access or missing Telegram initData
         showBrowserNotice();
         return false;
       }
@@ -2656,9 +3696,7 @@
           const data = await res.json();
           if (data.ok && data.session_token) {
             authToken = data.session_token;
-            currentUser = data.user || {};
-            const userNameEl = document.getElementById('userName');
-            if (userNameEl) userNameEl.innerText = currentUser.first_name || 'My Drive';
+            updateUserUI(data.user || {});
             hideBrowserNotice();
             return true;
           }
@@ -2689,9 +3727,45 @@
           options.headers['X-Telegram-Init-Data'] = initData;
         }
       }
+      const method = (options.method || 'GET').toUpperCase();
+      if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+        const csrf = getCookie('tma_csrf');
+        if (csrf) {
+          if (options.headers instanceof Headers) {
+            options.headers.set('X-CSRF-Token', csrf);
+          } else {
+            options.headers['X-CSRF-Token'] = csrf;
+          }
+        }
+      }
       options.credentials = 'same-origin';
-      return fetch(url, options);
+      const resp = await fetch(url, options);
+      if (resp.status === 401) {
+        handleSessionExpired();
+      }
+      return resp;
     }
+
+    // Global keyboard and click listeners for accessibility
+    document.addEventListener('click', (e) => {
+      const userSection = document.querySelector('.header-user-section');
+      if (userSection && !userSection.contains(e.target)) {
+        closeUserProfileMenu();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeUserProfileMenu();
+        const activeModals = document.querySelectorAll('.modal-overlay.active');
+        if (activeModals.length > 0) {
+          activeModals.forEach(m => {
+            m.classList.remove('active');
+            m.style.display = 'none';
+          });
+        }
+      }
+    });
 
     function signMediaUrl(url) {
       if (!url) return '';
@@ -2862,7 +3936,7 @@
     }
 
     async function loadDriveData() {
-      if (!authToken) {
+      if (!authToken && !currentUser) {
         const authed = await initSession();
         if (!authed) return;
       }
@@ -3133,11 +4207,709 @@
       });
     });
 
-    // Search filter
+    // ── TASK 5: Intelligent Search & WebApp Integration ──────
+    const searchState = {
+      active: false,
+      query: '',
+      filters: {
+        family: '',
+        domain: '',
+        document_type: '',
+        ext: '',
+        has_ocr: null,
+        sort_by: 'relevance',
+      },
+      results: [],
+      total_results: 0,
+      execution_time_ms: 0,
+      offset: 0,
+      limit: 25,
+      loading: false,
+      requestId: 0,
+      debounceTimer: null,
+    };
+
+    function hasActiveAdvancedFilters() {
+      const f = searchState.filters;
+      return Boolean(f.family || f.domain || f.document_type || f.ext || f.has_ocr !== null || f.sort_by !== 'relevance');
+    }
+
+    function countActiveFilters() {
+      let cnt = 0;
+      const f = searchState.filters;
+      if (f.family) cnt++;
+      if (f.domain) cnt++;
+      if (f.document_type) cnt++;
+      if (f.ext) cnt++;
+      if (f.has_ocr !== null) cnt++;
+      if (f.sort_by && f.sort_by !== 'relevance') cnt++;
+      return cnt;
+    }
+
+    function updateFilterBadge() {
+      const badge = document.getElementById('filterActiveBadge');
+      if (!badge) return;
+      const cnt = countActiveFilters();
+      if (cnt > 0) {
+        badge.innerText = String(cnt);
+        badge.style.display = 'block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    function openSearchFilterModal() {
+      triggerHaptic();
+      const modal = document.getElementById('searchFilterModal');
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeSearchFilterModal(e) {
+      if (!e || e.target?.id === 'searchFilterModal' || e.target?.classList?.contains('sheet-handle') || !e.target) {
+        const modal = document.getElementById('searchFilterModal');
+        if (modal) modal.classList.remove('active');
+      }
+    }
+
+    function setFilterOption(group, val, btnEl) {
+      triggerHaptic();
+      searchState.filters[group] = val;
+      const parent = btnEl.parentElement;
+      if (parent) {
+        parent.querySelectorAll('.filter-opt-btn').forEach(b => b.classList.remove('active'));
+        btnEl.classList.add('active');
+      }
+      updateFilterBadge();
+    }
+
+    function toggleFilterOcr(checked) {
+      triggerHaptic();
+      searchState.filters.has_ocr = checked ? true : null;
+      updateFilterBadge();
+    }
+
+    function setFilterSort(val) {
+      searchState.filters.sort_by = val;
+      updateFilterBadge();
+    }
+
+    function resetSearchFilters() {
+      triggerHaptic();
+      searchState.filters = {
+        family: '',
+        domain: '',
+        document_type: '',
+        ext: '',
+        has_ocr: null,
+        sort_by: 'relevance',
+      };
+      document.querySelectorAll('#searchFilterModal .filter-opt-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.val === '');
+      });
+      const ocrToggle = document.getElementById('filterOcrOnlyToggle');
+      if (ocrToggle) ocrToggle.checked = false;
+      const sortSelect = document.getElementById('filterSortSelect');
+      if (sortSelect) sortSelect.value = 'relevance';
+      updateFilterBadge();
+    }
+
+    function applySearchFilters() {
+      triggerHaptic();
+      const modal = document.getElementById('searchFilterModal');
+      if (modal) modal.classList.remove('active');
+      triggerSearch(true);
+    }
+
+    function applyQuickQuery(query) {
+      triggerHaptic();
+      const input = document.getElementById('searchInput');
+      if (input) {
+        input.value = query;
+      }
+      triggerSearch(true);
+    }
+
+    function clearSearch() {
+      triggerHaptic();
+      const input = document.getElementById('searchInput');
+      if (input) input.value = '';
+      resetSearchFilters();
+      exitSearchMode();
+    }
+
+    function exitSearchMode() {
+      searchState.active = false;
+      searchState.query = '';
+      searchState.results = [];
+      searchState.offset = 0;
+      searchState.total_results = 0;
+      
+      const clearBtn = document.getElementById('searchClearBtn');
+      if (clearBtn) clearBtn.style.display = 'none';
+      const header = document.getElementById('searchStateHeader');
+      if (header) header.style.display = 'none';
+      const foldersSection = document.getElementById('foldersSection');
+      if (foldersSection) foldersSection.style.display = 'block';
+      const paginationWrap = document.getElementById('searchPaginationWrap');
+      if (paginationWrap) paginationWrap.style.display = 'none';
+
+      applyFilter();
+    }
+
+    function triggerSearch(resetOffset = true) {
+      const q = document.getElementById('searchInput')?.value?.trim() || '';
+      const hasFilters = hasActiveAdvancedFilters();
+
+      if (!q && !hasFilters) {
+        exitSearchMode();
+        return;
+      }
+
+      searchState.active = true;
+      searchState.query = q;
+      if (resetOffset) {
+        searchState.offset = 0;
+      }
+
+      const clearBtn = document.getElementById('searchClearBtn');
+      if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
+      const foldersSection = document.getElementById('foldersSection');
+      if (foldersSection) foldersSection.style.display = 'none';
+
+      // Update search state header UI
+      const header = document.getElementById('searchStateHeader');
+      if (header) header.style.display = 'block';
+      const titleEl = document.getElementById('searchStateTitle');
+      if (titleEl) {
+        titleEl.innerText = q ? `Pencarian: "${q}"` : 'Filter Pencarian Aktif';
+      }
+      const countEl = document.getElementById('searchResultCount');
+      if (countEl) countEl.innerText = 'Mencari berkas...';
+
+      renderActiveFilterChips();
+
+      if (searchState.debounceTimer) {
+        clearTimeout(searchState.debounceTimer);
+      }
+
+      searchState.debounceTimer = setTimeout(() => {
+        executeBackendSearch(resetOffset);
+      }, 300);
+    }
+
+    function renderActiveFilterChips() {
+      const container = document.getElementById('searchActiveChips');
+      if (!container) return;
+      const chips = [];
+      const f = searchState.filters;
+
+      if (f.family) {
+        chips.push(`<span class="search-chip-tag">Tipe: ${escapeHtml(f.family)} <button onclick="removeFilter('family')">✕</button></span>`);
+      }
+      if (f.domain) {
+        chips.push(`<span class="search-chip-tag">Domain: ${escapeHtml(f.domain)} <button onclick="removeFilter('domain')">✕</button></span>`);
+      }
+      if (f.document_type) {
+        chips.push(`<span class="search-chip-tag">Dokumen: ${escapeHtml(f.document_type)} <button onclick="removeFilter('document_type')">✕</button></span>`);
+      }
+      if (f.ext) {
+        chips.push(`<span class="search-chip-tag">Ekstensi: .${escapeHtml(f.ext)} <button onclick="removeFilter('ext')">✕</button></span>`);
+      }
+      if (f.has_ocr) {
+        chips.push(`<span class="search-chip-tag">OCR: Ya <button onclick="removeFilter('has_ocr')">✕</button></span>`);
+      }
+      if (f.sort_by && f.sort_by !== 'relevance') {
+        chips.push(`<span class="search-chip-tag">Urut: ${escapeHtml(f.sort_by)} <button onclick="removeFilter('sort_by')">✕</button></span>`);
+      }
+
+      container.innerHTML = chips.join('');
+    }
+
+    function removeFilter(key) {
+      triggerHaptic();
+      if (key === 'has_ocr') {
+        searchState.filters.has_ocr = null;
+        const ocrToggle = document.getElementById('filterOcrOnlyToggle');
+        if (ocrToggle) ocrToggle.checked = false;
+      } else if (key === 'sort_by') {
+        searchState.filters.sort_by = 'relevance';
+        const sortSelect = document.getElementById('filterSortSelect');
+        if (sortSelect) sortSelect.value = 'relevance';
+      } else {
+        searchState.filters[key] = '';
+      }
+      updateFilterBadge();
+      triggerSearch(true);
+    }
+
+    async function executeBackendSearch(resetOffset = true) {
+      const currentReqId = ++searchState.requestId;
+      searchState.loading = true;
+
+      const params = new URLSearchParams();
+      if (searchState.query) params.set('q', searchState.query);
+      params.set('limit', String(searchState.limit));
+      params.set('offset', String(searchState.offset));
+      params.set('sort_by', searchState.filters.sort_by || 'relevance');
+
+      if (searchState.filters.family) params.set('type', searchState.filters.family);
+      if (searchState.filters.domain) params.set('domain', searchState.filters.domain);
+      if (searchState.filters.document_type) params.set('document_type', searchState.filters.document_type);
+      if (searchState.filters.ext) params.set('ext', searchState.filters.ext);
+      if (searchState.filters.has_ocr !== null) params.set('has_ocr', String(searchState.filters.has_ocr));
+
+      if (currentFolderId) {
+        const scopeBadge = document.getElementById('searchScopeBadge');
+        if (scopeBadge) {
+          scopeBadge.style.display = 'inline-block';
+          scopeBadge.innerText = 'Folder Aktif';
+        }
+      } else {
+        const scopeBadge = document.getElementById('searchScopeBadge');
+        if (scopeBadge) scopeBadge.style.display = 'none';
+      }
+
+      try {
+        const res = await authFetch(`/api/search?${params.toString()}`);
+        if (currentReqId !== searchState.requestId) return; // Stale response dropped!
+
+        const data = await res.json();
+        if (data.ok && data.result) {
+          const resObj = data.result;
+          searchState.total_results = resObj.total_results || 0;
+          searchState.execution_time_ms = resObj.execution_time_ms || 0;
+
+          if (resetOffset) {
+            searchState.results = resObj.items || [];
+          } else {
+            searchState.results = searchState.results.concat(resObj.items || []);
+          }
+
+          const countEl = document.getElementById('searchResultCount');
+          if (countEl) {
+            countEl.innerText = `${searchState.total_results} berkas ditemukan (${resObj.execution_time_ms} ms)`;
+          }
+
+          renderSearchResults(searchState.results, !resetOffset);
+
+          const paginationWrap = document.getElementById('searchPaginationWrap');
+          const hasMore = (searchState.offset + searchState.limit) < searchState.total_results;
+          if (paginationWrap) {
+            paginationWrap.style.display = hasMore ? 'flex' : 'none';
+          }
+        } else {
+          showSearchError(data.error?.message || 'Gagal memuat hasil pencarian.');
+        }
+      } catch (err) {
+        if (currentReqId !== searchState.requestId) return;
+        showSearchError('Terjadi kesalahan jaringan saat mencari berkas.');
+      } finally {
+        if (currentReqId === searchState.requestId) {
+          searchState.loading = false;
+        }
+      }
+    }
+
+    function showSearchError(msg) {
+      const container = document.getElementById('filesContainer');
+      if (container) {
+        container.innerHTML = `
+          <div class="empty-state" style="grid-column: 1/-1;">
+            <div class="empty-icon">⚠️</div>
+            <p style="color: var(--rose);">${escapeHtml(msg)}</p>
+            <button class="btn btn-secondary" onclick="clearSearch()" style="margin-top: 10px; font-size: 0.75rem;">Bersihkan Pencarian</button>
+          </div>
+        `;
+      }
+    }
+
+    function renderSearchResults(items, append = false) {
+      const container = document.getElementById('filesContainer');
+      if (!items || items.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="grid-column: 1/-1;">
+            <div class="empty-icon">🔍</div>
+            <p>Tidak ada berkas yang cocok dengan pencarian.</p>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">Coba gunakan kata kunci berbeda atau reset filter.</p>
+            <button class="btn btn-secondary" onclick="clearSearch()" style="margin-top: 10px; font-size: 0.75rem;">Bersihkan Pencarian</button>
+          </div>
+        `;
+        return;
+      }
+
+      if (currentViewMode === 'grid') {
+        container.className = 'files-grid';
+        const html = items.map(it => renderSearchResultGridCard(it)).join('');
+        if (append) {
+          container.insertAdjacentHTML('beforeend', html);
+        } else {
+          container.innerHTML = html;
+        }
+      } else {
+        container.className = 'files-list';
+        const html = items.map(it => renderSearchResultListRow(it)).join('');
+        if (append) {
+          container.insertAdjacentHTML('beforeend', html);
+        } else {
+          container.innerHTML = html;
+        }
+      }
+    }
+
+    function renderSearchResultGridCard(item) {
+      const f = item.file_data || {};
+      const fid = item.asset_id;
+      const typeBadgeColor = getTypeColor(f.file_type);
+      const isStarred = f.is_starred ? 'starred' : '';
+      const isSelected = selectedFileIds.has(fid);
+
+      let thumbContent = getFileIconSvg(f.file_type);
+      const thumbUrl = f.thumb_url || (f.file_type === 'photo' ? f.stream_url : null);
+      if (thumbUrl) {
+        thumbContent = `<img class="file-thumb-img" src="${thumbUrl}" loading="lazy" alt="${escapeHtml(f.file_name)}" onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('afterbegin', getFileIconSvg('${f.file_type}'));">`;
+      }
+
+      const badges = [];
+      const meta = f.metadata || {};
+      const domain = f.domain || meta.domain;
+      if (domain && domain !== 'other') {
+        badges.push(`<span class="intel-badge badge-domain">🧠 ${escapeHtml(domain)}</span>`);
+      }
+      if (f.ocr_text || meta.ocr_text) {
+        badges.push(`<span class="intel-badge badge-ocr">📝 OCR</span>`);
+      }
+      if (f.document_type === 'receipt' || meta.document_type === 'receipt') {
+        badges.push(`<span class="intel-badge badge-receipt">🧾 Struk</span>`);
+      } else if (f.document_type || meta.document_type) {
+        badges.push(`<span class="intel-badge badge-doc">📑 Dokumen</span>`);
+      }
+
+      const reasons = (item.reasons || []).slice(0, 2);
+      const reasonsHtml = reasons.length > 0
+        ? `<div class="search-match-reason" title="${escapeHtml(reasons.join(' • '))}">Cocok: ${escapeHtml(reasons.join(' • '))}</div>`
+        : '';
+
+      const folderName = f.folder_name || (f.folders && f.folders.name) || '';
+      const folderHtml = folderName
+        ? `<a class="search-folder-link" onclick="event.stopPropagation(); navigateToFolder(${f.folder_id})" title="Buka Folder ${escapeHtml(folderName)}">📁 ${escapeHtml(folderName)}</a>`
+        : '';
+
+      return `
+        <div class="file-card ${isSelected ? 'selected' : ''}" onclick="handleFileClick(event, ${fid})">
+          <div class="select-checkbox ${isSelected ? 'checked' : ''}" onclick="event.stopPropagation(); toggleSelectFile(${fid})">
+            ${isSelected ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+          </div>
+          <button class="star-btn ${isStarred}" onclick="toggleStar(event, ${fid})">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </button>
+          <div class="file-thumb-wrap">
+            ${thumbContent}
+            <span class="file-type-badge" style="background:${typeBadgeColor}cc">${escapeHtml(f.file_type || 'file')}</span>
+          </div>
+          <div class="file-name" title="${escapeHtml(f.file_name)}">${escapeHtml(f.file_name)}</div>
+          ${badges.length > 0 ? `<div class="intel-badges-wrap">${badges.join('')}</div>` : ''}
+          ${folderHtml}
+          ${reasonsHtml}
+          <div class="file-meta" style="margin-top: 6px;">
+            <span>${f.file_size_formatted || ''}</span>
+            <span>${f.created_at ? f.created_at.substring(0, 10) : ''}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSearchResultListRow(item) {
+      const f = item.file_data || {};
+      const fid = item.asset_id;
+      const isStarred = f.is_starred ? 'starred' : '';
+      const isSelected = selectedFileIds.has(fid);
+      const icon = getFileIconSvg(f.file_type, 20);
+      const rowThumbUrl = f.thumb_url || (f.file_type === 'photo' ? f.stream_url : null);
+      const rowIconContent = rowThumbUrl
+        ? `<img src="${rowThumbUrl}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" alt="${escapeHtml(f.file_name)}" onerror="this.parentElement.innerHTML = getFileIconSvg('${f.file_type}', 20);">`
+        : icon;
+
+      const badges = [];
+      const meta = f.metadata || {};
+      const domain = f.domain || meta.domain;
+      if (domain && domain !== 'other') {
+        badges.push(`<span class="intel-badge badge-domain">🧠 ${escapeHtml(domain)}</span>`);
+      }
+      if (f.ocr_text || meta.ocr_text) {
+        badges.push(`<span class="intel-badge badge-ocr">📝 OCR</span>`);
+      }
+      if (f.document_type === 'receipt' || meta.document_type === 'receipt') {
+        badges.push(`<span class="intel-badge badge-receipt">🧾 Struk</span>`);
+      } else if (f.document_type || meta.document_type) {
+        badges.push(`<span class="intel-badge badge-doc">📑 Dokumen</span>`);
+      }
+
+      const reasons = (item.reasons || []).slice(0, 2);
+      const reasonsHtml = reasons.length > 0
+        ? `<div class="search-match-reason" title="${escapeHtml(reasons.join(' • '))}">Cocok: ${escapeHtml(reasons.join(' • '))}</div>`
+        : '';
+
+      const folderName = f.folder_name || (f.folders && f.folders.name) || '';
+      const folderHtml = folderName
+        ? `<a class="search-folder-link" onclick="event.stopPropagation(); navigateToFolder(${f.folder_id})">📁 ${escapeHtml(folderName)}</a>`
+        : '';
+
+      return `
+        <div class="file-row ${isSelected ? 'selected' : ''}" onclick="handleFileClick(event, ${fid})">
+          <div class="select-checkbox ${isSelected ? 'checked' : ''}" onclick="event.stopPropagation(); toggleSelectFile(${fid})">
+            ${isSelected ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+          </div>
+          <div class="file-row-icon" style="background: rgba(255,255,255,0.05); overflow: hidden; padding: 0;">
+            ${rowIconContent}
+          </div>
+          <div class="file-row-main">
+            <div class="file-row-name">${escapeHtml(f.file_name)}</div>
+            ${badges.length > 0 ? `<div class="intel-badges-wrap" style="margin-top: 2px;">${badges.join('')}</div>` : ''}
+            ${folderHtml}
+            ${reasonsHtml}
+            <div class="file-row-sub" style="margin-top: 4px;">
+              <span>${f.file_size_formatted || ''}</span>
+              <span>•</span>
+              <span>${f.created_at ? f.created_at.substring(0, 10) : ''}</span>
+            </div>
+          </div>
+          <button class="star-btn ${isStarred}" style="position:static" onclick="toggleStar(event, ${fid})">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </button>
+        </div>
+      `;
+    }
+
+    function loadMoreSearchResults() {
+      triggerHaptic();
+      searchState.offset += searchState.limit;
+      executeBackendSearch(false);
+    }
+
+    async function loadAndRenderFileIntelligence(fileId) {
+      const container = document.getElementById('modalIntelligenceWrap');
+      if (!container) return;
+      container.style.display = 'block';
+      container.innerHTML = `
+        <div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 0.75rem;">
+          <div class="upc-spinner" style="width: 18px; height: 18px; margin: 0 auto 6px;"></div>
+          <span>Menganalisis intelligence berkas...</span>
+        </div>
+      `;
+
+      try {
+        const res = await authFetch(`/api/file_intelligence?file_id=${fileId}`);
+        const data = await res.json();
+        if (data.ok && data.intelligence && activeModalFile && activeModalFile.id === fileId) {
+          renderFileIntelligence(data.intelligence);
+        } else {
+          container.innerHTML = '<div style="font-size: 0.72rem; color: var(--text-muted); padding: 8px 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">Informasi intelligence belum tersedia untuk berkas ini.</div>';
+        }
+      } catch (err) {
+        container.innerHTML = '<div style="font-size: 0.72rem; color: var(--text-muted); padding: 8px 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">Informasi intelligence belum tersedia untuk berkas ini.</div>';
+      }
+    }
+
+    function renderFileIntelligence(intel) {
+      const container = document.getElementById('modalIntelligenceWrap');
+      if (!container) return;
+
+      const cls = intel.classification || {};
+      const confLabel = cls.confidence_label || 'Sedang';
+      let confBadgeClass = 'conf-med';
+      if (confLabel === 'Tinggi') confBadgeClass = 'conf-high';
+      else if (confLabel === 'Perlu ditinjau') confBadgeClass = 'conf-review';
+      else if (confLabel === 'Rendah') confBadgeClass = 'conf-low';
+
+      const cards = [];
+
+      // 1. Classification & Domain Card
+      cards.push(`
+        <div class="intel-card">
+          <div class="intel-card-header">
+            <span class="intel-card-title">🧠 Analisis Intelligence</span>
+            <span class="conf-badge ${confBadgeClass}">${escapeHtml(confLabel)}</span>
+          </div>
+          <div class="intel-grid">
+            <div>
+              <div class="intel-item-label">Domain</div>
+              <div class="intel-item-val" style="color: var(--accent);">${escapeHtml(cls.domain || 'other')}</div>
+            </div>
+            <div>
+              <div class="intel-item-label">Kategori</div>
+              <div class="intel-item-val">${escapeHtml(cls.category || 'general')}</div>
+            </div>
+            <div>
+              <div class="intel-item-label">Family Tipe</div>
+              <div class="intel-item-val">${escapeHtml(cls.family || intel.file_type || '-')}</div>
+            </div>
+            <div>
+              <div class="intel-item-label">Status</div>
+              <div class="intel-item-val">${cls.status === 'ambiguous' ? 'Perlu ditinjau' : 'Teridentifikasi'}</div>
+            </div>
+          </div>
+          ${cls.explain ? `<div class="intel-explain-text">ℹ️ ${escapeHtml(cls.explain)}</div>` : ''}
+        </div>
+      `);
+
+      // 2. Smart Safe Organizer Suggestion Card (Task 2C/2D)
+      if (intel.suggestion && intel.suggestion.folder_name) {
+        const sug = intel.suggestion;
+        cards.push(`
+          <div class="intel-card" style="border-color: rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.04);">
+            <div class="intel-card-header">
+              <span class="intel-card-title" style="color: var(--accent);">📁 Saran Penataan Berkas</span>
+              <span class="conf-badge conf-high">${escapeHtml(sug.confidence_label || 'Tinggi')}</span>
+            </div>
+            <div style="font-size: 0.78rem; margin-bottom: 8px;">
+              Pindahkan ke folder: <strong style="color: #fff;">${escapeHtml(sug.folder_name)}</strong>
+            </div>
+            ${sug.reason ? `<div class="intel-explain-text" style="margin-bottom: 10px;">${escapeHtml(sug.reason)}</div>` : ''}
+            <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end;" id="intelSugActions_${intel.file_id}">
+              <button class="btn btn-secondary" onclick="submitOrganizerFeedback(${intel.file_id}, ${sug.folder_id}, 'rejected', this)" title="Saran tidak cocok" style="padding: 5px 10px; font-size: 0.72rem;">
+                ✕ Bukan
+              </button>
+              <button class="btn btn-secondary" onclick="submitOrganizerFeedback(${intel.file_id}, ${sug.folder_id}, 'accepted', this)" title="Saran cocok" style="padding: 5px 10px; font-size: 0.72rem; color: var(--emerald);">
+                ✓ Cocok
+              </button>
+              <button class="btn btn-primary" onclick="executeOrganizerMoveFromModal(${intel.file_id}, ${sug.folder_id}, '${escapeHtml(sug.folder_name)}')" style="padding: 5px 12px; font-size: 0.72rem;">
+                Pindahkan
+              </button>
+            </div>
+          </div>
+        `);
+      }
+
+      // 3. OCR Text Preview Card (Task 3A)
+      if (intel.ocr && intel.ocr.available && intel.ocr.text_preview) {
+        cards.push(`
+          <div class="intel-card">
+            <div class="intel-card-header">
+              <span class="intel-card-title">📝 Teks Hasil OCR</span>
+              <span class="conf-badge conf-high">Akurasi: ${Math.round(intel.ocr.confidence * 100)}%</span>
+            </div>
+            <div class="intel-ocr-box">${escapeHtml(intel.ocr.text_preview)}</div>
+          </div>
+        `);
+      }
+
+      // 4. Screenshot Intelligence Card (Task 3B)
+      if (intel.screenshot && intel.screenshot.category && intel.screenshot.category !== 'screenshot_unknown') {
+        const ss = intel.screenshot;
+        const entities = ss.entities || {};
+        cards.push(`
+          <div class="intel-card">
+            <div class="intel-card-header">
+              <span class="intel-card-title">📸 Analisis Screenshot</span>
+              <span class="conf-badge conf-med">${escapeHtml(ss.category_label || ss.category)}</span>
+            </div>
+            <div class="intel-grid">
+              ${entities.merchants && entities.merchants.length ? `<div><div class="intel-item-label">Merchant</div><div class="intel-item-val">${escapeHtml(entities.merchants.join(', '))}</div></div>` : ''}
+              ${entities.amounts && entities.amounts.length ? `<div><div class="intel-item-label">Nominal</div><div class="intel-item-val">${escapeHtml(entities.amounts.join(', '))}</div></div>` : ''}
+              ${entities.dates && entities.dates.length ? `<div><div class="intel-item-label">Tanggal</div><div class="intel-item-val">${escapeHtml(entities.dates.join(', '))}</div></div>` : ''}
+            </div>
+          </div>
+        `);
+      }
+
+      // 5. Receipt / Document Details Card (Task 3C)
+      if (intel.document) {
+        const docRes = intel.document;
+        if (docRes.receipt) {
+          const rec = docRes.receipt;
+          cards.push(`
+            <div class="intel-card" style="border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.03);">
+              <div class="intel-card-header">
+                <span class="intel-card-title" style="color: var(--emerald);">🧾 Rincian Struk / Kuitansi</span>
+                <span class="conf-badge conf-high">Terverifikasi</span>
+              </div>
+              <div class="intel-grid">
+                ${rec.merchant_name ? `<div><div class="intel-item-label">Merchant</div><div class="intel-item-val">${escapeHtml(rec.merchant_name)}</div></div>` : ''}
+                ${rec.date ? `<div><div class="intel-item-label">Tanggal</div><div class="intel-item-val">${escapeHtml(rec.date)}</div></div>` : ''}
+                ${rec.total !== null && rec.total !== undefined ? `<div><div class="intel-item-label">Total Pembayaran</div><div class="intel-item-val" style="color: var(--emerald);">Rp ${Number(rec.total).toLocaleString('id-ID')}</div></div>` : ''}
+                ${rec.payment_method ? `<div><div class="intel-item-label">Metode Bayar</div><div class="intel-item-val">${escapeHtml(rec.payment_method.toUpperCase())}</div></div>` : ''}
+              </div>
+            </div>
+          `);
+        } else if (docRes.document) {
+          const d = docRes.document;
+          cards.push(`
+            <div class="intel-card" style="border-color: rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.03);">
+              <div class="intel-card-header">
+                <span class="intel-card-title" style="color: var(--gold);">📑 Rincian Dokumen Resmi</span>
+                <span class="conf-badge conf-high">${escapeHtml(docRes.document_type || 'Dokumen')}</span>
+              </div>
+              <div class="intel-grid">
+                ${d.document_number ? `<div><div class="intel-item-label">Nomor Dokumen</div><div class="intel-item-val">${escapeHtml(d.document_number)}</div></div>` : ''}
+                ${d.subject ? `<div><div class="intel-item-label">Perihal</div><div class="intel-item-val">${escapeHtml(d.subject)}</div></div>` : ''}
+                ${d.sender ? `<div><div class="intel-item-label">Pengirim</div><div class="intel-item-val">${escapeHtml(d.sender)}</div></div>` : ''}
+                ${d.recipient ? `<div><div class="intel-item-label">Penerima</div><div class="intel-item-val">${escapeHtml(d.recipient)}</div></div>` : ''}
+              </div>
+            </div>
+          `);
+        }
+      }
+
+      container.innerHTML = cards.join('');
+    }
+
+    async function submitOrganizerFeedback(fileId, targetFolderId, action, btn) {
+      triggerHaptic();
+      try {
+        await authFetch('/api/preferences/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_id: fileId, suggested_folder_id: targetFolderId, action: action })
+        });
+        showToast(action === 'accepted' ? '✓ Preferensi disimpan (cocok)' : '✕ Preferensi disimpan (ditolak)');
+        const wrap = document.getElementById(`intelSugActions_${fileId}`);
+        if (wrap) {
+          wrap.innerHTML = `<span style="font-size: 0.72rem; color: ${action === 'accepted' ? 'var(--emerald)' : 'var(--text-muted)'}; font-weight: 600;">${action === 'accepted' ? '✓ Disetujui' : '✕ Ditolak'}</span>`;
+        }
+      } catch (err) {
+        showToast('Gagal menyimpan preferensi');
+      }
+    }
+
+    async function executeOrganizerMoveFromModal(fileId, targetFolderId, targetFolderName) {
+      triggerHaptic();
+      try {
+        const res = await authFetch('/api/organizer/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_id: fileId, target_folder_id: targetFolderId })
+        });
+        const data = await res.json();
+        if (data.ok || (data.summary && data.summary.moved > 0)) {
+          showToast(`✅ Berkas dipindahkan ke ${targetFolderName}!`);
+          document.getElementById('fileModal').classList.remove('active');
+          if (searchState.active) {
+            triggerSearch(false);
+          } else {
+            loadDriveData();
+          }
+        } else {
+          alert('Gagal memindahkan: ' + (data.failed?.[0]?.error || data.error?.message || 'Error'));
+        }
+      } catch (err) {
+        alert('Gagal memindahkan berkas: ' + err);
+      }
+    }
+
+    // Debounced Search Input Handler
     document.getElementById('searchInput').addEventListener('input', (e) => {
-      applyFilter(e.target.value.toLowerCase().trim());
+      triggerSearch(true);
       if (isSelectMode) {
         updateSelectionUI(false);
+      }
+    });
+
+    document.getElementById('searchInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        triggerSearch(true);
+      } else if (e.key === 'Escape') {
+        clearSearch();
       }
     });
 
@@ -3243,7 +5015,13 @@
     // Modal Actions
     async function openFileModal(fileId) {
       triggerHaptic();
-      const f = (driveData.files || []).find(x => x.id === fileId);
+      let f = (driveData.files || []).find(x => x.id === fileId);
+      if (!f && searchState.active) {
+        const match = searchState.results.find(x => x.asset_id === fileId);
+        if (match) {
+          f = Object.assign({}, match.file_data, { id: fileId });
+        }
+      }
       if (!f) return;
       activeModalFile = f;
 
@@ -3353,6 +5131,9 @@
       if (f.file_type === 'audio') {
         playAudio(f);
       }
+
+      // Load Task 5 Intelligence details
+      loadAndRenderFileIntelligence(f.id);
 
       document.getElementById('fileModal').classList.add('active');
     }
@@ -4668,6 +6449,157 @@
         }
       } catch (err) {
         alert('Error: ' + err);
+        btn.disabled = false;
+      }
+    }
+
+    // ── Smart Organizer (Task 2C) ───────────────────────────
+    let currentOrgPlan = null;
+
+    async function openSmartOrganizerModal() {
+      triggerHaptic();
+      const modal = document.getElementById('smartOrganizerModal');
+      const badge = document.getElementById('orgCountBadge');
+      const container = document.getElementById('orgListContainer');
+      const btnAll = document.getElementById('btnExecuteOrgAll');
+
+      modal.classList.add('active');
+      badge.innerText = 'Menganalisis...';
+      container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 24px; font-size: 0.82rem;">🧠 Menganalisis berkas dan folder Anda...</div>';
+      btnAll.disabled = true;
+
+      try {
+        const res = await authFetch('/api/organizer/preview');
+        const data = await res.json();
+
+        if (!data.ok || !data.plan) {
+          container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 24px; font-size: 0.82rem;">Gagal memuat saran penataan.</div>';
+          badge.innerText = '0 Saran';
+          return;
+        }
+
+        currentOrgPlan = data.plan;
+        const eligible = (data.plan.items || []).filter(it => it.status === 'planned');
+        badge.innerText = `${eligible.length} Saran`;
+
+        if (eligible.length === 0) {
+          container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 24px; font-size: 0.82rem;">✨ Semua berkas sudah tertata rapi di folder yang tepat!</div>';
+          btnAll.disabled = true;
+          return;
+        }
+
+        btnAll.disabled = false;
+        btnAll.innerText = `Pindahkan Semua (${eligible.length})`;
+
+        container.innerHTML = eligible.map(it => `
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <div style="font-size: 0.82rem; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%;">
+                📄 ${escapeHtml(it.filename)}
+              </div>
+              <span class="tag-pill" style="font-size: 0.7rem; color: var(--emerald); border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.1);">
+                ${Math.round(it.confidence * 100)}%
+              </span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <div style="font-size: 0.74rem; color: var(--text-muted);">
+                → 📁 <span style="color: var(--accent); font-weight: 500;">${escapeHtml(it.target_path || it.target_folder_name || 'Folder')}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <button class="btn btn-secondary" onclick="rejectSmartOrganizeItem(${it.file_id}, ${it.target_folder_id})" title="Tolak saran ini" style="padding: 4px 8px; font-size: 0.72rem; min-height: 28px; color: var(--rose);">
+                  ✕
+                </button>
+                <button class="btn btn-secondary" onclick="executeSmartOrganizeItem(${it.file_id}, ${it.target_folder_id}, ${it.source_folder_id})" style="padding: 4px 10px; font-size: 0.72rem; min-height: 28px;">
+                  Pindahkan
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = `<div style="text-align: center; color: var(--rose); padding: 20px; font-size: 0.8rem;">Gagal: ${escapeHtml(err.message || String(err))}</div>`;
+        badge.innerText = 'Error';
+      }
+    }
+
+    function closeSmartOrganizerModal(e) {
+      if (!e || e.target?.id === 'smartOrganizerModal' || e.target?.classList?.contains('sheet-handle') || !e.target) {
+        document.getElementById('smartOrganizerModal').classList.remove('active');
+      }
+    }
+
+    async function submitFeedback(fileId, targetFolderId, action) {
+      try {
+        await authFetch('/api/preferences/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_id: fileId, suggested_folder_id: targetFolderId, action: action })
+        });
+      } catch (e) {
+        console.debug('Feedback error:', e);
+      }
+    }
+
+    async function rejectSmartOrganizeItem(fileId, targetFolderId) {
+      triggerHaptic();
+      await submitFeedback(fileId, targetFolderId, 'rejected');
+      showToast('Preferensi diperbarui (saran ditolak)');
+      await openSmartOrganizerModal();
+    }
+
+    async function executeSmartOrganizeItem(fileId, targetFolderId, sourceFolderId) {
+      triggerHaptic();
+      try {
+        const res = await authFetch('/api/organizer/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: [{ file_id: fileId, target_folder_id: targetFolderId, source_folder_id: sourceFolderId }]
+          })
+        });
+        const data = await res.json();
+        if (data.ok || (data.summary && data.summary.moved > 0)) {
+          await submitFeedback(fileId, targetFolderId, 'accepted');
+          showToast('✅ Berkas berhasil dipindahkan!');
+          await openSmartOrganizerModal();
+          await loadDriveData();
+        } else {
+          alert('Gagal memindahkan: ' + (data.failed?.[0]?.error || data.error?.message || 'Error'));
+        }
+      } catch (err) {
+        alert('Error: ' + err);
+      }
+    }
+
+    async function executeSmartOrganizeBatch() {
+      if (!currentOrgPlan) return;
+      const eligible = (currentOrgPlan.items || []).filter(it => it.status === 'planned');
+      if (eligible.length === 0) return;
+
+      triggerHaptic();
+      const btn = document.getElementById('btnExecuteOrgAll');
+      btn.disabled = true;
+      btn.innerText = 'Memindahkan...';
+
+      const payloadItems = eligible.map(it => ({
+        file_id: it.file_id,
+        target_folder_id: it.target_folder_id,
+        source_folder_id: it.source_folder_id
+      }));
+
+      try {
+        const res = await authFetch('/api/organizer/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: payloadItems })
+        });
+        const data = await res.json();
+        const moved = data.summary?.moved || 0;
+        showToast(`🎉 ${moved} berkas berhasil ditata rapi!`);
+        document.getElementById('smartOrganizerModal').classList.remove('active');
+        await loadDriveData();
+      } catch (err) {
+        alert('Gagal memproses batch: ' + err);
         btn.disabled = false;
       }
     }
