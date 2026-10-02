@@ -79,11 +79,10 @@ cp .env.example .env
 
 ## 🧪 Running Automated Tests
 
-Run the complete security and regression test suite:
+Run the complete test suite:
 ```bash
-.venv/bin/python test_security.py
+.venv/bin/python -m unittest discover tests
 ```
-See [`TEST_REPORT.md`](file:///home/darfinstar/projectTelegram/TEST_REPORT.md) for full test coverage and results.
 
 ---
 
