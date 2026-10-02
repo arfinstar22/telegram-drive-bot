@@ -22,7 +22,7 @@ A production-grade, secure cloud storage platform built on **Python 3.12**, **py
 
 ## 🔒 Security Architecture
 
-For detailed security specifications, threat modeling, and access control flows, see [`SECURITY_MODEL.md`](file:///home/darfinstar/projectTelegram/SECURITY_MODEL.md) and [`AUDIT_REPORT.md`](file:///home/darfinstar/projectTelegram/AUDIT_REPORT.md).
+For detailed security specifications, threat modeling, and access control flows, see [`SECURITY_MODEL.md`](file:///home/darfinstar/projectTelegram/SECURITY_MODEL.md).
 
 - **Zero Trust Client Identity:** Client-provided `user_id` is completely ignored. User identity is cryptographically validated from Telegram `initData` HMAC-SHA256 signatures.
 - **Object-Level Authorization (IDOR Immune):** Every database query and bot callback enforces `WHERE user_id = :authenticated_user_id`.
