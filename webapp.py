@@ -318,7 +318,10 @@ class ApiAuthSessionHandler(BaseApiHandler):
                 return
 
             user_id = validated["user_id"]
-            db.upsert_user(user_id, username=validated.get("username"), full_name=validated.get("first_name"))
+            first_name = (validated.get("first_name") or "").strip()
+            last_name = (validated.get("last_name") or "").strip()
+            full_name = f"{first_name} {last_name}".strip() or first_name or validated.get("username") or ""
+            db.upsert_user(user_id, username=validated.get("username"), full_name=full_name)
             db.get_or_create_inbox_folder(user_id)
 
             token = create_session_token(user_id, duration_seconds=86400)
@@ -346,7 +349,10 @@ class ApiAuthSessionHandler(BaseApiHandler):
                 "ok": True,
                 "user": {
                     "id": user_id,
-                    "first_name": validated.get("first_name", ""),
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "full_name": full_name,
+                    "name": full_name,
                     "username": validated.get("username"),
                 },
                 "token": token,
