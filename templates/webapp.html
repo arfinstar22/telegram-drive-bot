@@ -2879,6 +2879,26 @@
       overflow-x: hidden;
     }
 
+    body.in-auth-mode .container {
+      display: none !important;
+    }
+
+    body.in-auth-mode #browserNoticeCard {
+      display: flex !important;
+    }
+
+    body.in-auth-mode .bottom-dock-nav,
+    body.in-auth-mode #bottomDockNav,
+    body.in-auth-mode .upload-fab,
+    body.in-auth-mode #uploadFab,
+    body.in-auth-mode .upload-progress-card,
+    body.in-auth-mode #uploadProgressCard,
+    body.in-auth-mode .ambient-bg,
+    body.in-auth-mode .server-wakeup-overlay,
+    body.in-auth-mode #serverWakeupOverlay {
+      display: none !important;
+    }
+
     #browserNoticeCard {
       min-height: 100vh;
       width: 100%;
@@ -4831,7 +4851,7 @@
   </div>
 
   <!-- Floating Capsule Bottom Dock Navigation (Screens 1, 2, 3) -->
-  <nav class="bottom-dock-nav" id="bottomDockNav">
+  <nav class="bottom-dock-nav" id="bottomDockNav" style="display: none;">
     <button class="dock-btn active" id="dockTabDrive" onclick="switchNavTab('drive')">
       <span class="dock-glow-dot"></span>
       <svg class="dock-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -4902,6 +4922,11 @@
 
     let authToken = '';
     let currentUser = null;
+
+    const isTgApp = Boolean(window.Telegram?.WebApp?.initData || (window.location.hash && window.location.hash.includes('tgWebAppData')));
+    if (!isTgApp) {
+      document.body.classList.add('in-auth-mode');
+    }
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -5025,6 +5050,8 @@
     }
 
     async function handleLogout() {
+      const dockNav = document.getElementById('bottomDockNav');
+      if (dockNav) dockNav.style.display = 'none';
       const uploadFab = document.getElementById('uploadFab');
       if (uploadFab) uploadFab.style.display = 'none';
       try {
@@ -5044,6 +5071,8 @@
       driveData = { folders: [], files: [] };
       document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
       closeUserProfileMenu();
+      const dockNav = document.getElementById('bottomDockNav');
+      if (dockNav) dockNav.style.display = 'none';
       const uploadFab = document.getElementById('uploadFab');
       if (uploadFab) uploadFab.style.display = 'none';
       showBrowserNotice('expired');
@@ -5057,8 +5086,12 @@
       if (notice) notice.style.display = 'flex';
       const overlay = document.getElementById('unauthorizedOverlay');
       if (overlay) overlay.style.display = 'none';
+      const dockNav = document.getElementById('bottomDockNav');
+      if (dockNav) dockNav.style.display = 'none';
       const uploadFab = document.getElementById('uploadFab');
       if (uploadFab) uploadFab.style.display = 'none';
+      const serverOverlay = document.getElementById('serverWakeupOverlay');
+      if (serverOverlay) serverOverlay.classList.remove('active');
 
       // Check query params for auth feedback
       const params = new URLSearchParams(window.location.search);
@@ -5099,8 +5132,16 @@
       if (notice) notice.style.display = 'none';
       const container = document.querySelector('.container');
       if (container) container.style.display = 'block';
+      const dockNav = document.getElementById('bottomDockNav');
+      if (dockNav) dockNav.style.display = 'flex';
       const uploadFab = document.getElementById('uploadFab');
-      if (uploadFab && !isTrashMode) uploadFab.style.display = 'flex';
+      if (uploadFab) {
+        if (currentNavTab === 'drive' && !isTrashMode && !isSelectMode) {
+          uploadFab.style.display = 'flex';
+        } else {
+          uploadFab.style.display = 'none';
+        }
+      }
     }
 
     function showUnauthorizedScreen(message) {
@@ -7407,12 +7448,19 @@
 
     // Direct Web Upload Logic
     function triggerWebUpload() {
+      if (document.body.classList.contains('in-auth-mode') || (!authToken && !currentUser)) {
+        return;
+      }
       triggerHaptic();
       const input = document.getElementById('webFileInput');
       if (input) input.click();
     }
 
     async function handleWebUpload(event) {
+      if (document.body.classList.contains('in-auth-mode') || (!authToken && !currentUser)) {
+        event.target.value = '';
+        return;
+      }
       const files = event.target.files;
       if (!files || !files.length) return;
       triggerHaptic();
@@ -8515,6 +8563,14 @@
     let currentStarredFilter = 'all';
 
     function switchNavTab(tabName) {
+      if (document.body.classList.contains('in-auth-mode') || (!authToken && !currentUser)) {
+        const dockNav = document.getElementById('bottomDockNav');
+        if (dockNav) dockNav.style.display = 'none';
+        const fab = document.getElementById('uploadFab');
+        if (fab) fab.style.display = 'none';
+        return;
+      }
+
       triggerHaptic();
       if (tabName === 'activity') tabName = 'starred';
       currentNavTab = tabName;
