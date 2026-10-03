@@ -44,12 +44,18 @@
     }
 
     body {
-      background: var(--bg);
+      background-color: #060d1f;
+      background-image: 
+        radial-gradient(circle at 50% -20px, rgba(14, 116, 144, 0.28) 0%, transparent 65%),
+        linear-gradient(rgba(30, 58, 138, 0.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30, 58, 138, 0.12) 1px, transparent 1px);
+      background-size: 100% 100%, 28px 28px, 28px 28px;
+      background-position: 0 0, -1px -1px, -1px -1px;
       color: var(--text);
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       min-height: 100vh;
       overflow-x: hidden;
-      padding-bottom: calc(90px + var(--safe-bottom));
+      padding-bottom: calc(96px + var(--safe-bottom));
       line-height: 1.5;
     }
 
@@ -2323,7 +2329,7 @@
     .upload-fab {
       position: fixed;
       right: 20px;
-      bottom: calc(24px + var(--safe-bottom));
+      bottom: calc(84px + var(--safe-bottom));
       width: 52px;
       height: 52px;
       border-radius: 50%;
@@ -3171,6 +3177,467 @@
         justify-content: center;
       }
     }
+
+    /* =========================================================
+       Hiroto Store Premium Theme & Bottom Capsule Navigation
+       ========================================================= */
+
+    /* 2-Column Mobile Files Grid Enhancement (Hiroto Store Style) */
+    @media (max-width: 640px) {
+      .files-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+      }
+      .file-card {
+        padding: 10px !important;
+        border-radius: 18px !important;
+      }
+      .file-thumb-wrap {
+        height: 104px !important;
+        border-radius: 12px !important;
+      }
+    }
+
+    /* Hero Welcome Banner (Screen 1) */
+    .hero-welcome-card {
+      background: linear-gradient(145deg, rgba(16, 38, 86, 0.78) 0%, rgba(8, 19, 46, 0.92) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-radius: 22px;
+      padding: 20px 20px 18px;
+      margin-bottom: 16px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(2, 6, 23, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+    .hero-welcome-card::before {
+      content: '';
+      position: absolute;
+      top: -30px;
+      right: -30px;
+      width: 140px;
+      height: 140px;
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.22) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(6, 182, 212, 0.12);
+      border: 1px solid rgba(6, 182, 212, 0.32);
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #22d3ee;
+      letter-spacing: 0.6px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+    .hero-title {
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      line-height: 1.2;
+    }
+    .hero-username {
+      font-weight: 900;
+      font-style: italic;
+      letter-spacing: 1px;
+      color: #ffffff;
+      text-transform: uppercase;
+    }
+    .hero-wave-hand {
+      display: inline-block;
+      animation: waveHand 2.4s infinite ease-in-out;
+      transform-origin: 70% 70%;
+    }
+    @keyframes waveHand {
+      0%, 100% { transform: rotate(0deg); }
+      20%, 60% { transform: rotate(14deg); }
+      40%, 80% { transform: rotate(-10deg); }
+    }
+    .hero-desc {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    /* Floating Capsule Bottom Dock (Screens 1, 2, 3) */
+    .bottom-dock-nav {
+      position: fixed;
+      bottom: calc(12px + var(--safe-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 24px);
+      max-width: 440px;
+      height: 64px;
+      background: rgba(8, 17, 40, 0.94);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 34px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 0 20px rgba(6, 182, 212, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 4px 6px;
+      z-index: 90;
+    }
+    .dock-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      padding: 6px 4px;
+      border-radius: 24px;
+      color: rgba(255, 255, 255, 0.45);
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      height: 52px;
+      outline: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .dock-btn .dock-glow-dot {
+      width: 4.5px;
+      height: 4.5px;
+      border-radius: 50%;
+      background: #22d3ee;
+      box-shadow: 0 0 8px #22d3ee;
+      margin-bottom: 2px;
+      opacity: 0;
+      transform: scale(0.6);
+      transition: all 0.2s ease;
+    }
+    .dock-btn.active .dock-glow-dot {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .dock-btn.active {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+    }
+    .dock-btn.active .dock-icon {
+      color: #22d3ee;
+      stroke: #22d3ee;
+    }
+    .dock-btn .dock-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      margin-top: 2px;
+      letter-spacing: 0.2px;
+    }
+    .dock-btn.active .dock-label {
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    /* Card Action Button (+ Buka) */
+    .card-action-btn {
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px 0;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #06b6d4, #0284c7);
+      border: none;
+      color: #ffffff;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .card-action-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* Page Header Block */
+    .page-header-block {
+      margin: 12px 0 16px;
+    }
+    .page-title {
+      font-size: 1.55rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.3px;
+      margin-bottom: 4px;
+    }
+    .page-subtitle {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin: 0;
+    }
+
+    /* Sub Filter Chips (Screen 2) */
+    .sub-filter-chips {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 0 16px;
+      margin-bottom: 8px;
+      scrollbar-width: none;
+    }
+    .sub-filter-chips::-webkit-scrollbar {
+      display: none;
+    }
+    .sub-chip {
+      background: rgba(14, 28, 62, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 7px 16px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #94a3b8;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.18s ease;
+      outline: none;
+    }
+    .sub-chip.active {
+      background: linear-gradient(135deg, #06b6d4, #0284c7);
+      color: #ffffff;
+      font-weight: 700;
+      border-color: transparent;
+      box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35);
+    }
+
+    /* Empty Glass State Card (Screen 2) */
+    .empty-glass-card {
+      background: linear-gradient(145deg, rgba(14, 28, 62, 0.65) 0%, rgba(8, 17, 40, 0.82) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      padding: 48px 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 30px rgba(2, 6, 23, 0.4);
+      margin: 12px 0;
+    }
+    .empty-circle-icon {
+      width: 68px;
+      height: 68px;
+      border-radius: 22px;
+      background: rgba(14, 116, 144, 0.16);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      color: #38bdf8;
+    }
+    .empty-card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+    .empty-card-desc {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      max-width: 280px;
+      line-height: 1.45;
+      margin-bottom: 22px;
+    }
+    .btn-gradient-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, #06b6d4, #0284c7);
+      border: none;
+      border-radius: 16px;
+      padding: 10px 24px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(6, 182, 212, 0.38);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-gradient-cta:active {
+      transform: scale(0.96);
+    }
+
+    /* Profile Hero Card (Screen 3) */
+    .profile-hero-card {
+      background: linear-gradient(145deg, rgba(16, 36, 80, 0.75) 0%, rgba(8, 18, 44, 0.88) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      border-radius: 22px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 30px rgba(2, 6, 23, 0.45);
+    }
+    .profile-avatar-circle {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #06b6d4, #0284c7);
+      padding: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.35);
+    }
+    .profile-avatar-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: #09132b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #38bdf8;
+      overflow: hidden;
+    }
+    .profile-avatar-inner img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .profile-info-block {
+      min-width: 0;
+      flex: 1;
+    }
+    .profile-name-text {
+      font-size: 1.4rem;
+      font-weight: 900;
+      font-style: italic;
+      color: #ffffff;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      line-height: 1.2;
+    }
+    .profile-handle-text {
+      font-size: 0.82rem;
+      color: #7dd3fc;
+      margin-top: 2px;
+      margin-bottom: 8px;
+    }
+    .profile-member-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      border-radius: 12px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #38bdf8;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    /* 3 Mini Stat Boxes Row (Screen 3) */
+    .stat-boxes-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .stat-mini-card {
+      background: rgba(14, 28, 62, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 12px 8px;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(2, 6, 23, 0.3);
+    }
+    .stat-mini-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #94a3b8;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .stat-mini-val {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    /* Settings Menu List (Screen 3) */
+    .settings-menu-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .settings-menu-item {
+      background: rgba(14, 28, 62, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .settings-menu-item:active {
+      transform: scale(0.98);
+      background: rgba(20, 38, 80, 0.85);
+    }
+    .settings-menu-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+    .settings-menu-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .settings-menu-text {
+      min-width: 0;
+    }
+    .settings-menu-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .settings-menu-desc {
+      font-size: 0.74rem;
+      color: #94a3b8;
+      margin-top: 1px;
+    }
+    .settings-chevron {
+      color: #64748b;
+      flex-shrink: 0;
+    }
+    .settings-disclaimer {
+      font-size: 0.78rem;
+      color: #64748b;
+      line-height: 1.5;
+      text-align: center;
+      padding: 8px 12px 24px;
+    }
   </style>
 </head>
 <body>
@@ -3319,8 +3786,22 @@
       </div>
     </header>
 
-    <!-- Storage Diagnostics Card -->
-    <div class="storage-bar-card" onclick="openStorageStatsModal()" title="Klik untuk lihat Statistik & Rincian Storage">
+    <!-- Tab 1: Store / Drive View (Screen 1) -->
+    <div id="tabViewDrive">
+      <!-- Hero Welcome Card (Hiroto Store Style) -->
+      <div class="hero-welcome-card">
+        <div class="hero-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Unlimited Storage
+        </div>
+        <div class="hero-title">
+          Hi, <span id="heroUsernameDisplay" class="hero-username">DARFIN</span> <span class="hero-wave-hand">🖐️</span>
+        </div>
+        <p class="hero-desc">Penyimpanan cloud pribadi Telegram, kelola berkas aman dan cepat dalam hitungan detik.</p>
+      </div>
+
+      <!-- Storage Diagnostics Card -->
+      <div class="storage-bar-card" onclick="openStorageStatsModal()" title="Klik untuk lihat Statistik & Rincian Storage">
       <div class="storage-header">
         <span class="unlimited-badge">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 12c-2-2.5-4-4-6.5-4A5.5 5.5 0 0 0 0 13.5 5.5 5.5 0 0 0 5.5 19c2.5 0 4.5-1.5 6.5-4 2 2.5 4 4 6.5 4a5.5 5.5 0 0 0 5.5-5.5 5.5 5.5 0 0 0-5.5-5.5c-2.5 0-4.5 1.5-6.5 4z"/></svg>
@@ -3491,6 +3972,230 @@
         <span>Muat Lebih Banyak</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
+    </div>
+    </div> <!-- /tabViewDrive -->
+
+    <!-- Tab 2: Activity / History View (Screen 2) -->
+    <div id="tabViewActivity" style="display: none;">
+      <div class="page-header-block">
+        <h2 class="page-title">Order History</h2>
+        <p class="page-subtitle">Lihat dan kelola aktivitas berkas Anda.</p>
+      </div>
+
+      <div class="sub-filter-chips">
+        <button class="sub-chip active" id="chipHistAll" onclick="setActivityFilter('all')">Semua (<span id="histAllCount">0</span>)</button>
+        <button class="sub-chip" id="chipHistStarred" onclick="setActivityFilter('starred')">⭐ Favorit</button>
+        <button class="sub-chip" id="chipHistRecent" onclick="setActivityFilter('recent')">🕒 Terbaru</button>
+        <button class="sub-chip" id="chipHistTrash" onclick="setActivityFilter('trash')">🗑️ Sampah</button>
+      </div>
+
+      <div id="activityContentArea">
+        <div class="empty-glass-card" id="activityEmptyCard">
+          <div class="empty-circle-icon">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 8V21H3V8"/>
+              <path d="M1 3h22v5H1z"/>
+              <path d="M10 12h4"/>
+            </svg>
+          </div>
+          <div class="empty-card-title" id="activityEmptyTitle">Belum ada order</div>
+          <div class="empty-card-desc" id="activityEmptyDesc">Mulai jelajahi atau simpan berkas dari tab Store / Drive, ya.</div>
+          <button class="btn-gradient-cta" onclick="switchNavTab('drive')">
+            <span>Buka Store</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+        <div class="files-grid" id="activityFilesGrid" style="display: none;"></div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Smart Organizer View -->
+    <div id="tabViewOrganizer" style="display: none;">
+      <div class="page-header-block">
+        <h2 class="page-title">Smart Organizer</h2>
+        <p class="page-subtitle">Penataan berkas otomatis bertenaga AI dan pembersih ruang.</p>
+      </div>
+
+      <div class="settings-menu-list">
+        <div class="settings-menu-item" onclick="openSmartOrganizerModal()">
+          <div class="settings-menu-left">
+            <div class="settings-menu-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/></svg>
+            </div>
+            <div class="settings-menu-text">
+              <div class="settings-menu-title">Smart Folder Organizer</div>
+              <div class="settings-menu-desc">Kelompokkan berkas secara cerdas ke folder tujuan dengan 1 klik</div>
+            </div>
+          </div>
+          <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+
+        <div class="settings-menu-item" onclick="openDuplicatesModal()">
+          <div class="settings-menu-left">
+            <div class="settings-menu-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <div class="settings-menu-text">
+              <div class="settings-menu-title">Pindai Berkas Duplikat</div>
+              <div class="settings-menu-desc">Temukan berkas identik dan pindahkan salinan ke tempat sampah</div>
+            </div>
+          </div>
+          <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+
+        <div class="settings-menu-item" onclick="openDropzoneManagerModal()">
+          <div class="settings-menu-left">
+            <div class="settings-menu-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="settings-menu-text">
+              <div class="settings-menu-title">Dropzone Berkas Tamu</div>
+              <div class="settings-menu-desc">Buat dan bagikan tautan upload privat untuk teman atau kolega</div>
+            </div>
+          </div>
+          <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+
+        <div class="settings-menu-item" onclick="openStorageStatsModal()">
+          <div class="settings-menu-left">
+            <div class="settings-menu-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+            </div>
+            <div class="settings-menu-text">
+              <div class="settings-menu-title">Statistik Storage Lengkap</div>
+              <div class="settings-menu-desc">Lihat perincian kapasitas foto, dokumen, video, audio, dan arsip</div>
+            </div>
+          </div>
+          <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: Profile & Settings View (Screen 3) -->
+    <div id="tabViewProfile" style="display: none;">
+      <div class="page-header-block">
+        <h2 class="page-title">My Profile</h2>
+        <p class="page-subtitle">Status keanggotaan dan riwayat belanja.</p>
+      </div>
+
+      <div class="profile-hero-card">
+        <div class="profile-avatar-circle">
+          <div class="profile-avatar-inner" id="profileTabAvatar">
+            <span id="profileTabInitials">DA</span>
+          </div>
+        </div>
+        <div class="profile-info-block">
+          <div class="profile-name-text" id="profileTabName">DARFIN</div>
+          <div class="profile-handle-text" id="profileTabHandle">@Dxstar22</div>
+          <div class="profile-member-badge">✨ NEW MEMBER</div>
+        </div>
+      </div>
+
+      <!-- 3 Stat Mini Boxes (Screen 3) -->
+      <div class="stat-boxes-row">
+        <div class="stat-mini-card">
+          <div class="stat-mini-label">TOTAL SPENT</div>
+          <div class="stat-mini-val" id="profileStatTotalSpent">Rp 0</div>
+        </div>
+        <div class="stat-mini-card">
+          <div class="stat-mini-label">PAID ORDERS</div>
+          <div class="stat-mini-val" id="profileStatPaidOrders">0</div>
+        </div>
+        <div class="stat-mini-card">
+          <div class="stat-mini-label">TOTAL ORDERS</div>
+          <div class="stat-mini-val" id="profileStatTotalOrders">0</div>
+        </div>
+      </div>
+
+      <!-- Settings Menu List Rows (Screen 3) -->
+      <div class="settings-menu-list">
+        <div class="settings-menu-item" onclick="switchNavTab('activity')">
+          <div class="settings-menu-left">
+            <div class="settings-menu-icon" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+              </svg>
+            </div>
+            <div class="settings-menu-text">
+              <div class="settings-menu-title">Lihat Riwayat Order</div>
+              <div class="settings-menu-desc">Kelola berkas terbaru, favorit, dan riwayat</div>
+            </div>
+          </div>
+          <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+
+        <div class="settings-menu-item" onclick="window.open('https://t.me/darfinstoragebot', '_blank')">
+          <div class="settings-menu-left">
+            <div class="settings-menu-icon" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+              </svg>
+            </div>
+            <div class="settings-menu-text">
+              <div class="settings-menu-title">Hubungi Customer Service</div>
+              <div class="settings-menu-desc">Bantuan dan panduan penggunaan bot</div>
+            </div>
+          </div>
+          <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+
+        <div class="settings-menu-item" onclick="openStorageStatsModal()">
+          <div class="settings-menu-left">
+            <div class="settings-menu-icon" style="background: rgba(168, 85, 247, 0.12); color: #c084fc;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
+                <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+              </svg>
+            </div>
+            <div class="settings-menu-text">
+              <div class="settings-menu-title">Statistik & Analisis Storage</div>
+              <div class="settings-menu-desc">Rincian kapasitas storage dan kategori file</div>
+            </div>
+          </div>
+          <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+
+        <div class="settings-menu-item" onclick="openDropzoneManagerModal()">
+          <div class="settings-menu-left">
+            <div class="settings-menu-icon" style="background: rgba(16, 185, 129, 0.12); color: #34d399;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <div class="settings-menu-text">
+              <div class="settings-menu-title">Dropzone Berkas Tamu</div>
+              <div class="settings-menu-desc">Buat tautan untuk menerima berkas langsung</div>
+            </div>
+          </div>
+          <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+
+        <div class="settings-menu-item" onclick="handleLogout()" style="border-color: rgba(244, 63, 94, 0.2);">
+          <div class="settings-menu-left">
+            <div class="settings-menu-icon" style="background: rgba(244, 63, 94, 0.12); color: #fb7185;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+            </div>
+            <div class="settings-menu-text">
+              <div class="settings-menu-title" style="color: #fb7185;">Keluar dari Akun</div>
+              <div class="settings-menu-desc">Akhiri sesi di webapp ini</div>
+            </div>
+          </div>
+          <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+
+      <div class="settings-disclaimer">
+        Bot ini mendukung produk akun premium, source code, dan file digital lainnya. Semua pengiriman otomatis lewat Telegram.
+      </div>
     </div>
   </div>
 
@@ -4042,6 +4747,46 @@
     </div>
   </div>
 
+  <!-- Floating Capsule Bottom Dock Navigation (Screens 1, 2, 3) -->
+  <nav class="bottom-dock-nav" id="bottomDockNav">
+    <button class="dock-btn active" id="dockTabDrive" onclick="switchNavTab('drive')">
+      <span class="dock-glow-dot"></span>
+      <svg class="dock-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="4"/>
+        <line x1="3" y1="9" x2="21" y2="9"/>
+        <line x1="9" y1="21" x2="9" y2="9"/>
+      </svg>
+      <span class="dock-label">Store</span>
+    </button>
+
+    <button class="dock-btn" id="dockTabActivity" onclick="switchNavTab('activity')">
+      <span class="dock-glow-dot"></span>
+      <svg class="dock-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+        <path d="M3 3v5h5"/>
+        <path d="M12 7v5l4 2"/>
+      </svg>
+      <span class="dock-label">History</span>
+    </button>
+
+    <button class="dock-btn" id="dockTabOrganizer" onclick="switchNavTab('organizer')">
+      <span class="dock-glow-dot"></span>
+      <svg class="dock-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span class="dock-label">Organizer</span>
+    </button>
+
+    <button class="dock-btn" id="dockTabProfile" onclick="switchNavTab('profile')">
+      <span class="dock-glow-dot"></span>
+      <svg class="dock-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      <span class="dock-label">Profile</span>
+    </button>
+  </nav>
+
   <!-- Upload FAB & Hidden Input -->
   <button class="upload-fab" id="uploadFab" onclick="triggerWebUpload()" title="Unggah Berkas" style="display: none;">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
@@ -4175,6 +4920,25 @@
           userAvatarLarge.innerHTML = `<img src="${escapeHtml(pictureUrl)}" alt="${escapeHtml(displayName)}" class="user-avatar-img" onerror="this.parentElement.innerText='${safeInitials}'">`;
         } else {
           userAvatarLarge.innerText = safeInitials;
+        }
+      }
+
+      // Hiroto Store Hero and Profile Tab User updates
+      const heroUsernameEl = document.getElementById('heroUsernameDisplay');
+      if (heroUsernameEl) heroUsernameEl.innerText = displayName.split(/\s+/)[0].toUpperCase();
+
+      const profileTabNameEl = document.getElementById('profileTabName');
+      if (profileTabNameEl) profileTabNameEl.innerText = displayName.toUpperCase();
+
+      const profileTabHandleEl = document.getElementById('profileTabHandle');
+      if (profileTabHandleEl) profileTabHandleEl.innerText = handleText || '@member';
+
+      const profileTabAvatarEl = document.getElementById('profileTabAvatar');
+      if (profileTabAvatarEl) {
+        if (pictureUrl) {
+          profileTabAvatarEl.innerHTML = `<img src="${escapeHtml(pictureUrl)}" alt="${escapeHtml(displayName)}" onerror="this.parentElement.innerHTML='<span id=\\'profileTabInitials\\'>${safeInitials}</span>'">`;
+        } else {
+          profileTabAvatarEl.innerHTML = `<span id="profileTabInitials">${safeInitials}</span>`;
         }
       }
     }
@@ -4525,6 +5289,7 @@
         renderBreadcrumbs(driveData.breadcrumbs || []);
         renderFolders(driveData.folders || []);
         renderFiles(driveData.files || []);
+        updateNavigationStats();
       }
 
       setTimeout(() => {
@@ -4740,6 +5505,9 @@
             <span>${f.file_size_formatted}</span>
             <span>${f.created_at ? f.created_at.substring(0, 10) : ''}</span>
           </div>
+          <button class="card-action-btn" onclick="event.stopPropagation(); handleFileClick(event, ${f.id});">
+            <span>+ Buka</span>
+          </button>
         </div>
       `;
     }
@@ -5227,6 +5995,9 @@
             <span>${f.file_size_formatted || ''}</span>
             <span>${f.created_at ? f.created_at.substring(0, 10) : ''}</span>
           </div>
+          <button class="card-action-btn" onclick="event.stopPropagation(); handleFileClick(event, ${fid});">
+            <span>+ Buka</span>
+          </button>
         </div>
       `;
     }
@@ -7439,6 +8210,165 @@
           return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
         default:
           return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`;
+      }
+    }
+
+    // =========================================================
+    // Hiroto Store Navigation & Tab Logic (Screens 1, 2, 3)
+    // =========================================================
+
+    let currentNavTab = 'drive';
+    let currentActivityFilter = 'all';
+
+    function switchNavTab(tabName) {
+      triggerHaptic();
+      currentNavTab = tabName;
+
+      // Update bottom dock active state
+      document.querySelectorAll('.dock-btn').forEach(b => b.classList.remove('active'));
+      const activeBtnId = 'dockTab' + tabName.charAt(0).toUpperCase() + tabName.slice(1);
+      const activeBtn = document.getElementById(activeBtnId);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      // Toggle views
+      const views = ['Drive', 'Activity', 'Organizer', 'Profile'];
+      views.forEach(v => {
+        const el = document.getElementById('tabView' + v);
+        if (el) {
+          el.style.display = (v.toLowerCase() === tabName.toLowerCase()) ? 'block' : 'none';
+        }
+      });
+
+      // FAB visibility: only show on Store / Drive tab when not in trash mode
+      const fab = document.getElementById('uploadFab');
+      if (fab) {
+        if (tabName === 'drive' && !isTrashMode && !isSelectMode) {
+          fab.style.display = 'flex';
+        } else {
+          fab.style.display = 'none';
+        }
+      }
+
+      // Tab specific logic
+      if (tabName === 'activity') {
+        renderActivityTab();
+      } else if (tabName === 'profile') {
+        renderProfileTab();
+      }
+    }
+
+    function updateNavigationStats() {
+      const files = driveData.files || [];
+      const folders = driveData.folders || [];
+      const totalFiles = (driveData.storage && driveData.storage.total_files !== undefined) 
+        ? driveData.storage.total_files 
+        : files.length;
+      const totalFolders = folders.length;
+      const usedSize = (driveData.storage && driveData.storage.total_size) || '0 MB';
+
+      // Profile tab stats
+      const pFiles = document.getElementById('profileStatTotalFiles');
+      if (pFiles) pFiles.innerText = totalFiles;
+      const pSize = document.getElementById('profileStatUsedSize');
+      if (pSize) pSize.innerText = usedSize;
+      const pFolders = document.getElementById('profileStatTotalFolders');
+      if (pFolders) pFolders.innerText = totalFolders;
+
+      // Order stats for Hiroto profile layout
+      const pTotalOrders = document.getElementById('profileStatTotalOrders');
+      if (pTotalOrders) pTotalOrders.innerText = totalFiles;
+      const pPaidOrders = document.getElementById('profileStatPaidOrders');
+      if (pPaidOrders) pPaidOrders.innerText = totalFiles;
+
+      // History tab count
+      const hCount = document.getElementById('histAllCount');
+      if (hCount) hCount.innerText = totalFiles;
+    }
+
+    function setActivityFilter(filter) {
+      triggerHaptic();
+      currentActivityFilter = filter;
+
+      document.querySelectorAll('.sub-chip').forEach(c => c.classList.remove('active'));
+      const chipMap = {
+        'all': 'chipHistAll',
+        'starred': 'chipHistStarred',
+        'recent': 'chipHistRecent',
+        'trash': 'chipHistTrash'
+      };
+      const activeChip = document.getElementById(chipMap[filter]);
+      if (activeChip) activeChip.classList.add('active');
+
+      renderActivityTab();
+    }
+
+    async function renderActivityTab() {
+      const files = driveData.files || [];
+      const emptyCard = document.getElementById('activityEmptyCard');
+      const filesGrid = document.getElementById('activityFilesGrid');
+      const emptyTitle = document.getElementById('activityEmptyTitle');
+      const emptyDesc = document.getElementById('activityEmptyDesc');
+
+      if (!emptyCard || !filesGrid) return;
+
+      if (currentActivityFilter === 'trash') {
+        emptyCard.style.display = 'flex';
+        filesGrid.style.display = 'none';
+        if (emptyTitle) emptyTitle.innerText = 'Memuat kotak sampah...';
+        if (emptyDesc) emptyDesc.innerText = 'Mengambil daftar berkas yang telah dihapus.';
+
+        try {
+          const res = await authFetch('/api/trash');
+          const data = await res.json();
+          const trashFiles = (data.ok && data.files) ? data.files : [];
+          if (trashFiles.length === 0) {
+            if (emptyTitle) emptyTitle.innerText = 'Kotak sampah kosong';
+            if (emptyDesc) emptyDesc.innerText = 'Tidak ada berkas di dalam kotak sampah.';
+            emptyCard.style.display = 'flex';
+            filesGrid.style.display = 'none';
+          } else {
+            emptyCard.style.display = 'none';
+            filesGrid.style.display = 'grid';
+            filesGrid.innerHTML = trashFiles.map(f => renderFileGridCard(f)).join('');
+          }
+        } catch (e) {
+          console.warn('Error loading trash in activity:', e);
+          if (emptyTitle) emptyTitle.innerText = 'Gagal memuat sampah';
+          if (emptyDesc) emptyDesc.innerText = 'Silakan coba lagi beberapa saat lagi.';
+        }
+        return;
+      }
+
+      let filtered = [];
+      if (currentActivityFilter === 'starred') {
+        filtered = files.filter(f => f.is_starred);
+      } else if (currentActivityFilter === 'recent') {
+        filtered = [...files].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      } else {
+        filtered = files;
+      }
+
+      if (filtered.length === 0) {
+        emptyCard.style.display = 'flex';
+        filesGrid.style.display = 'none';
+        if (currentActivityFilter === 'starred') {
+          if (emptyTitle) emptyTitle.innerText = 'Belum ada favorit';
+          if (emptyDesc) emptyDesc.innerText = 'Tandai berkas dengan ikon bintang untuk melihatnya di sini.';
+        } else {
+          if (emptyTitle) emptyTitle.innerText = 'Belum ada order';
+          if (emptyDesc) emptyDesc.innerText = 'Mulai belanja atau simpan berkas dari tab Store / Drive, ya.';
+        }
+      } else {
+        emptyCard.style.display = 'none';
+        filesGrid.style.display = 'grid';
+        filesGrid.innerHTML = filtered.map(f => renderFileGridCard(f)).join('');
+      }
+    }
+
+    function renderProfileTab() {
+      updateNavigationStats();
+      if (currentUser) {
+        updateUserUI(currentUser);
       }
     }
 
