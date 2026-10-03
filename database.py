@@ -30,6 +30,30 @@ db: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Format: {code_hash: {"user_id": int, "expires_at": int}}
 _RECOVERY_CODES: dict[str, dict] = {}
 
+# In-memory user files cache: (user_id, is_trashed) -> (timestamp, list_of_files)
+_USER_FILES_CACHE: dict[tuple[int, bool], tuple[float, list[dict]]] = {}
+_USER_FILES_CACHE_TTL = 60.0  # 60 seconds
+
+
+def invalidate_user_files_cache(user_id: int | None = None) -> None:
+    """Invalidate in-memory user files cache."""
+    global _USER_FILES_CACHE
+    if user_id is None:
+        _USER_FILES_CACHE.clear()
+    else:
+        for k in list(_USER_FILES_CACHE.keys()):
+            if k[0] == user_id:
+                _USER_FILES_CACHE.pop(k, None)
+
+
+def is_user_files_cached(user_id: int, is_trashed: bool = False) -> bool:
+    """Check if full user file catalog is currently cached and valid."""
+    cache_key = (user_id, is_trashed)
+    if cache_key in _USER_FILES_CACHE:
+        cached_time, _ = _USER_FILES_CACHE[cache_key]
+        return (time.time() - cached_time) < _USER_FILES_CACHE_TTL
+    return False
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -352,6 +376,8 @@ def save_file(user_id: int, folder_id: int, **file_data) -> dict | None:
     data = {"user_id": user_id, "folder_id": folder_id, **file_data}
     try:
         res = db.table("files").insert(data).execute()
+        if res.data:
+            invalidate_user_files_cache(user_id)
         return res.data[0] if res.data else None
     except Exception as exc:
         log.error("Failed to save file for user %s: %s", user_id, exc)
@@ -436,6 +462,8 @@ def rename_file(file_id: int, name: str, user_id: int | None = None) -> bool:
         if user_id is not None:
             q = q.eq("user_id", user_id)
         res = q.execute()
+        if res.data:
+            invalidate_user_files_cache(user_id)
         return bool(res.data)
     except Exception as exc:
         log.error("Failed to rename file %s: %s", file_id, exc)
@@ -459,6 +487,8 @@ def move_file(file_id: int, folder_id: int, user_id: int | None = None) -> bool:
         if user_id is not None:
             q = q.eq("user_id", user_id)
         res = q.execute()
+        if res.data:
+            invalidate_user_files_cache(user_id)
         return bool(res.data)
     except Exception as exc:
         log.error("Failed to move file %s to folder %s: %s", file_id, folder_id, exc)
@@ -471,6 +501,8 @@ def trash_file(file_id: int, user_id: int | None = None) -> bool:
         if user_id is not None:
             q = q.eq("user_id", user_id)
         res = q.execute()
+        if res.data:
+            invalidate_user_files_cache(user_id)
         return bool(res.data)
     except Exception as exc:
         log.error("Failed to trash file %s: %s", file_id, exc)
@@ -493,6 +525,8 @@ def restore_file(file_id: int, user_id: int | None = None) -> bool:
                .eq("id", file_id)
                .eq("user_id", owner_id)
                .execute())
+        if res.data:
+            invalidate_user_files_cache(owner_id)
         return bool(res.data)
     except Exception as exc:
         log.error("Failed to restore file %s: %s", file_id, exc)
@@ -505,6 +539,8 @@ def permanent_delete(file_id: int, user_id: int | None = None) -> bool:
         if user_id is not None:
             q = q.eq("user_id", user_id)
         res = q.execute()
+        if res.data:
+            invalidate_user_files_cache(user_id)
         return bool(res.data)
     except Exception as exc:
         log.error("Failed to permanently delete file %s: %s", file_id, exc)
@@ -528,6 +564,7 @@ def get_trash(user_id: int) -> list[dict]:
 def empty_trash(user_id: int) -> bool:
     try:
         db.table("files").delete().eq("user_id", user_id).eq("is_trashed", True).execute()
+        invalidate_user_files_cache(user_id)
         return True
     except Exception as exc:
         log.error("Failed to empty trash for user %s: %s", user_id, exc)
@@ -554,11 +591,22 @@ def search_files(user_id: int, query: str) -> list[dict]:
 
 def get_storage_info(user_id: int) -> dict:
     try:
-        files_data = (db.table("files")
-                      .select("file_size, file_type")
-                      .eq("user_id", user_id)
-                      .eq("is_trashed", False)
-                      .execute().data or [])
+        files_data: list[dict] = []
+        offset = 0
+        page_size = 1000
+        while True:
+            batch = (db.table("files")
+                     .select("file_size, file_type")
+                     .eq("user_id", user_id)
+                     .eq("is_trashed", False)
+                     .range(offset, offset + page_size - 1)
+                     .execute().data or [])
+            if not batch:
+                break
+            files_data.extend(batch)
+            if len(batch) < page_size:
+                break
+            offset += len(batch)
 
         total_size = sum(f.get("file_size", 0) for f in files_data)
         by_type: dict[str, int] = {}
@@ -601,6 +649,7 @@ def toggle_star_file(file_id: int, user_id: int | None = None) -> bool | None:
     new_state = not bool(f.get("is_starred"))
     try:
         db.table("files").update({"is_starred": new_state, "updated_at": _now()}).eq("id", file_id).eq("user_id", f["user_id"]).execute()
+        invalidate_user_files_cache(f["user_id"])
         return new_state
     except Exception as exc:
         log.error("Failed to toggle star file %s: %s", file_id, exc)
@@ -874,6 +923,8 @@ def update_file_notes_and_tags(
         if user_id is not None:
             q = q.eq("user_id", user_id)
         res = q.execute()
+        if res.data:
+            invalidate_user_files_cache(user_id)
         return bool(res.data)
     except Exception as exc:
         log.error("Failed to update notes/tags for file %s: %s", file_id, exc)
@@ -954,6 +1005,8 @@ def copy_file_to_user_folder(source_file: dict, target_user_id: int, target_fold
     }
     try:
         res = db.table("files").insert(data).execute()
+        if res.data:
+            invalidate_user_files_cache(target_user_id)
         return res.data[0] if res.data else None
     except Exception as exc:
         log.error("Failed to copy file to user %s folder %s: %s", target_user_id, target_folder_id, exc)
@@ -977,15 +1030,65 @@ def find_duplicate_file(user_id: int, file_unique_id: str) -> dict | None:
         return None
 
 
-def get_all_user_files(user_id: int, limit: int = 100) -> list[dict]:
+def get_all_user_files(
+    user_id: int,
+    limit: int | None = 100,
+    is_trashed: bool = False,
+    use_cache: bool = True,
+) -> list[dict]:
+    cache_key = (user_id, is_trashed)
+    now = time.time()
+
+    # Fast path: return from in-memory cache if available
+    if use_cache and cache_key in _USER_FILES_CACHE:
+        cached_time, cached_files = _USER_FILES_CACHE[cache_key]
+        if (now - cached_time) < _USER_FILES_CACHE_TTL:
+            if limit is None:
+                return list(cached_files)
+            return list(cached_files[:limit])
+
     try:
-        return (db.table("files")
-                .select("*, folders(name)")
-                .eq("user_id", user_id)
-                .eq("is_trashed", False)
-                .order("created_at", desc=True)
-                .limit(limit)
-                .execute().data or [])
+        # Small limit: single fast database query
+        if limit is not None and limit <= 1000:
+            res = (db.table("files")
+                    .select("*, folders(name)")
+                    .eq("user_id", user_id)
+                    .eq("is_trashed", is_trashed)
+                    .order("created_at", desc=True)
+                    .limit(limit)
+                    .execute().data or [])
+            return res
+
+        # Large limit or limit is None: paginate across all PostgREST pages
+        all_files: list[dict] = []
+        offset = 0
+        page_size = 1000
+        while True:
+            fetch_size = page_size
+            if limit is not None:
+                remaining = limit - len(all_files)
+                if remaining <= 0:
+                    break
+                fetch_size = min(page_size, remaining)
+
+            batch = (db.table("files")
+                     .select("*, folders(name)")
+                     .eq("user_id", user_id)
+                     .eq("is_trashed", is_trashed)
+                     .order("created_at", desc=True)
+                     .range(offset, offset + fetch_size - 1)
+                     .execute().data or [])
+            if not batch:
+                break
+            all_files.extend(batch)
+            if len(batch) < fetch_size:
+                break
+            offset += len(batch)
+
+        if limit is None and use_cache:
+            _USER_FILES_CACHE[cache_key] = (now, all_files)
+
+        return all_files
     except Exception as exc:
         log.error("Failed to get all user files for %s: %s", user_id, exc)
         return []
@@ -1009,11 +1112,22 @@ def get_storage_health(user_id: int) -> dict:
                    .limit(5)
                    .execute().data or [])
 
-        all_files = (db.table("files")
+        all_files: list[dict] = []
+        offset = 0
+        page_size = 1000
+        while True:
+            batch = (db.table("files")
                      .select("id, file_name, file_size, file_unique_id, folder_id, folders(name)")
                      .eq("user_id", user_id)
                      .eq("is_trashed", False)
+                     .range(offset, offset + page_size - 1)
                      .execute().data or [])
+            if not batch:
+                break
+            all_files.extend(batch)
+            if len(batch) < page_size:
+                break
+            offset += len(batch)
 
         seen: dict[str, list[dict]] = {}
         for f in all_files:

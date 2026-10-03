@@ -20,8 +20,8 @@ def get_file_extension(filename: str) -> str:
 def get_file_family(file_item: dict[str, Any]) -> str:
     """Determine file family using file_type, extension, or MIME."""
     ftype = file_item.get("file_type")
-    if ftype and ftype in ("video", "photo", "document", "audio", "archive", "application"):
-        if ftype == "photo":
+    if ftype and ftype in ("video", "photo", "image", "document", "audio", "archive", "application"):
+        if ftype in ("photo", "image"):
             return "image"
         return ftype
 

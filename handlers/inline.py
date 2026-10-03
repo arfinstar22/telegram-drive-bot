@@ -30,26 +30,18 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = inline_query.from_user.id
 
     try:
-        # Fetch user's non-trashed files
-        all_files = db.get_all_user_files(user_id, limit=60)
-        if not all_files:
-            items = [
-                InlineQueryResultArticle(
-                    id="no_files",
-                    title="📁 Belum Ada File",
-                    description="Buka bot untuk mulai upload file ke Telegram Drive Anda.",
-                    input_message_content=InputTextMessageContent(
-                        "🗂 <b>Telegram Drive</b>\nBelum ada file di penyimpanan saya.",
-                        parse_mode="HTML",
-                    ),
-                )
-            ]
-            await inline_query.answer(items, cache_time=2, is_personal=True)
-            return
-
         if query:
-            matches = smart_organizer.smart_search(query, all_files)
+            try:
+                from darfin_intelligence.search import search
+                search_res = search(user_id=user_id, query=query, limit=25)
+                matches = [item.file_data for item in search_res.items]
+            except Exception:
+                matches = []
+            if not matches:
+                all_files = db.get_all_user_files(user_id, limit=60)
+                matches = smart_organizer.smart_search(query, all_files)
         else:
+            all_files = db.get_all_user_files(user_id, limit=25)
             matches = all_files[:25]
 
         if not matches:

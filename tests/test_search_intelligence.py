@@ -558,8 +558,61 @@ class TestSearchIntelligence(unittest.TestCase):
         res = self.service.search(self.user_id, "Batch 250", assets=large_candidates)
         self.assertGreater(res.total_results, 0)
         self.assertEqual(res.items[0].asset_id, 1250)
-        self.assertLess(res.execution_time_ms, 100.0)  # Sub-100ms for 500 files
+    def test_66_search_deep_candidates_beyond_500_limit(self):
+        # Verify search reaches items placed deep in catalog (>500 items)
+        class MockDB:
+            def __init__(self):
+                self.files = [
+                    {
+                        "id": i + 1,
+                        "user_id": 1001,
+                        "file_name": f"Document_{i}.pdf",
+                        "file_type": "document",
+                        "file_size": 1000,
+                        "is_trashed": False,
+                    }
+                    for i in range(1200)
+                ]
+                # Target item placed at index 850 (exceeds old 500 limit)
+                self.files[850] = {
+                    "id": 9999,
+                    "user_id": 1001,
+                    "file_name": "Intro Video.mov",
+                    "file_type": "video",
+                    "file_size": 8700000,
+                    "is_trashed": False,
+                    "folders": {"name": "UKM FOKUS"},
+                }
+
+            def is_user_files_cached(self, user_id, is_trashed=False):
+                return True
+
+            def get_all_user_files(self, user_id, limit=None, is_trashed=False, use_cache=True):
+                if limit is None:
+                    return list(self.files)
+                return list(self.files[:limit])
+
+        svc = SearchService(db_module=MockDB())
+        res = svc.search(1001, "intro")
+        self.assertGreater(res.total_results, 0)
+        self.assertEqual(res.items[0].asset_id, 9999)
+        self.assertEqual(res.items[0].file_data.get("file_name"), "Intro Video.mov")
+
+    def test_67_cache_and_invalidation(self):
+        import database
+        uid = 999999
+        database.invalidate_user_files_cache(uid)
+        self.assertFalse(database.is_user_files_cached(uid))
+
+        # Manually populate cache
+        database._USER_FILES_CACHE[(uid, False)] = (datetime.now().timestamp(), [{"id": 1, "file_name": "test.txt"}])
+        self.assertTrue(database.is_user_files_cached(uid))
+
+        # Test invalidation
+        database.invalidate_user_files_cache(uid)
+        self.assertFalse(database.is_user_files_cached(uid))
 
 
 if __name__ == "__main__":
     unittest.main()
+

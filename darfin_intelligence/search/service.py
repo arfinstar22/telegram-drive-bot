@@ -40,6 +40,61 @@ class SearchService:
             except ImportError:
                 self.db = None
 
+    def _retrieve_candidates(
+        self,
+        user_id: int,
+        parsed_query: SearchQuery,
+        active_filters: SearchFilters,
+        warnings: list[str],
+    ) -> list[dict[str, Any]]:
+        seen_ids: set[Any] = set()
+        candidates: list[dict[str, Any]] = []
+
+        def _add_items(items: list[dict[str, Any]]) -> None:
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                fid = item.get("id")
+                if fid is not None and fid not in seen_ids:
+                    uid = item.get("user_id")
+                    if uid is not None and int(uid) != user_id:
+                        continue
+                    seen_ids.add(fid)
+                    candidates.append(item)
+
+        # Primary path: Fetch full user catalog via get_all_user_files (in-memory cached, paginated)
+        if self.db and hasattr(self.db, "get_all_user_files"):
+            try:
+                all_files = self.db.get_all_user_files(
+                    user_id,
+                    limit=None,
+                    is_trashed=active_filters.is_trashed,
+                )
+                if all_files:
+                    _add_items(all_files)
+                    return candidates
+            except Exception as exc:
+                warnings.append(f"get_all_user_files error: {exc}")
+
+        # Fallback path if get_all_user_files is missing or throws error
+        if self.db and hasattr(self.db, "db") and self.db.db is not None:
+            try:
+                base_rows = (
+                    self.db.db.table("files")
+                    .select("*, folders(name)")
+                    .eq("user_id", user_id)
+                    .eq("is_trashed", active_filters.is_trashed)
+                    .order("created_at", desc=True)
+                    .limit(1000)
+                    .execute()
+                    .data or []
+                )
+                _add_items(base_rows)
+            except Exception as exc:
+                warnings.append(f"DB fallback fetch error: {exc}")
+
+        return candidates
+
     def search(
         self,
         user_id: int,
@@ -107,23 +162,7 @@ class SearchService:
                     continue  # Strict IDOR prevention
                 candidates.append(a)
         else:
-            if self.db and hasattr(self.db, "get_all_user_files"):
-                candidates = self.db.get_all_user_files(user_id, limit=500)
-            elif self.db and hasattr(self.db, "db"):
-                try:
-                    candidates = (
-                        self.db.db.table("files")
-                        .select("*, folders(name)")
-                        .eq("user_id", user_id)
-                        .eq("is_trashed", active_filters.is_trashed)
-                        .order("created_at", desc=True)
-                        .limit(500)
-                        .execute()
-                        .data or []
-                    )
-                except Exception as exc:
-                    warnings.append(f"Database query warning: {exc}")
-                    candidates = []
+            candidates = self._retrieve_candidates(user_id, parsed_query, active_filters, warnings)
 
         total_candidates = len(candidates)
         matches: list[SearchMatch] = []

@@ -554,10 +554,15 @@ async def _do_search(update: Update, context: ContextTypes.DEFAULT_TYPE, query: 
     user_id = update.effective_user.id
     _reset(context)
 
-    import smart_organizer
-    all_files = db.get_all_user_files(user_id, limit=300)
-    results = smart_organizer.smart_search(query, all_files) if all_files else []
-    smart_used = bool(results)
+    try:
+        from darfin_intelligence.search import search
+        search_res = search(user_id=user_id, query=query, limit=20)
+        results = [item.file_data for item in search_res.items]
+        smart_used = bool(results)
+    except Exception as exc:
+        log.warning("Darfin search in Telegram bot fallback: %s", exc)
+        results = []
+        smart_used = False
 
     if not results:
         results = db.search_files(user_id, query)
