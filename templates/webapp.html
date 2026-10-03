@@ -3669,7 +3669,7 @@
     <div class="auth-card-container">
       <div class="auth-card">
         <div class="auth-eyebrow">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
           Personal Cloud Storage
         </div>
 
@@ -3791,7 +3791,7 @@
       <!-- Hero Welcome Card -->
       <div class="hero-welcome-card">
         <div class="hero-badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
           Unlimited Storage
         </div>
         <div class="hero-title">
@@ -3975,37 +3975,36 @@
     </div>
     </div> <!-- /tabViewDrive -->
 
-    <!-- Tab 2: Activity / History View (Screen 2) -->
-    <div id="tabViewActivity" style="display: none;">
+    <!-- Tab 2: Starred View (Google Drive Style) -->
+    <div id="tabViewStarred" style="display: none;">
       <div class="page-header-block">
-        <h2 class="page-title">Aktivitas Berkas</h2>
-        <p class="page-subtitle">Lihat berkas terbaru, favorit, dan sampah Anda.</p>
+        <h2 class="page-title">⭐ Berkas Berbintang</h2>
+        <p class="page-subtitle">Akses cepat ke berkas dan dokumen penting yang Anda beri bintang.</p>
       </div>
 
       <div class="sub-filter-chips">
-        <button class="sub-chip active" id="chipHistAll" onclick="setActivityFilter('all')">Semua (<span id="histAllCount">0</span>)</button>
-        <button class="sub-chip" id="chipHistStarred" onclick="setActivityFilter('starred')">⭐ Favorit</button>
-        <button class="sub-chip" id="chipHistRecent" onclick="setActivityFilter('recent')">🕒 Terbaru</button>
-        <button class="sub-chip" id="chipHistTrash" onclick="setActivityFilter('trash')">🗑️ Sampah</button>
+        <button class="sub-chip active" id="chipStarredAll" onclick="setStarredFilter('all')">Semua (<span id="starredCountPill">0</span>)</button>
+        <button class="sub-chip" id="chipStarredImage" onclick="setStarredFilter('image')">🖼️ Foto</button>
+        <button class="sub-chip" id="chipStarredDoc" onclick="setStarredFilter('document')">📄 Dokumen</button>
+        <button class="sub-chip" id="chipStarredVideo" onclick="setStarredFilter('video')">🎬 Video</button>
+        <button class="sub-chip" id="chipStarredAudio" onclick="setStarredFilter('audio')">🎵 Audio</button>
       </div>
 
-      <div id="activityContentArea">
-        <div class="empty-glass-card" id="activityEmptyCard">
-          <div class="empty-circle-icon">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 8V21H3V8"/>
-              <path d="M1 3h22v5H1z"/>
-              <path d="M10 12h4"/>
+      <div id="starredContentArea">
+        <div class="empty-glass-card" id="starredEmptyCard">
+          <div class="empty-circle-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
             </svg>
           </div>
-          <div class="empty-card-title" id="activityEmptyTitle">Belum ada berkas</div>
-          <div class="empty-card-desc" id="activityEmptyDesc">Upload berkas dari tab Drive atau kirim langsung ke bot Telegram.</div>
+          <div class="empty-card-title">Belum ada berkas berbintang</div>
+          <div class="empty-card-desc">Beri tanda bintang pada berkas favorit Anda di Drive agar dapat diakses dengan cepat di sini.</div>
           <button class="btn-gradient-cta" onclick="switchNavTab('drive')">
-            <span>Buka Drive</span>
+            <span>Jelajahi Drive</span>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
-        <div class="files-grid" id="activityFilesGrid" style="display: none;"></div>
+        <div class="files-grid" id="starredFilesGrid" style="display: none;"></div>
       </div>
     </div>
 
@@ -4050,7 +4049,20 @@
             </div>
             <div class="settings-menu-text">
               <div class="settings-menu-title">Dropzone Berkas Tamu</div>
-              <div class="settings-menu-desc">Buat dan bagikan tautan upload privat untuk teman atau kolega</div>
+              <div class="settings-menu-desc">Buat dan kelola tautan upload privat untuk teman atau kolega</div>
+            </div>
+          </div>
+          <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+
+        <div class="settings-menu-item" onclick="switchNavTab('drive'); openTrashView();">
+          <div class="settings-menu-left">
+            <div class="settings-menu-icon" style="background: rgba(244, 63, 94, 0.15); color: #fb7185;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            </div>
+            <div class="settings-menu-text">
+              <div class="settings-menu-title">Kotak Sampah & Pemulihan</div>
+              <div class="settings-menu-desc">Kelola berkas terhapus, pulihkan atau kosongkan sampah</div>
             </div>
           </div>
           <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
@@ -4075,7 +4087,7 @@
     <div id="tabViewProfile" style="display: none;">
       <div class="page-header-block">
         <h2 class="page-title">Profil Saya</h2>
-        <p class="page-subtitle">Info akun dan statistik penyimpanan Anda.</p>
+        <p class="page-subtitle">Informasi akun dan status cloud storage Anda.</p>
       </div>
 
       <div class="profile-hero-card">
@@ -4087,7 +4099,10 @@
         <div class="profile-info-block">
           <div class="profile-name-text" id="profileTabName">DARFIN</div>
           <div class="profile-handle-text" id="profileTabHandle">@Dxstar22</div>
-          <div class="profile-member-badge">✨ NEW MEMBER</div>
+          <div class="profile-cloud-badge">
+            <span class="status-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 6px #34d399; display: inline-block;"></span>
+            <span>Telegram Verified</span>
+          </div>
         </div>
       </div>
 
@@ -4107,25 +4122,8 @@
         </div>
       </div>
 
-      <!-- Settings Menu List Rows (Screen 3) -->
+      <!-- Settings Menu List Rows (NO DUPLICATES!) -->
       <div class="settings-menu-list">
-        <div class="settings-menu-item" onclick="switchNavTab('activity')">
-          <div class="settings-menu-left">
-            <div class="settings-menu-icon" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8;">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                <line x1="12" y1="22.08" x2="12" y2="12"/>
-              </svg>
-            </div>
-            <div class="settings-menu-text">
-              <div class="settings-menu-title">Aktivitas Berkas</div>
-              <div class="settings-menu-desc">Lihat berkas terbaru, favorit, dan sampah</div>
-            </div>
-          </div>
-          <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
-
         <div class="settings-menu-item" onclick="window.open('https://t.me/darfinstoragebot', '_blank')">
           <div class="settings-menu-left">
             <div class="settings-menu-icon" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8;">
@@ -4135,41 +4133,40 @@
               </svg>
             </div>
             <div class="settings-menu-text">
-              <div class="settings-menu-title">Hubungi Customer Service</div>
-              <div class="settings-menu-desc">Bantuan dan panduan penggunaan bot</div>
+              <div class="settings-menu-title">Buka Bot Telegram</div>
+              <div class="settings-menu-desc">Kirim berkas langsung atau hubungi bot @darfinstoragebot</div>
             </div>
           </div>
           <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
 
-        <div class="settings-menu-item" onclick="openStorageStatsModal()">
+        <div class="settings-menu-item" onclick="copyTelegramUserId()">
           <div class="settings-menu-left">
-            <div class="settings-menu-icon" style="background: rgba(168, 85, 247, 0.12); color: #c084fc;">
+            <div class="settings-menu-icon" style="background: rgba(99, 102, 241, 0.12); color: #818cf8;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
-                <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
             </div>
             <div class="settings-menu-text">
-              <div class="settings-menu-title">Statistik & Analisis Storage</div>
-              <div class="settings-menu-desc">Rincian kapasitas storage dan kategori file</div>
+              <div class="settings-menu-title">ID Akun Telegram</div>
+              <div class="settings-menu-desc" id="profileUserIdDesc">Klik untuk menyalin ID Telegram Anda</div>
             </div>
           </div>
-          <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          <span style="font-size: 0.72rem; color: var(--accent); font-family: monospace; background: rgba(56, 189, 248, 0.1); padding: 4px 8px; border-radius: 6px;" id="profileUserIdBadge">Salin ID</span>
         </div>
 
-        <div class="settings-menu-item" onclick="openDropzoneManagerModal()">
+        <div class="settings-menu-item" onclick="showInlineSearchGuide()">
           <div class="settings-menu-left">
-            <div class="settings-menu-icon" style="background: rgba(16, 185, 129, 0.12); color: #34d399;">
+            <div class="settings-menu-icon" style="background: rgba(234, 179, 8, 0.12); color: #facc15;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
             </div>
             <div class="settings-menu-text">
-              <div class="settings-menu-title">Dropzone Berkas Tamu</div>
-              <div class="settings-menu-desc">Buat tautan untuk menerima berkas langsung</div>
+              <div class="settings-menu-title">Panduan Inline Search Bot</div>
+              <div class="settings-menu-desc">Ketik @darfinstoragebot di chat mana pun untuk kirim berkas instan</div>
             </div>
           </div>
           <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
@@ -4439,6 +4436,33 @@
           </button>
         </div>
         <button class="btn btn-secondary" style="width: 100%; margin-top: 2px;" onclick="closeFileShareModal()">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dropzone Manager Modal Sheet -->
+  <div class="modal-overlay" id="dropzoneManagerModal" onclick="closeDropzoneManagerModal(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="sheet-handle"></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <h3 class="sheet-title" style="margin-bottom: 0;">📤 Dropzone Berkas Tamu</h3>
+        <button onclick="closeDropzoneManagerModal()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 6px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 14px;">
+        Pilih folder tujuan untuk menerima berkas dari tamu atau kolega tanpa login akun Telegram.
+      </p>
+
+      <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+        <button class="btn btn-primary" style="flex: 1; font-size: 0.82rem; padding: 10px 14px; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="createNewDropzoneFolder()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Folder Tamu Baru
+        </button>
+      </div>
+
+      <div id="dropzoneFolderList" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+        <div style="text-align: center; color: var(--text-muted); padding: 18px; font-size: 0.82rem;">Memuat daftar folder...</div>
       </div>
     </div>
   </div>
@@ -4759,20 +4783,18 @@
       <span class="dock-label">Drive</span>
     </button>
 
-    <button class="dock-btn" id="dockTabActivity" onclick="switchNavTab('activity')">
+    <button class="dock-btn" id="dockTabStarred" onclick="switchNavTab('starred')">
       <span class="dock-glow-dot"></span>
       <svg class="dock-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-        <path d="M3 3v5h5"/>
-        <path d="M12 7v5l4 2"/>
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
       </svg>
-      <span class="dock-label">Aktivitas</span>
+      <span class="dock-label">Berbintang</span>
     </button>
 
     <button class="dock-btn" id="dockTabOrganizer" onclick="switchNavTab('organizer')">
       <span class="dock-glow-dot"></span>
       <svg class="dock-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
       </svg>
       <span class="dock-label">Organizer</span>
     </button>
@@ -4783,7 +4805,7 @@
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
         <circle cx="12" cy="7" r="4"/>
       </svg>
-      <span class="dock-label">Profile</span>
+      <span class="dock-label">Profil</span>
     </button>
   </nav>
 
@@ -5290,6 +5312,9 @@
         renderFolders(driveData.folders || []);
         renderFiles(driveData.files || []);
         updateNavigationStats();
+        if (currentNavTab === 'starred') {
+          renderStarredTab();
+        }
       }
 
       setTimeout(() => {
@@ -6384,6 +6409,10 @@
       if (f) {
         f.is_starred = !f.is_starred;
         applyFilter();
+        if (currentNavTab === 'starred') {
+          renderStarredTab();
+        }
+        updateNavigationStats();
       }
       try {
         await authFetch('/api/star', {
@@ -7633,10 +7662,115 @@
     let activeDropzoneFolderId = null;
     let activeDropzoneUrl = '';
 
+    async function openDropzoneManagerModal() {
+      triggerHaptic();
+      const modal = document.getElementById('dropzoneManagerModal');
+      if (!modal) return;
+      modal.classList.add('active');
+      const listEl = document.getElementById('dropzoneFolderList');
+      if (listEl) {
+        listEl.innerHTML = `
+          <div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 0.82rem;">
+            <div style="font-size: 1.5rem; margin-bottom: 6px;">⏳</div>
+            Memuat daftar folder...
+          </div>
+        `;
+      }
+
+      try {
+        const res = await authFetch('/api/all_folders');
+        const data = await res.json();
+        const folders = (data.ok && data.folders) ? data.folders : (driveData.folders || []);
+        renderDropzoneFolderList(folders);
+      } catch (err) {
+        console.error('Error fetching folders for dropzone:', err);
+        renderDropzoneFolderList(driveData.folders || []);
+      }
+    }
+
+    function renderDropzoneFolderList(folders) {
+      const listEl = document.getElementById('dropzoneFolderList');
+      if (!listEl) return;
+
+      if (!folders || folders.length === 0) {
+        listEl.innerHTML = `
+          <div style="text-align: center; color: var(--text-muted); padding: 18px; font-size: 0.82rem; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px dashed var(--border);">
+            <div style="font-size: 1.3rem; margin-bottom: 4px;">📂</div>
+            <div>Belum ada folder khusus untuk menerima berkas tamu.</div>
+            <div style="font-size: 0.72rem; margin-top: 4px; color: var(--text-muted);">Klik tombol <b>Folder Tamu Baru</b> di atas untuk membuat folder otomatis.</div>
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = folders.map(f => {
+        const isCurrent = (currentFolderId && f.id === currentFolderId);
+        return `
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid ${isCurrent ? 'var(--accent)' : 'var(--border)'}; border-radius: 12px; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;">
+              <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(56, 189, 248, 0.15); display: flex; align-items: center; justify-content: center; color: #38bdf8; flex-shrink: 0;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <div style="min-width: 0; flex: 1;">
+                <div style="font-size: 0.84rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  ${escapeHtml(f.name || 'Folder')}
+                  ${isCurrent ? '<span style="font-size: 0.65rem; color: var(--accent); margin-left: 4px; font-weight: 500;">(Aktif)</span>' : ''}
+                </div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">${f.file_count || 0} berkas</div>
+              </div>
+            </div>
+            <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem; white-space: nowrap; flex-shrink: 0;" onclick="selectFolderForDropzone(${f.id})">
+              Buka Dropzone
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectFolderForDropzone(folderId) {
+      closeDropzoneManagerModal();
+      openDropzoneModal(folderId);
+    }
+
+    async function createNewDropzoneFolder() {
+      triggerHaptic();
+      const folderName = prompt('Masukkan nama folder untuk tamu:', 'Dropzone Tamu');
+      if (!folderName || !folderName.trim()) return;
+
+      try {
+        const res = await authFetch('/api/create_folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: folderName.trim(), parent_id: null })
+        });
+        const data = await res.json();
+        if (data.ok && data.folder) {
+          showToast('✅ Folder berhasil dibuat!');
+          closeDropzoneManagerModal();
+          loadDriveData(false);
+          openDropzoneModal(data.folder.id);
+        } else {
+          alert('Gagal membuat folder: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Error membuat folder: ' + err);
+      }
+    }
+
+    function closeDropzoneManagerModal(e) {
+      if (!e || e.target?.id === 'dropzoneManagerModal' || e.target?.classList?.contains('sheet-handle') || !e.target || e.currentTarget === e.target) {
+        const modal = document.getElementById('dropzoneManagerModal');
+        if (modal) modal.classList.remove('active');
+      }
+    }
+
     async function openDropzoneModal(folderId) {
       triggerHaptic();
       activeDropzoneFolderId = folderId || currentFolderId;
-      if (!activeDropzoneFolderId) return;
+      if (!activeDropzoneFolderId) {
+        openDropzoneManagerModal();
+        return;
+      }
 
       document.getElementById('dropzoneModal').classList.add('active');
       document.getElementById('dropzoneUrlInput').value = 'Menghubungkan link...';
@@ -7712,6 +7846,25 @@
       } catch (err) {
         alert('Gagal menonaktifkan: ' + err);
       }
+    }
+
+    function copyTelegramUserId() {
+      triggerHaptic();
+      const uid = (currentUser && (currentUser.user_id || currentUser.id)) ? String(currentUser.user_id || currentUser.id) : '';
+      if (!uid) {
+        showToast('ID Telegram tidak ditemukan.');
+        return;
+      }
+      navigator.clipboard.writeText(uid).then(() => {
+        showToast('📋 ID Telegram disalin: ' + uid);
+      }).catch(() => {
+        showToast('ID: ' + uid);
+      });
+    }
+
+    function showInlineSearchGuide() {
+      triggerHaptic();
+      alert("🔍 Panduan Inline Search Bot:\n\n1. Buka chat Telegram mana saja (teman, grup, atau channel).\n2. Ketik di kolom pesan:\n   @darfinstoragebot <nama_berkas>\n3. Daftar berkas Anda akan muncul secara instan di atas keyboard!\n4. Klik berkas untuk langsung mengirimkannya ke chat.");
     }
 
     // Trash View & Logic
@@ -8214,14 +8367,15 @@
     }
 
     // =========================================================
-    // Navigation & Tab Logic
+    // Navigation & Tab Logic (Google Drive Style)
     // =========================================================
 
     let currentNavTab = 'drive';
-    let currentActivityFilter = 'all';
+    let currentStarredFilter = 'all';
 
     function switchNavTab(tabName) {
       triggerHaptic();
+      if (tabName === 'activity') tabName = 'starred';
       currentNavTab = tabName;
 
       // Update bottom dock active state
@@ -8231,7 +8385,7 @@
       if (activeBtn) activeBtn.classList.add('active');
 
       // Toggle views
-      const views = ['Drive', 'Activity', 'Organizer', 'Profile'];
+      const views = ['Drive', 'Starred', 'Organizer', 'Profile'];
       views.forEach(v => {
         const el = document.getElementById('tabView' + v);
         if (el) {
@@ -8250,8 +8404,8 @@
       }
 
       // Tab specific logic
-      if (tabName === 'activity') {
-        renderActivityTab();
+      if (tabName === 'starred') {
+        renderStarredTab();
       } else if (tabName === 'profile') {
         renderProfileTab();
       }
@@ -8274,90 +8428,66 @@
       const pFolders = document.getElementById('profileStatTotalFolders');
       if (pFolders) pFolders.innerText = totalFolders;
 
-      // Storage stats for profile
-      const pTotalFiles2 = document.getElementById('profileStatTotalFiles');
-      if (pTotalFiles2) pTotalFiles2.innerText = totalFiles;
-      const pUsedSize2 = document.getElementById('profileStatUsedSize');
-      if (pUsedSize2) pUsedSize2.innerText = usedSize;
+      // Starred count pill
+      const starredCount = files.filter(f => f.is_starred).length;
+      const countPill = document.getElementById('starredCountPill');
+      if (countPill) countPill.innerText = starredCount;
 
-      // History tab count
-      const hCount = document.getElementById('histAllCount');
-      if (hCount) hCount.innerText = totalFiles;
+      // Update profile user ID badge
+      if (currentUser) {
+        const uid = currentUser.user_id || currentUser.id;
+        if (uid) {
+          const badge = document.getElementById('profileUserIdBadge');
+          if (badge) badge.innerText = 'ID: ' + uid;
+          const desc = document.getElementById('profileUserIdDesc');
+          if (desc) desc.innerText = 'Telegram ID: ' + uid;
+        }
+      }
     }
 
-    function setActivityFilter(filter) {
+    function setStarredFilter(filter) {
       triggerHaptic();
-      currentActivityFilter = filter;
+      currentStarredFilter = filter;
 
-      document.querySelectorAll('.sub-chip').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('#tabViewStarred .sub-chip').forEach(c => c.classList.remove('active'));
       const chipMap = {
-        'all': 'chipHistAll',
-        'starred': 'chipHistStarred',
-        'recent': 'chipHistRecent',
-        'trash': 'chipHistTrash'
+        'all': 'chipStarredAll',
+        'image': 'chipStarredImage',
+        'document': 'chipStarredDoc',
+        'video': 'chipStarredVideo',
+        'audio': 'chipStarredAudio'
       };
       const activeChip = document.getElementById(chipMap[filter]);
       if (activeChip) activeChip.classList.add('active');
 
-      renderActivityTab();
+      renderStarredTab();
     }
 
-    async function renderActivityTab() {
+    function renderStarredTab() {
       const files = driveData.files || [];
-      const emptyCard = document.getElementById('activityEmptyCard');
-      const filesGrid = document.getElementById('activityFilesGrid');
-      const emptyTitle = document.getElementById('activityEmptyTitle');
-      const emptyDesc = document.getElementById('activityEmptyDesc');
+      const starred = files.filter(f => f.is_starred);
 
+      const countPill = document.getElementById('starredCountPill');
+      if (countPill) countPill.innerText = starred.length;
+
+      let filtered = starred;
+      if (currentStarredFilter === 'image') {
+        filtered = starred.filter(f => f.file_type === 'photo' || f.file_type === 'image' || /\.(jpe?g|png|gif|webp|svg|bmp)$/i.test(f.file_name || ''));
+      } else if (currentStarredFilter === 'document') {
+        filtered = starred.filter(f => f.file_type === 'document' || /\.(pdf|docx?|xlsx?|pptx?|txt|csv|zip|rar)$/i.test(f.file_name || ''));
+      } else if (currentStarredFilter === 'video') {
+        filtered = starred.filter(f => f.file_type === 'video' || f.file_type === 'video_note' || /\.(mp4|mkv|mov|avi|webm)$/i.test(f.file_name || ''));
+      } else if (currentStarredFilter === 'audio') {
+        filtered = starred.filter(f => f.file_type === 'audio' || f.file_type === 'voice' || /\.(mp3|wav|ogg|flac|m4a|aac)$/i.test(f.file_name || ''));
+      }
+
+      const emptyCard = document.getElementById('starredEmptyCard');
+      const filesGrid = document.getElementById('starredFilesGrid');
       if (!emptyCard || !filesGrid) return;
-
-      if (currentActivityFilter === 'trash') {
-        emptyCard.style.display = 'flex';
-        filesGrid.style.display = 'none';
-        if (emptyTitle) emptyTitle.innerText = 'Memuat kotak sampah...';
-        if (emptyDesc) emptyDesc.innerText = 'Mengambil daftar berkas yang telah dihapus.';
-
-        try {
-          const res = await authFetch('/api/trash');
-          const data = await res.json();
-          const trashFiles = (data.ok && data.files) ? data.files : [];
-          if (trashFiles.length === 0) {
-            if (emptyTitle) emptyTitle.innerText = 'Kotak sampah kosong';
-            if (emptyDesc) emptyDesc.innerText = 'Tidak ada berkas di dalam kotak sampah.';
-            emptyCard.style.display = 'flex';
-            filesGrid.style.display = 'none';
-          } else {
-            emptyCard.style.display = 'none';
-            filesGrid.style.display = 'grid';
-            filesGrid.innerHTML = trashFiles.map(f => renderFileGridCard(f)).join('');
-          }
-        } catch (e) {
-          console.warn('Error loading trash in activity:', e);
-          if (emptyTitle) emptyTitle.innerText = 'Gagal memuat sampah';
-          if (emptyDesc) emptyDesc.innerText = 'Silakan coba lagi beberapa saat lagi.';
-        }
-        return;
-      }
-
-      let filtered = [];
-      if (currentActivityFilter === 'starred') {
-        filtered = files.filter(f => f.is_starred);
-      } else if (currentActivityFilter === 'recent') {
-        filtered = [...files].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-      } else {
-        filtered = files;
-      }
 
       if (filtered.length === 0) {
         emptyCard.style.display = 'flex';
         filesGrid.style.display = 'none';
-        if (currentActivityFilter === 'starred') {
-          if (emptyTitle) emptyTitle.innerText = 'Belum ada favorit';
-          if (emptyDesc) emptyDesc.innerText = 'Tandai berkas dengan ikon bintang untuk melihatnya di sini.';
-        } else {
-          if (emptyTitle) emptyTitle.innerText = 'Belum ada berkas';
-          if (emptyDesc) emptyDesc.innerText = 'Upload berkas dari tab Drive atau kirim langsung ke bot Telegram.';
-        }
       } else {
         emptyCard.style.display = 'none';
         filesGrid.style.display = 'grid';
