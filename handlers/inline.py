@@ -21,46 +21,64 @@ log = logging.getLogger(__name__)
 
 
 async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle @bot_name search queries in any chat."""
+    """Handle @bot_name search queries in any chat with multi-signal search and infinite pagination."""
     inline_query = update.inline_query
     if not inline_query:
         return
 
     query = inline_query.query.strip()
     user_id = inline_query.from_user.id
+    raw_offset = inline_query.offset or ""
+    try:
+        offset = int(raw_offset) if raw_offset else 0
+    except ValueError:
+        offset = 0
+
+    page_size = 25
+    has_more = False
 
     try:
         if query:
             try:
                 from darfin_intelligence.search import search
-                search_res = search(user_id=user_id, query=query, limit=25)
+                search_res = search(user_id=user_id, query=query, limit=page_size, offset=offset)
                 matches = [item.file_data for item in search_res.items]
-            except Exception:
+                has_more = search_res.has_more
+            except Exception as e:
+                log.warning("darfin_intelligence search error in inline: %s", e)
                 matches = []
-            if not matches:
-                all_files = db.get_all_user_files(user_id, limit=60)
-                matches = smart_organizer.smart_search(query, all_files)
+                has_more = False
+
+            if not matches and offset == 0:
+                all_files = db.get_all_user_files(user_id, limit=None)
+                all_matches = smart_organizer.smart_search(query, all_files)
+                matches = all_matches[offset : offset + page_size]
+                has_more = (offset + page_size) < len(all_matches)
         else:
-            all_files = db.get_all_user_files(user_id, limit=25)
-            matches = all_files[:25]
+            all_files = db.get_all_user_files(user_id, limit=None)
+            matches = all_files[offset : offset + page_size]
+            has_more = (offset + page_size) < len(all_files)
 
         if not matches:
-            items = [
-                InlineQueryResultArticle(
-                    id="no_match",
-                    title=f"🔍 Tidak ditemukan: {query}",
-                    description="Coba cari dengan kata kunci, nama file, tahun, atau format lain.",
-                    input_message_content=InputTextMessageContent(
-                        f"🔍 Tidak ditemukan file untuk: <b>{query}</b>",
-                        parse_mode="HTML",
-                    ),
-                )
-            ]
-            await inline_query.answer(items, cache_time=2, is_personal=True)
+            if offset == 0:
+                items = [
+                    InlineQueryResultArticle(
+                        id="no_match",
+                        title=f"🔍 Tidak ditemukan: {query}" if query else "📂 Belum ada berkas",
+                        description="Coba cari dengan kata kunci, nama file, tahun, atau format lain." if query else "Unggah berkas melalui bot terlebih dahulu.",
+                        input_message_content=InputTextMessageContent(
+                            f"🔍 Tidak ditemukan file untuk: <b>{query}</b>" if query else "📂 Belum ada file tersimpan.",
+                            parse_mode="HTML",
+                        ),
+                    )
+                ]
+                await inline_query.answer(items, cache_time=2, is_personal=True, next_offset="")
+            else:
+                await inline_query.answer([], cache_time=2, is_personal=True, next_offset="")
             return
 
         items = []
-        for f in matches[:25]:
+        for f in matches:
             try:
                 fid = str(f["id"])
                 name = f.get("file_name", "File")
@@ -123,6 +141,7 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             except Exception as item_err:
                 log.warning("Skipping inline file item %s: %s", f.get("id"), item_err)
 
-        await inline_query.answer(items, cache_time=2, is_personal=True)
+        next_offset = str(offset + len(matches)) if has_more and len(matches) > 0 else ""
+        await inline_query.answer(items, cache_time=2, is_personal=True, next_offset=next_offset)
     except Exception as e:
         log.exception("Error in inline_query_handler: %s", e)
