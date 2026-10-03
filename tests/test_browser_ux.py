@@ -151,8 +151,9 @@ class TestSearchIntegration(TestBrowserUxBase):
         self.assertIn("searchState.debounceTimer = setTimeout(", self.template_html)
         self.assertIn("300", self.template_html)
 
+    @patch("database.get_user_preferences", return_value={})
     @patch("darfin_intelligence.search.search")
-    def test_13_search_pagination_parameters(self, mock_search):
+    def test_13_search_pagination_parameters(self, mock_search, mock_prefs):
         """13. /api/search accepts limit and offset parameters."""
         mock_res = MagicMock()
         mock_res.as_dict.return_value = {
@@ -169,8 +170,9 @@ class TestSearchIntegration(TestBrowserUxBase):
         data = json.loads(response.body.decode("utf-8"))
         self.assertEqual(data["result"]["total_results"], 45)
 
+    @patch("database.get_user_preferences", return_value={})
     @patch("darfin_intelligence.search.search")
-    def test_14_search_filters_supported(self, mock_search):
+    def test_14_search_filters_supported(self, mock_search, mock_prefs):
         """14. /api/search accepts family, domain, and document_type filters."""
         mock_res = MagicMock()
         mock_res.as_dict.return_value = {
@@ -188,8 +190,9 @@ class TestSearchIntegration(TestBrowserUxBase):
         )
         self.assertEqual(response.code, 200)
 
+    @patch("database.get_user_preferences", return_value={})
     @patch("darfin_intelligence.search.search")
-    def test_15_search_sorting_supported(self, mock_search):
+    def test_15_search_sorting_supported(self, mock_search, mock_prefs):
         """15. /api/search accepts sort_by parameter."""
         mock_res = MagicMock()
         mock_res.as_dict.return_value = {"query": "test", "items": [], "total_results": 0, "execution_time_ms": 0.5}

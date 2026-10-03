@@ -90,15 +90,21 @@ class SearchResult:
     limit: int = 25
     offset: int = 0
 
+    @property
+    def has_more(self) -> bool:
+        return (self.offset + len(self.items)) < self.total_results
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "items": [item.as_dict() for item in self.items],
             "query": self.query,
             "total_candidates": self.total_candidates,
             "total_results": self.total_results,
+            "has_more": self.has_more,
             "execution_time_ms": round(self.execution_time_ms, 3),
             "strategy": self.strategy,
             "warnings": list(self.warnings),
             "limit": self.limit,
             "offset": self.offset,
         }
+

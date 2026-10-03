@@ -142,6 +142,32 @@ async def inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 log.warning("Skipping inline file item %s: %s", f.get("id"), item_err)
 
         next_offset = str(offset + len(matches)) if has_more and len(matches) > 0 else ""
-        await inline_query.answer(items, cache_time=2, is_personal=True, next_offset=next_offset)
+        try:
+            await inline_query.answer(items, cache_time=1, is_personal=True, next_offset=next_offset)
+        except Exception as ans_err:
+            log.warning("Primary inline answer failed (%s), attempting document fallback", ans_err)
+            fallback_items = []
+            for f in matches:
+                tg_file_id = f.get("file_id")
+                if not tg_file_id:
+                    continue
+                fid = str(f.get("id"))
+                name = f.get("file_name", "File")
+                size = format_size(f.get("file_size", 0))
+                folder_info = f["folders"]["name"] if f.get("folders") and isinstance(f["folders"], dict) else "Drive"
+                _, note, tags = parse_file_metadata(f.get("mime_type"))
+                note_str = f"\n📝 <i>{note}</i>" if note else ""
+                tags_str = ("\n🏷 " + " ".join([f"#{t}" for t in tags])) if tags else ""
+                caption = f"📄 <b>{name}</b> ({size})\n📁 {folder_info}{note_str}{tags_str}"
+                fallback_items.append(InlineQueryResultCachedDocument(
+                    id=fid,
+                    title=name,
+                    document_file_id=tg_file_id,
+                    description=f"{size} • {folder_info}",
+                    caption=caption,
+                    parse_mode="HTML",
+                ))
+            if fallback_items:
+                await inline_query.answer(fallback_items, cache_time=1, is_personal=True, next_offset=next_offset)
     except Exception as e:
         log.exception("Error in inline_query_handler: %s", e)

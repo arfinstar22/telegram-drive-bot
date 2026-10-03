@@ -308,8 +308,13 @@ class TestSearchApiOperations(TestWebappIntelligenceBase):
         args, kwargs = mock_search.call_args
         self.assertEqual(kwargs["sort_by"], "newest")
 
-    def test_search_malformed_json_handled_safely(self):
+    @patch("database.get_user_preferences", return_value={})
+    @patch("darfin_intelligence.search.search")
+    def test_search_malformed_json_handled_safely(self, mock_search, mock_prefs):
         """Malformed JSON body in POST /api/search handled gracefully without trace leak."""
+        from darfin_intelligence.search.models import SearchResult
+        mock_search.return_value = SearchResult(items=[], query="", total_results=0)
+
         response = self.fetch(
             "/api/search",
             method="POST",
