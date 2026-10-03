@@ -3179,10 +3179,10 @@
     }
 
     /* =========================================================
-       Hiroto Store Premium Theme & Bottom Capsule Navigation
+       Cloud Drive Premium Theme & Bottom Capsule Navigation
        ========================================================= */
 
-    /* 2-Column Mobile Files Grid Enhancement (Hiroto Store Style) */
+    /* 2-Column Mobile Files Grid Enhancement */
     @media (max-width: 640px) {
       .files-grid {
         grid-template-columns: repeat(2, 1fr) !important;
@@ -3786,9 +3786,9 @@
       </div>
     </header>
 
-    <!-- Tab 1: Store / Drive View (Screen 1) -->
+    <!-- Tab 1: Cloud Drive View -->
     <div id="tabViewDrive">
-      <!-- Hero Welcome Card (Hiroto Store Style) -->
+      <!-- Hero Welcome Card -->
       <div class="hero-welcome-card">
         <div class="hero-badge">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -3978,8 +3978,8 @@
     <!-- Tab 2: Activity / History View (Screen 2) -->
     <div id="tabViewActivity" style="display: none;">
       <div class="page-header-block">
-        <h2 class="page-title">Order History</h2>
-        <p class="page-subtitle">Lihat dan kelola aktivitas berkas Anda.</p>
+        <h2 class="page-title">Aktivitas Berkas</h2>
+        <p class="page-subtitle">Lihat berkas terbaru, favorit, dan sampah Anda.</p>
       </div>
 
       <div class="sub-filter-chips">
@@ -3998,10 +3998,10 @@
               <path d="M10 12h4"/>
             </svg>
           </div>
-          <div class="empty-card-title" id="activityEmptyTitle">Belum ada order</div>
-          <div class="empty-card-desc" id="activityEmptyDesc">Mulai jelajahi atau simpan berkas dari tab Store / Drive, ya.</div>
+          <div class="empty-card-title" id="activityEmptyTitle">Belum ada berkas</div>
+          <div class="empty-card-desc" id="activityEmptyDesc">Upload berkas dari tab Drive atau kirim langsung ke bot Telegram.</div>
           <button class="btn-gradient-cta" onclick="switchNavTab('drive')">
-            <span>Buka Store</span>
+            <span>Buka Drive</span>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
@@ -4074,8 +4074,8 @@
     <!-- Tab 4: Profile & Settings View (Screen 3) -->
     <div id="tabViewProfile" style="display: none;">
       <div class="page-header-block">
-        <h2 class="page-title">My Profile</h2>
-        <p class="page-subtitle">Status keanggotaan dan riwayat belanja.</p>
+        <h2 class="page-title">Profil Saya</h2>
+        <p class="page-subtitle">Info akun dan statistik penyimpanan Anda.</p>
       </div>
 
       <div class="profile-hero-card">
@@ -4091,19 +4091,19 @@
         </div>
       </div>
 
-      <!-- 3 Stat Mini Boxes (Screen 3) -->
+      <!-- 3 Stat Mini Boxes -->
       <div class="stat-boxes-row">
         <div class="stat-mini-card">
-          <div class="stat-mini-label">TOTAL SPENT</div>
-          <div class="stat-mini-val" id="profileStatTotalSpent">Rp 0</div>
+          <div class="stat-mini-label">TOTAL BERKAS</div>
+          <div class="stat-mini-val" id="profileStatTotalFiles">0</div>
         </div>
         <div class="stat-mini-card">
-          <div class="stat-mini-label">PAID ORDERS</div>
-          <div class="stat-mini-val" id="profileStatPaidOrders">0</div>
+          <div class="stat-mini-label">KAPASITAS</div>
+          <div class="stat-mini-val" id="profileStatUsedSize">0 MB</div>
         </div>
         <div class="stat-mini-card">
-          <div class="stat-mini-label">TOTAL ORDERS</div>
-          <div class="stat-mini-val" id="profileStatTotalOrders">0</div>
+          <div class="stat-mini-label">FOLDER</div>
+          <div class="stat-mini-val" id="profileStatTotalFolders">0</div>
         </div>
       </div>
 
@@ -4119,8 +4119,8 @@
               </svg>
             </div>
             <div class="settings-menu-text">
-              <div class="settings-menu-title">Lihat Riwayat Order</div>
-              <div class="settings-menu-desc">Kelola berkas terbaru, favorit, dan riwayat</div>
+              <div class="settings-menu-title">Aktivitas Berkas</div>
+              <div class="settings-menu-desc">Lihat berkas terbaru, favorit, dan sampah</div>
             </div>
           </div>
           <svg class="settings-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
@@ -4194,7 +4194,7 @@
       </div>
 
       <div class="settings-disclaimer">
-        Bot ini mendukung produk akun premium, source code, dan file digital lainnya. Semua pengiriman otomatis lewat Telegram.
+        Darfin Storage menyimpan berkas Anda secara unlimited di cloud Telegram. Kelola, cari, dan unduh kapan saja.
       </div>
     </div>
   </div>
@@ -4756,7 +4756,7 @@
         <line x1="3" y1="9" x2="21" y2="9"/>
         <line x1="9" y1="21" x2="9" y2="9"/>
       </svg>
-      <span class="dock-label">Store</span>
+      <span class="dock-label">Drive</span>
     </button>
 
     <button class="dock-btn" id="dockTabActivity" onclick="switchNavTab('activity')">
@@ -4766,7 +4766,7 @@
         <path d="M3 3v5h5"/>
         <path d="M12 7v5l4 2"/>
       </svg>
-      <span class="dock-label">History</span>
+      <span class="dock-label">Aktivitas</span>
     </button>
 
     <button class="dock-btn" id="dockTabOrganizer" onclick="switchNavTab('organizer')">
@@ -4923,7 +4923,7 @@
         }
       }
 
-      // Hiroto Store Hero and Profile Tab User updates
+      // Hero and Profile Tab User updates
       const heroUsernameEl = document.getElementById('heroUsernameDisplay');
       if (heroUsernameEl) heroUsernameEl.innerText = displayName.split(/\s+/)[0].toUpperCase();
 
@@ -8214,7 +8214,7 @@
     }
 
     // =========================================================
-    // Hiroto Store Navigation & Tab Logic (Screens 1, 2, 3)
+    // Navigation & Tab Logic
     // =========================================================
 
     let currentNavTab = 'drive';
@@ -8239,7 +8239,7 @@
         }
       });
 
-      // FAB visibility: only show on Store / Drive tab when not in trash mode
+      // FAB visibility: only show on Drive tab when not in trash mode
       const fab = document.getElementById('uploadFab');
       if (fab) {
         if (tabName === 'drive' && !isTrashMode && !isSelectMode) {
@@ -8274,11 +8274,11 @@
       const pFolders = document.getElementById('profileStatTotalFolders');
       if (pFolders) pFolders.innerText = totalFolders;
 
-      // Order stats for Hiroto profile layout
-      const pTotalOrders = document.getElementById('profileStatTotalOrders');
-      if (pTotalOrders) pTotalOrders.innerText = totalFiles;
-      const pPaidOrders = document.getElementById('profileStatPaidOrders');
-      if (pPaidOrders) pPaidOrders.innerText = totalFiles;
+      // Storage stats for profile
+      const pTotalFiles2 = document.getElementById('profileStatTotalFiles');
+      if (pTotalFiles2) pTotalFiles2.innerText = totalFiles;
+      const pUsedSize2 = document.getElementById('profileStatUsedSize');
+      if (pUsedSize2) pUsedSize2.innerText = usedSize;
 
       // History tab count
       const hCount = document.getElementById('histAllCount');
@@ -8355,8 +8355,8 @@
           if (emptyTitle) emptyTitle.innerText = 'Belum ada favorit';
           if (emptyDesc) emptyDesc.innerText = 'Tandai berkas dengan ikon bintang untuk melihatnya di sini.';
         } else {
-          if (emptyTitle) emptyTitle.innerText = 'Belum ada order';
-          if (emptyDesc) emptyDesc.innerText = 'Mulai belanja atau simpan berkas dari tab Store / Drive, ya.';
+          if (emptyTitle) emptyTitle.innerText = 'Belum ada berkas';
+          if (emptyDesc) emptyDesc.innerText = 'Upload berkas dari tab Drive atau kirim langsung ke bot Telegram.';
         }
       } else {
         emptyCard.style.display = 'none';
