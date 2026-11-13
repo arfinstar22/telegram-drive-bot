@@ -2879,6 +2879,14 @@
       overflow-x: hidden;
     }
 
+    body.in-auth-mode .bottom-dock-nav,
+    body.in-auth-mode #bottomDockNav,
+    body.in-auth-mode .upload-fab,
+    body.in-auth-mode #uploadFab {
+      display: none !important;
+      pointer-events: none !important;
+    }
+
     #browserNoticeCard {
       min-height: 100vh;
       width: 100%;
@@ -4831,7 +4839,7 @@
   </div>
 
   <!-- Floating Capsule Bottom Dock Navigation (Screens 1, 2, 3) -->
-  <nav class="bottom-dock-nav" id="bottomDockNav">
+  <nav class="bottom-dock-nav" id="bottomDockNav" style="display: none;">
     <button class="dock-btn active" id="dockTabDrive" onclick="switchNavTab('drive')">
       <span class="dock-glow-dot"></span>
       <svg class="dock-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -5027,6 +5035,8 @@
     async function handleLogout() {
       const uploadFab = document.getElementById('uploadFab');
       if (uploadFab) uploadFab.style.display = 'none';
+      const bottomDock = document.getElementById('bottomDockNav');
+      if (bottomDock) bottomDock.style.display = 'none';
       try {
         await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
       } catch (e) {
@@ -5046,6 +5056,8 @@
       closeUserProfileMenu();
       const uploadFab = document.getElementById('uploadFab');
       if (uploadFab) uploadFab.style.display = 'none';
+      const bottomDock = document.getElementById('bottomDockNav');
+      if (bottomDock) bottomDock.style.display = 'none';
       showBrowserNotice('expired');
     }
 
@@ -5059,6 +5071,8 @@
       if (overlay) overlay.style.display = 'none';
       const uploadFab = document.getElementById('uploadFab');
       if (uploadFab) uploadFab.style.display = 'none';
+      const bottomDock = document.getElementById('bottomDockNav');
+      if (bottomDock) bottomDock.style.display = 'none';
 
       // Check query params for auth feedback
       const params = new URLSearchParams(window.location.search);
@@ -5099,8 +5113,10 @@
       if (notice) notice.style.display = 'none';
       const container = document.querySelector('.container');
       if (container) container.style.display = 'block';
+      const bottomDock = document.getElementById('bottomDockNav');
+      if (bottomDock) bottomDock.style.display = 'flex';
       const uploadFab = document.getElementById('uploadFab');
-      if (uploadFab && !isTrashMode) uploadFab.style.display = 'flex';
+      if (uploadFab && !isTrashMode && currentNavTab === 'drive') uploadFab.style.display = 'flex';
     }
 
     function showUnauthorizedScreen(message) {
@@ -5660,7 +5676,10 @@
         }
         if (isTrashMode) {
           isTrashMode = false;
-          document.getElementById('uploadFab').style.display = 'flex';
+          const fab = document.getElementById('uploadFab');
+          if (fab && (authToken || currentUser) && currentNavTab === 'drive') {
+            fab.style.display = 'flex';
+          }
         }
         document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
@@ -8057,7 +8076,10 @@
 
     function exitTrashMode() {
       isTrashMode = false;
-      document.getElementById('uploadFab').style.display = 'flex';
+      const fab = document.getElementById('uploadFab');
+      if (fab && (authToken || currentUser) && currentNavTab === 'drive') {
+        fab.style.display = 'flex';
+      }
       document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
       const allChip = document.querySelector('.chip[data-type="all"]');
       if (allChip) allChip.classList.add('active');
@@ -8515,6 +8537,9 @@
     let currentStarredFilter = 'all';
 
     function switchNavTab(tabName) {
+      if (!authToken && !currentUser) {
+        return;
+      }
       triggerHaptic();
       if (tabName === 'activity') tabName = 'starred';
       currentNavTab = tabName;
@@ -8534,10 +8559,10 @@
         }
       });
 
-      // FAB visibility: only show on Drive tab when not in trash mode
+      // FAB visibility: only show on Drive tab when not in trash mode and authenticated
       const fab = document.getElementById('uploadFab');
       if (fab) {
-        if (tabName === 'drive' && !isTrashMode && !isSelectMode) {
+        if (tabName === 'drive' && !isTrashMode && !isSelectMode && (authToken || currentUser)) {
           fab.style.display = 'flex';
         } else {
           fab.style.display = 'none';

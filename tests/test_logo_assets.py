@@ -82,6 +82,21 @@ class TestLogoMarkupInTemplates(unittest.TestCase):
         # showBrowserNotice must hide uploadFab
         self.assertIn("const uploadFab = document.getElementById('uploadFab');", content)
         self.assertIn("if (uploadFab) uploadFab.style.display = 'none';", content)
+        # CSS rule for in-auth-mode
+        self.assertIn("body.in-auth-mode .upload-fab", content)
+
+    def test_bottom_dock_nav_hidden_unauthenticated(self):
+        """Verify bottom dock navigation is hidden by default and in auth mode."""
+        with open("templates/webapp.html", "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # HTML element must have style="display: none;" initially
+        self.assertIn('id="bottomDockNav" style="display: none;"', content)
+        # showBrowserNotice must hide bottomDockNav
+        self.assertIn("const bottomDock = document.getElementById('bottomDockNav');", content)
+        self.assertIn("if (bottomDock) bottomDock.style.display = 'none';", content)
+        # CSS rule for in-auth-mode
+        self.assertIn("body.in-auth-mode .bottom-dock-nav", content)
 
 
 if __name__ == "__main__":
