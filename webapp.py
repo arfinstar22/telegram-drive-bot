@@ -2349,25 +2349,80 @@ class FaviconPngHandler(tornado.web.RequestHandler):
 
 
 class ManifestHandler(tornado.web.RequestHandler):
-    """Serve Web App Manifest for APK/WebView/PWA standalone metadata."""
+    """Serve PWABuilder/TWA-ready Web App Manifest."""
     def get(self):
         self.set_header("Content-Type", "application/manifest+json; charset=utf-8")
-        self.set_header("Cache-Control", "public, max-age=86400")
+        self.set_header("Cache-Control", "public, max-age=3600")
         self.write(json.dumps({
+            "id": "/",
             "name": "Darfin Storage",
             "short_name": "Darfin",
             "description": "Cloud storage pribadi terhubung ke Telegram",
+            "lang": "id",
+            "dir": "ltr",
             "start_url": "/",
             "scope": "/",
             "display": "standalone",
+            "display_override": ["standalone", "minimal-ui"],
             "orientation": "portrait",
             "background_color": "#060d1f",
             "theme_color": "#060d1f",
+            "categories": ["productivity", "utilities"],
             "icons": [
-                {"src": "/static/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any maskable"},
-                {"src": "/static/darfin_logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+                {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+                {"src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
             ],
         }))
+
+
+class ServiceWorkerHandler(tornado.web.RequestHandler):
+    """Serve root-scoped Service Worker for PWA/PWABuilder offline & asset caching."""
+    def get(self):
+        sw_path = STATIC_DIR / "sw.js"
+        if sw_path.is_file():
+            self.set_header("Content-Type", "application/javascript; charset=utf-8")
+            self.set_header("Service-Worker-Allowed", "/")
+            self.set_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.write(sw_path.read_text(encoding="utf-8"))
+        else:
+            self.set_status(404)
+
+
+class AssetLinksHandler(tornado.web.RequestHandler):
+    """Serve Android TWA Digital Asset Links (/.well-known/assetlinks.json)."""
+    def get(self):
+        self.set_header("Content-Type", "application/json; charset=utf-8")
+        self.set_header("Cache-Control", "public, max-age=300")
+
+        raw_json = getattr(config, "ANDROID_ASSETLINKS_JSON", "").strip()
+        if raw_json:
+            try:
+                parsed = json.loads(raw_json)
+                self.write(json.dumps(parsed))
+                return
+            except Exception as e:
+                log.warning("Invalid ANDROID_ASSETLINKS_JSON env var: %s", e)
+
+        pkg = getattr(config, "ANDROID_TWA_PACKAGE_NAME", "").strip()
+        fps = getattr(config, "ANDROID_TWA_SHA256_FINGERPRINTS", []) or []
+        if pkg and fps:
+            self.write(json.dumps([{
+                "relation": ["delegate_permission/common.handle_all_urls"],
+                "target": {
+                    "namespace": "android_app",
+                    "package_name": pkg,
+                    "sha256_cert_fingerprints": fps,
+                },
+            }]))
+            return
+
+        assetlinks_file = STATIC_DIR / "assetlinks.json"
+        if assetlinks_file.is_file():
+            self.write(assetlinks_file.read_text(encoding="utf-8"))
+            return
+
+        self.write("[]")
 
 
 def build_app_routes(webhook_path: str = "", shared_objects: dict | None = None) -> list:
@@ -2379,6 +2434,8 @@ def build_app_routes(webhook_path: str = "", shared_objects: dict | None = None)
 
     routes.extend([
         (r"/manifest\.json", ManifestHandler),
+        (r"/sw\.js", ServiceWorkerHandler),
+        (r"/\.well-known/assetlinks\.json", AssetLinksHandler),
         (r"/favicon\.ico", FaviconHandler),
         (r"/favicon\.png", FaviconPngHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": str(STATIC_DIR)}),

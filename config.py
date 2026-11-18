@@ -51,4 +51,11 @@ TELEGRAM_OIDC_AUTH_URL = os.getenv("TELEGRAM_OIDC_AUTH_URL", f"{TELEGRAM_OIDC_IS
 TELEGRAM_OIDC_TOKEN_URL = os.getenv("TELEGRAM_OIDC_TOKEN_URL", f"{TELEGRAM_OIDC_ISSUER}/token").strip()
 TELEGRAM_OIDC_JWKS_URL = os.getenv("TELEGRAM_OIDC_JWKS_URL", f"{TELEGRAM_OIDC_ISSUER}/.well-known/jwks.json").strip()
 
+# Android TWA / PWABuilder Digital Asset Links (/.well-known/assetlinks.json)
+ANDROID_ASSETLINKS_JSON = os.getenv("ANDROID_ASSETLINKS_JSON", "").strip()
+ANDROID_TWA_PACKAGE_NAME = os.getenv("ANDROID_TWA_PACKAGE_NAME", "").strip()
+ANDROID_TWA_SHA256_FINGERPRINTS = [
+    fp.strip() for fp in os.getenv("ANDROID_TWA_SHA256_FINGERPRINTS", "").split(",") if fp.strip()
+]
+
 

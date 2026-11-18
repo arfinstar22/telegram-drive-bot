@@ -440,6 +440,48 @@ class TestMobileApkExperience(TestBrowserUxBase):
         self.assertIn("window.addEventListener('popstate'", self.template_html)
         self.assertIn('id="ptrIndicator"', self.template_html)
         self.assertIn("function openExternalUrl(", self.template_html)
+        self.assertIn("navigator.serviceWorker.register('/sw.js'", self.template_html)
+
+    def test_49_service_worker_and_pwa_icons_served(self):
+        """49. /sw.js and 192/512/maskable icons serve cleanly for PWABuilder."""
+        sw_resp = self.fetch("/sw.js")
+        self.assertEqual(sw_resp.code, 200)
+        self.assertIn("application/javascript", sw_resp.headers.get("Content-Type", ""))
+        self.assertEqual(sw_resp.headers.get("Service-Worker-Allowed"), "/")
+        sw_body = sw_resp.body.decode("utf-8")
+        self.assertIn("url.pathname.startsWith('/api/')", sw_body)
+        self.assertIn("url.pathname.startsWith('/auth/')", sw_body)
+
+        for icon_url in ("/static/icon-192.png", "/static/icon-512.png", "/static/icon-maskable-512.png"):
+            icon_resp = self.fetch(icon_url)
+            self.assertEqual(icon_resp.code, 200)
+            self.assertEqual(icon_resp.headers.get("Content-Type"), "image/png")
+
+    def test_50_assetlinks_json_default_and_configured(self):
+        """50. /.well-known/assetlinks.json serves valid JSON both default and configured via TWA vars."""
+        orig_raw = config.ANDROID_ASSETLINKS_JSON
+        orig_pkg = config.ANDROID_TWA_PACKAGE_NAME
+        orig_fps = config.ANDROID_TWA_SHA256_FINGERPRINTS
+        try:
+            config.ANDROID_ASSETLINKS_JSON = ""
+            config.ANDROID_TWA_PACKAGE_NAME = ""
+            config.ANDROID_TWA_SHA256_FINGERPRINTS = []
+            resp_default = self.fetch("/.well-known/assetlinks.json")
+            self.assertEqual(resp_default.code, 200)
+            self.assertEqual(json.loads(resp_default.body.decode("utf-8")), [])
+
+            config.ANDROID_TWA_PACKAGE_NAME = "com.darfin.storage"
+            config.ANDROID_TWA_SHA256_FINGERPRINTS = ["AA:BB:CC:DD"]
+            resp_cfg = self.fetch("/.well-known/assetlinks.json")
+            self.assertEqual(resp_cfg.code, 200)
+            data = json.loads(resp_cfg.body.decode("utf-8"))
+            self.assertEqual(len(data), 1)
+            self.assertEqual(data[0]["target"]["package_name"], "com.darfin.storage")
+            self.assertEqual(data[0]["target"]["sha256_cert_fingerprints"], ["AA:BB:CC:DD"])
+        finally:
+            config.ANDROID_ASSETLINKS_JSON = orig_raw
+            config.ANDROID_TWA_PACKAGE_NAME = orig_pkg
+            config.ANDROID_TWA_SHA256_FINGERPRINTS = orig_fps
 
 
 if __name__ == "__main__":
