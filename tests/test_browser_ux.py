@@ -468,15 +468,17 @@ class TestMobileApkExperience(TestBrowserUxBase):
             config.ANDROID_TWA_SHA256_FINGERPRINTS = []
             resp_default = self.fetch("/.well-known/assetlinks.json")
             self.assertEqual(resp_default.code, 200)
-            self.assertEqual(json.loads(resp_default.body.decode("utf-8")), [])
+            default_data = json.loads(resp_default.body.decode("utf-8"))
+            self.assertEqual(len(default_data), 1)
+            self.assertEqual(default_data[0]["target"]["package_name"], "com.darfin.storage")
 
-            config.ANDROID_TWA_PACKAGE_NAME = "com.darfin.storage"
+            config.ANDROID_TWA_PACKAGE_NAME = "com.darfin.override"
             config.ANDROID_TWA_SHA256_FINGERPRINTS = ["AA:BB:CC:DD"]
             resp_cfg = self.fetch("/.well-known/assetlinks.json")
             self.assertEqual(resp_cfg.code, 200)
             data = json.loads(resp_cfg.body.decode("utf-8"))
             self.assertEqual(len(data), 1)
-            self.assertEqual(data[0]["target"]["package_name"], "com.darfin.storage")
+            self.assertEqual(data[0]["target"]["package_name"], "com.darfin.override")
             self.assertEqual(data[0]["target"]["sha256_cert_fingerprints"], ["AA:BB:CC:DD"])
         finally:
             config.ANDROID_ASSETLINKS_JSON = orig_raw

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.darfin.storage",
+      "sha256_cert_fingerprints": [
+        "CC:05:45:A0:5B:3A:E0:15:1B:C6:A6:1C:16:CC:F2:2E:68:0C:E2:0A:CE:15:03:F8:99:7A:2B:BE:9C:94:71:B8"
+      ]
+    }
+  }
+]
