@@ -404,5 +404,43 @@ class TestAccessibility(TestBrowserUxBase):
         self.assertIn("if (!authToken && !currentUser)", self.template_html)
 
 
+class TestMobileApkExperience(TestBrowserUxBase):
+    """Test mobile WebView / APK ergonomics, manifest, and persistent 30-day sliding sessions."""
+
+    def test_46_manifest_json_served(self):
+        """46. /manifest.json returns valid standalone PWA/APK manifest."""
+        response = self.fetch("/manifest.json")
+        self.assertEqual(response.code, 200)
+        self.assertIn("application/manifest+json", response.headers.get("Content-Type", ""))
+        data = json.loads(response.body.decode("utf-8"))
+        self.assertEqual(data["display"], "standalone")
+        self.assertEqual(data["theme_color"], "#060d1f")
+        self.assertTrue(len(data["icons"]) >= 1)
+
+    @patch("database.get_user")
+    def test_47_sliding_session_refreshes_30d_cookie_and_preserves_csrf(self, mock_get_user):
+        """47. /api/auth/me slides tma_session cookie to 30-day TTL and preserves tma_csrf."""
+        mock_get_user.return_value = {"id": 9001, "username": "apk_user", "full_name": "APK User"}
+        token = auth.create_session_token(9001)
+        response = self.fetch(
+            "/api/auth/me",
+            headers={"Cookie": f"tma_session={token}; tma_csrf=keep_me_csrf"},
+        )
+        self.assertEqual(response.code, 200)
+        set_cookies = "; ".join(response.headers.get_list("Set-Cookie"))
+        self.assertIn("tma_session=", set_cookies)
+        self.assertIn("Max-Age=2592000", set_cookies)
+        self.assertIn("tma_csrf=keep_me_csrf", set_cookies)
+
+    def test_48_mobile_apk_native_hooks_present(self):
+        """48. Template defines safe-top, non-blocking TG script, back button handler, pull-to-refresh, and WebView-safe links."""
+        self.assertIn("--safe-top: env(safe-area-inset-top, 0px);", self.template_html)
+        self.assertIn('<link rel="manifest" href="/manifest.json">', self.template_html)
+        self.assertIn('telegram-web-app.js" async', self.template_html)
+        self.assertIn("window.addEventListener('popstate'", self.template_html)
+        self.assertIn('id="ptrIndicator"', self.template_html)
+        self.assertIn("function openExternalUrl(", self.template_html)
+
+
 if __name__ == "__main__":
     unittest.main()

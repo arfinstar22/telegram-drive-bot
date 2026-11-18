@@ -22,6 +22,7 @@ DEV_AUTH_ENABLED = os.getenv("DEV_AUTH_ENABLED", "false").lower() in ("true", "1
 _dev_user_raw = os.getenv("DEV_USER_ID", "")
 DEV_USER_ID = int(_dev_user_raw) if _dev_user_raw and _dev_user_raw.isdigit() else None
 INIT_DATA_MAX_AGE_SECONDS = int(os.getenv("INIT_DATA_MAX_AGE_SECONDS", "86400"))
+SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", str(30 * 86400)))
 
 # Upload security limits
 MAX_UPLOAD_FILE_SIZE_MB = int(os.getenv("MAX_UPLOAD_FILE_SIZE_MB", "50"))

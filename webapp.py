@@ -2028,6 +2028,40 @@ class ApiFileIntelligenceHandler(BaseApiHandler):
 
 # ── Task 6A Telegram OIDC Standalone Browser Authentication Handlers ──
 
+def _issue_browser_session_cookies(
+    handler: tornado.web.RequestHandler,
+    user_id: int,
+    existing_csrf: str | None = None,
+) -> None:
+    """Issue or slide persistent HttpOnly session + CSRF cookies (default 30 days)."""
+    ttl = max(3600, int(getattr(config, "SESSION_TTL_SECONDS", 30 * 86400)))
+    expires_ts = time.time() + ttl
+    session_token = auth.create_session_token(user_id=user_id, duration_seconds=ttl)
+    csrf_token = (existing_csrf or "").strip() or secrets.token_hex(16)
+    is_secure = (handler.request.protocol == "https") or ("onrender.com" in handler.request.host)
+
+    handler.set_cookie(
+        "tma_session",
+        session_token,
+        httponly=True,
+        secure=is_secure,
+        samesite="Lax",
+        path="/",
+        max_age=ttl,
+        expires=expires_ts,
+    )
+    handler.set_cookie(
+        "tma_csrf",
+        csrf_token,
+        httponly=False,
+        secure=is_secure,
+        samesite="Lax",
+        path="/",
+        max_age=ttl,
+        expires=expires_ts,
+    )
+
+
 class OidcStartHandler(tornado.web.RequestHandler):
     """Initiate Telegram OpenID Connect login with PKCE and state protection."""
 
@@ -2167,29 +2201,8 @@ class OidcCallbackHandler(tornado.web.RequestHandler):
         except Exception as e:
             log.error("Error syncing user record for Telegram user %s: %s", user_id, e)
 
-        # Issue DARFIN session token and CSRF token
-        session_token = auth.create_session_token(user_id=user_id, duration_seconds=86400)
-        csrf_token = secrets.token_hex(16)
-        is_secure = (self.request.protocol == "https") or ("onrender.com" in self.request.host)
-
-        self.set_cookie(
-            "tma_session",
-            session_token,
-            httponly=True,
-            secure=is_secure,
-            samesite="Lax",
-            path="/",
-            max_age=86400,
-        )
-        self.set_cookie(
-            "tma_csrf",
-            csrf_token,
-            httponly=False,
-            secure=is_secure,
-            samesite="Lax",
-            path="/",
-            max_age=86400,
-        )
+        # Issue persistent DARFIN session and CSRF cookies (sliding 30-day TTL)
+        _issue_browser_session_cookies(self, user_id)
         log.info("Telegram OIDC login successful for user %s. Redirecting to %s", user_id, next_path)
         self.redirect(next_path)
 
@@ -2231,6 +2244,8 @@ class ApiAuthMeHandler(BaseApiHandler):
             return
 
         user_id = user["user_id"]
+        if user.get("auth_type") == "cookie":
+            _issue_browser_session_cookies(self, user_id, existing_csrf=self.get_cookie("tma_csrf"))
         u = db.get_user(user_id)
 
         display_name = ""
@@ -2333,6 +2348,28 @@ class FaviconPngHandler(tornado.web.RequestHandler):
             self.set_status(404)
 
 
+class ManifestHandler(tornado.web.RequestHandler):
+    """Serve Web App Manifest for APK/WebView/PWA standalone metadata."""
+    def get(self):
+        self.set_header("Content-Type", "application/manifest+json; charset=utf-8")
+        self.set_header("Cache-Control", "public, max-age=86400")
+        self.write(json.dumps({
+            "name": "Darfin Storage",
+            "short_name": "Darfin",
+            "description": "Cloud storage pribadi terhubung ke Telegram",
+            "start_url": "/",
+            "scope": "/",
+            "display": "standalone",
+            "orientation": "portrait",
+            "background_color": "#060d1f",
+            "theme_color": "#060d1f",
+            "icons": [
+                {"src": "/static/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any maskable"},
+                {"src": "/static/darfin_logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            ],
+        }))
+
+
 def build_app_routes(webhook_path: str = "", shared_objects: dict | None = None) -> list:
     """Consolidated single source of truth for all routes."""
     routes = []
@@ -2341,6 +2378,7 @@ def build_app_routes(webhook_path: str = "", shared_objects: dict | None = None)
         routes.append((rf"{webhook_path}/?", wh.TelegramHandler, shared_objects))
 
     routes.extend([
+        (r"/manifest\.json", ManifestHandler),
         (r"/favicon\.ico", FaviconHandler),
         (r"/favicon\.png", FaviconPngHandler),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": str(STATIC_DIR)}),

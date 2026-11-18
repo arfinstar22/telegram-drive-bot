@@ -4,13 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#090D16">
+  <meta name="theme-color" content="#060d1f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Darfin Storage">
   <title>Darfin Storage - Cloud Drive</title>
+  <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js" async onload="if(typeof initTelegramWebAppBridge==='function')initTelegramWebAppBridge()"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -32,6 +37,7 @@
       --emerald: #10B981;
       --rose: #F43F5E;
       --radius: 14px;
+      --safe-top: env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 16px);
     }
 
@@ -41,6 +47,21 @@
       padding: 0;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
+      -webkit-user-select: none;
+    }
+
+    input, textarea, [contenteditable="true"], .code-preview-box, .ocr-text-preview {
+      user-select: text;
+      -webkit-user-select: text;
+    }
+
+    button, a, .chip, .sub-chip, .dock-btn, .file-card, .folder-card, .settings-menu-item, .user-pill, .quick-pill {
+      touch-action: manipulation;
+    }
+
+    html {
+      background-color: #060d1f;
+      overscroll-behavior-y: contain;
     }
 
     body {
@@ -53,10 +74,48 @@
       background-position: 0 0, -1px -1px, -1px -1px;
       color: var(--text);
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      min-height: 100vh;
+      min-height: 100dvh;
       overflow-x: hidden;
+      overscroll-behavior-y: contain;
       padding-bottom: calc(96px + var(--safe-bottom));
       line-height: 1.5;
+    }
+
+    /* Native Pull-to-Refresh Pill */
+    .ptr-indicator {
+      position: fixed;
+      top: calc(10px + var(--safe-top));
+      left: 50%;
+      transform: translate(-50%, -70px);
+      background: rgba(15, 23, 42, 0.94);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      z-index: 250;
+      pointer-events: none;
+      opacity: 0;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+    }
+
+    .ptr-indicator.visible {
+      opacity: 1;
+    }
+
+    .ptr-indicator.refreshing .ptr-spinner {
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
     /* Ambient background mesh */
@@ -78,7 +137,7 @@
       z-index: 1;
       max-width: 640px;
       margin: 0 auto;
-      padding: 16px;
+      padding: calc(16px + var(--safe-top)) 16px 16px;
     }
 
     /* Header */
@@ -167,6 +226,17 @@
     .user-pill:hover {
       background: var(--surface-hover);
       border-color: rgba(56, 189, 248, 0.35);
+    }
+
+    .user-pill:active {
+      transform: scale(0.96);
+    }
+
+    #userName {
+      max-width: 115px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .user-avatar-badge {
@@ -330,8 +400,14 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
       gap: 8px;
       margin-bottom: 10px;
+    }
+
+    .storage-header > div {
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .unlimited-badge {
@@ -1564,7 +1640,7 @@
     /* Floating Audio Player */
     .audio-player-bar {
       position: fixed;
-      bottom: calc(16px + var(--safe-bottom));
+      bottom: calc(86px + var(--safe-bottom));
       left: 50%;
       transform: translateX(-50%);
       width: calc(100% - 32px);
@@ -1824,8 +1900,9 @@
       border: 1px solid rgba(56, 189, 248, 0.4);
       backdrop-filter: blur(25px);
       -webkit-backdrop-filter: blur(25px);
-      border-radius: 16px;
-      padding: 6px 8px;
+      border-radius: 22px;
+      min-height: 64px;
+      padding: 8px 10px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -2014,10 +2091,17 @@
     /* Small Mobile (320px - 375px) */
     @media (max-width: 375px) {
       .container {
-        padding: 10px;
+        padding: calc(10px + var(--safe-top)) 10px 12px;
       }
       .brand-title {
         font-size: 1.02rem;
+      }
+      #userName {
+        max-width: 82px;
+      }
+      .hero-title {
+        font-size: 1.32rem;
+        flex-wrap: wrap;
       }
       .quick-pill {
         font-size: 0.72rem;
@@ -2888,7 +2972,7 @@
     }
 
     #browserNoticeCard {
-      min-height: 100vh;
+      min-height: 100dvh;
       width: 100%;
       position: relative;
       overflow-x: hidden;
@@ -2897,7 +2981,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: space-between;
-      padding: 32px 20px 24px;
+      padding: calc(28px + var(--safe-top)) 20px calc(24px + var(--safe-bottom));
       z-index: 10;
       box-sizing: border-box;
     }
@@ -3210,12 +3294,24 @@
 
     @media (max-width: 640px) {
       #browserNoticeCard {
-        padding: 24px 16px 20px;
+        padding: calc(20px + var(--safe-top)) 16px calc(24px + var(--safe-bottom));
         justify-content: flex-start;
-        gap: 24px;
+        gap: 20px;
+      }
+      .auth-topbar {
+        gap: 8px;
+      }
+      .auth-brand-name {
+        font-size: 0.92rem;
+      }
+      .auth-status-pill {
+        white-space: nowrap;
+        flex-shrink: 0;
+        padding: 5px 10px;
+        font-size: 0.7rem;
       }
       .auth-card {
-        padding: 28px 18px 24px;
+        padding: 26px 18px 22px;
         border-radius: 20px;
       }
       .auth-title {
@@ -3230,6 +3326,15 @@
       }
       .auth-footer-badges {
         justify-content: center;
+      }
+      .filter-chips,
+      .breadcrumb-nav,
+      .search-quick-pills,
+      .sub-filter-chips {
+        -webkit-overflow-scrolling: touch;
+      }
+      .dock-btn:active {
+        transform: scale(0.92);
       }
     }
 
@@ -3696,6 +3801,12 @@
   </style>
 </head>
 <body>
+  <!-- Native Pull-to-Refresh Indicator -->
+  <div class="ptr-indicator" id="ptrIndicator" aria-hidden="true">
+    <svg class="ptr-spinner" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+    <span id="ptrText">Tarik untuk menyegarkan</span>
+  </div>
+
   <!-- Unauthorized Screen (Non-blocking) -->
   <div id="unauthorizedOverlay" style="display:none !important;"></div>
 
@@ -4021,6 +4132,7 @@
       <div class="file-card skeleton" style="height: 180px;"></div>
       <div class="file-card skeleton" style="height: 180px;"></div>
       <div class="file-card skeleton" style="height: 180px;"></div>
+      <div class="file-card skeleton" style="height: 180px;"></div>
     </div>
     <div id="searchPaginationWrap" class="search-pagination-wrap" style="display: none;">
       <button class="btn-load-more" id="btnLoadMoreSearch" onclick="loadMoreSearchResults()">
@@ -4148,12 +4260,12 @@
       <div class="profile-hero-card">
         <div class="profile-avatar-circle">
           <div class="profile-avatar-inner" id="profileTabAvatar">
-            <span id="profileTabInitials">DA</span>
+            <span id="profileTabInitials">TU</span>
           </div>
         </div>
         <div class="profile-info-block">
-          <div class="profile-name-text" id="profileTabName">DARFIN</div>
-          <div class="profile-handle-text" id="profileTabHandle">@Dxstar22</div>
+          <div class="profile-name-text" id="profileTabName">Akun Saya</div>
+          <div class="profile-handle-text" id="profileTabHandle" style="display: none;"></div>
           <div class="profile-cloud-badge">
             <span class="status-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 6px #34d399; display: inline-block;"></span>
             <span>Telegram Verified</span>
@@ -4179,7 +4291,7 @@
 
       <!-- Settings Menu List Rows (NO DUPLICATES!) -->
       <div class="settings-menu-list">
-        <div class="settings-menu-item" onclick="window.open('https://t.me/darfinstoragebot', '_blank')">
+        <div class="settings-menu-item" onclick="openExternalUrl('https://t.me/darfinstoragebot')">
           <div class="settings-menu-left">
             <div class="settings-menu-icon" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -4898,18 +5010,31 @@
   <div class="toast-container" id="toastNotification"></div>
 
   <script>
-    const tg = window.Telegram?.WebApp;
-    if (tg) {
-      tg.ready();
-      tg.expand();
-      try {
-        tg.setHeaderColor('#090D16');
-        tg.setBackgroundColor('#090D16');
-      } catch (e) {}
+    let tg = null;
+    function initTelegramWebAppBridge() {
+      tg = window.Telegram?.WebApp || null;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+        try {
+          tg.setHeaderColor('#060d1f');
+          tg.setBackgroundColor('#060d1f');
+        } catch (e) {}
+      }
     }
+    initTelegramWebAppBridge();
 
     let authToken = '';
     let currentUser = null;
+    const folderCache = new Map();
+
+    function openExternalUrl(url) {
+      if (!url) return;
+      const opened = window.open(url, '_blank', 'noopener');
+      if (!opened) {
+        window.location.href = url;
+      }
+    }
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -5020,7 +5145,10 @@
       if (profileTabNameEl) profileTabNameEl.innerText = displayName.toUpperCase();
 
       const profileTabHandleEl = document.getElementById('profileTabHandle');
-      if (profileTabHandleEl) profileTabHandleEl.innerText = handleText || '@member';
+      if (profileTabHandleEl) {
+        profileTabHandleEl.innerText = handleText;
+        profileTabHandleEl.style.display = handleText ? 'block' : 'none';
+      }
 
       const profileTabAvatarEl = document.getElementById('profileTabAvatar');
       if (profileTabAvatarEl) {
@@ -5045,6 +5173,7 @@
       authToken = null;
       currentUser = null;
       driveData = { folders: [], files: [] };
+      folderCache.clear();
       window.location.href = '/?logged_out=1';
     }
 
@@ -5052,6 +5181,7 @@
       authToken = null;
       currentUser = null;
       driveData = { folders: [], files: [] };
+      folderCache.clear();
       document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
       closeUserProfileMenu();
       const uploadFab = document.getElementById('uploadFab');
@@ -5117,6 +5247,7 @@
       if (bottomDock) bottomDock.style.display = 'flex';
       const uploadFab = document.getElementById('uploadFab');
       if (uploadFab && !isTrashMode && currentNavTab === 'drive') uploadFab.style.display = 'flex';
+      if (typeof ensureBackGuard === 'function') ensureBackGuard();
     }
 
     function showUnauthorizedScreen(message) {
@@ -5216,6 +5347,8 @@
       const resp = await fetch(url, options);
       if (resp.status === 401) {
         handleSessionExpired();
+      } else if (resp.ok && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+        folderCache.clear();
       }
       return resp;
     }
@@ -5228,16 +5361,20 @@
       }
     });
 
+    function closeAllActiveModals() {
+      const activeModals = document.querySelectorAll('.modal-overlay.active');
+      if (activeModals.length === 0) return false;
+      activeModals.forEach(m => {
+        m.classList.remove('active');
+        m.querySelectorAll('video').forEach(v => { try { v.pause(); } catch (e) {} });
+      });
+      return true;
+    }
+
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeUserProfileMenu();
-        const activeModals = document.querySelectorAll('.modal-overlay.active');
-        if (activeModals.length > 0) {
-          activeModals.forEach(m => {
-            m.classList.remove('active');
-            m.style.display = 'none';
-          });
-        }
+        closeAllActiveModals();
       }
     });
 
@@ -5380,8 +5517,12 @@
         tg.HapticFeedback.notificationOccurred('success');
       }
 
+      const overlay = document.getElementById('serverWakeupOverlay');
+      const wasWakeupVisible = overlay && overlay.classList.contains('active');
+
       if (data) {
         driveData = data;
+        folderCache.set(String(currentFolderId || 'root'), data);
         renderStorage(driveData.storage);
         renderBreadcrumbs(driveData.breadcrumbs || []);
         renderFolders(driveData.folders || []);
@@ -5392,13 +5533,12 @@
         }
       }
 
-      setTimeout(() => {
-        const overlay = document.getElementById('serverWakeupOverlay');
-        if (overlay) {
+      if (wasWakeupVisible) {
+        setTimeout(() => {
           overlay.classList.remove('active');
-        }
-        showToast('🚀 Server aktif! Berkas Anda siap.');
-      }, 750);
+          showToast('🚀 Server aktif! Berkas Anda siap.');
+        }, 600);
+      }
     }
 
     function forceServerWakeupRetry() {
@@ -5413,10 +5553,65 @@
       if (overlay) overlay.classList.remove('active');
     }
 
-    async function loadDriveData() {
+    async function loadDriveData(useCache = true) {
+      let url = '/api/drive';
+      if (currentFolderId) url += `?folder_id=${currentFolderId}`;
+      const cacheKey = String(currentFolderId || 'root');
+
+      // Fast path: initial boot with existing browser/APK session cookie -> fetch /api/auth/me & /api/drive in parallel
       if (!authToken && !currentUser) {
+        const hasBrowserCookie = !!getCookie('tma_csrf');
+        const hasTgInitData = !!(window.Telegram?.WebApp?.initData || (window.location.hash && window.location.hash.includes('tgWebAppData=')));
+
+        if (!hasBrowserCookie && !hasTgInitData) {
+          // Avoid flashing empty dashboard while verifying unauthenticated state
+          document.body.classList.add('in-auth-mode');
+          const container = document.querySelector('.container');
+          if (container) container.style.display = 'none';
+        }
+
+        if (hasBrowserCookie) {
+          if (!isServerAwake) {
+            if (coldStartTimer) clearTimeout(coldStartTimer);
+            coldStartTimer = setTimeout(() => showServerWakeupOverlay('slow'), 2500);
+          }
+          try {
+            const [meRes, driveRes] = await Promise.all([
+              fetch('/api/auth/me', { credentials: 'same-origin' }),
+              fetch(url, { credentials: 'same-origin' }),
+            ]);
+            if (meRes.ok) {
+              const meData = await meRes.json();
+              if (meData.ok && meData.authenticated && meData.user) {
+                updateUserUI(meData.user);
+                hideBrowserNotice();
+                if (driveRes.ok) {
+                  const data = await driveRes.json();
+                  if (coldStartTimer) clearTimeout(coldStartTimer);
+                  handleServerWakeupSuccess(data);
+                  return;
+                }
+              }
+            }
+          } catch (e) {
+            console.debug('Parallel boot fallback:', e);
+          }
+          if (coldStartTimer) clearTimeout(coldStartTimer);
+        }
+
         const authed = await initSession();
         if (!authed) return;
+      }
+
+      // Instant 0ms UI from in-memory folder cache while silently refreshing fresh data
+      if (useCache && folderCache.has(cacheKey)) {
+        const cached = folderCache.get(cacheKey);
+        driveData = cached;
+        renderStorage(driveData.storage);
+        renderBreadcrumbs(driveData.breadcrumbs || []);
+        renderFolders(driveData.folders || []);
+        renderFiles(driveData.files || []);
+        updateNavigationStats();
       }
 
       if (!isServerAwake) {
@@ -5427,13 +5622,10 @@
       }
 
       try {
-        let url = '/api/drive';
-        if (currentFolderId) url += `?folder_id=${currentFolderId}`;
-
         const res = await authFetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        
+
         if (coldStartTimer) clearTimeout(coldStartTimer);
         handleServerWakeupSuccess(data);
       } catch (err) {
@@ -6661,7 +6853,7 @@
           <div style="padding: 14px; text-align: center; background: rgba(56, 189, 248, 0.05); border-radius: 8px;">
             <div style="font-size: 2rem; margin-bottom: 4px;">📑</div>
             <div style="font-size: 0.82rem; font-weight: 600; color: #fff; margin-bottom: 8px;">Dokumen PDF</div>
-            <a href="${dlUrl}" target="_blank" class="btn btn-secondary" style="display: inline-flex; padding: 6px 14px; font-size: 0.75rem; text-decoration: none;">
+            <a href="${dlUrl}" target="_blank" rel="noopener" onclick="event.preventDefault(); openExternalUrl('${dlUrl}');" class="btn btn-secondary" style="display: inline-flex; padding: 6px 14px; font-size: 0.75rem; text-decoration: none;">
               🔍 Buka / Pratinjau PDF
             </a>
           </div>
@@ -6694,11 +6886,11 @@
         }
       }
 
-      // Direct download link
+      // Direct download link (WebView & browser safe)
       const dlBtn = document.getElementById('modalDownloadBtn');
       dlBtn.onclick = () => {
         triggerHaptic();
-        window.open(dlUrl, '_blank');
+        openExternalUrl(dlUrl);
       };
 
       if (f.file_type === 'audio') {
@@ -8667,6 +8859,154 @@
         updateUserUI(currentUser);
       }
     }
+
+    // =========================================================
+    // Native APK / Android WebView Polish: Back Button & Pull-to-Refresh
+    // =========================================================
+    let backGuardArmed = false;
+    let lastRootBackAt = 0;
+
+    function ensureBackGuard() {
+      if (backGuardArmed) return;
+      try {
+        history.pushState({ darfinAppGuard: true }, '', window.location.href);
+        backGuardArmed = true;
+      } catch (e) {}
+    }
+
+    window.addEventListener('popstate', () => {
+      backGuardArmed = false;
+      if (!currentUser && !authToken) return;
+
+      // 1. Close open modal sheet
+      if (closeAllActiveModals()) {
+        ensureBackGuard();
+        return;
+      }
+      // 2. Close user profile dropdown
+      const dropdown = document.getElementById('userProfileDropdown');
+      if (dropdown && dropdown.classList.contains('open')) {
+        closeUserProfileMenu();
+        ensureBackGuard();
+        return;
+      }
+      // 3. Exit selection mode
+      if (isSelectMode) {
+        updateSelectionUI(false);
+        ensureBackGuard();
+        return;
+      }
+      // 4. Exit trash mode
+      if (isTrashMode) {
+        exitTrashMode();
+        ensureBackGuard();
+        return;
+      }
+      // 5. Clear active search
+      const searchEl = document.getElementById('searchInput');
+      if (searchEl && searchEl.value.trim()) {
+        clearSearch();
+        ensureBackGuard();
+        return;
+      }
+      // 6. Return to Drive tab from secondary tabs
+      if (currentNavTab !== 'drive') {
+        switchNavTab('drive');
+        ensureBackGuard();
+        return;
+      }
+      // 7. Navigate up to parent folder
+      if (currentFolderId !== null) {
+        const crumbs = driveData.breadcrumbs || [];
+        const parentCrumb = crumbs.length >= 2 ? crumbs[crumbs.length - 2] : null;
+        navigateToFolder(parentCrumb ? parentCrumb.id : null);
+        ensureBackGuard();
+        return;
+      }
+      // 8. At root Drive: double-back within 2s to exit APK cleanly
+      const now = Date.now();
+      if (now - lastRootBackAt < 2000) {
+        history.back();
+        return;
+      }
+      lastRootBackAt = now;
+      showToast('Tekan kembali sekali lagi untuk keluar');
+      ensureBackGuard();
+    });
+
+    // Native Pull-to-Refresh at top of Drive/Starred view
+    (function setupPullToRefresh() {
+      const ptrEl = document.getElementById('ptrIndicator');
+      const ptrText = document.getElementById('ptrText');
+      if (!ptrEl || !ptrText) return;
+
+      let startY = 0;
+      let pulling = false;
+      let triggered = false;
+      let refreshing = false;
+
+      document.addEventListener('touchstart', (e) => {
+        if (refreshing || (!currentUser && !authToken)) return;
+        if (window.scrollY > 2) return;
+        if (document.querySelector('.modal-overlay.active')) return;
+        if (currentNavTab !== 'drive' && currentNavTab !== 'starred') return;
+        if (e.touches.length !== 1) return;
+        startY = e.touches[0].clientY;
+        pulling = true;
+        triggered = false;
+      }, { passive: true });
+
+      document.addEventListener('touchmove', (e) => {
+        if (!pulling || refreshing) return;
+        const dy = e.touches[0].clientY - startY;
+        if (dy <= 8 || window.scrollY > 2) {
+          if (dy <= 0) {
+            pulling = false;
+            ptrEl.classList.remove('visible');
+            ptrEl.style.transform = 'translate(-50%, -70px)';
+          }
+          return;
+        }
+        const dampened = Math.min(dy * 0.45, 72);
+        ptrEl.classList.add('visible');
+        ptrEl.style.transform = `translate(-50%, ${dampened - 10}px)`;
+        if (dampened >= 52) {
+          if (!triggered) {
+            triggered = true;
+            triggerHaptic();
+          }
+          ptrText.innerText = 'Lepas untuk menyegarkan';
+        } else {
+          triggered = false;
+          ptrText.innerText = 'Tarik untuk menyegarkan';
+        }
+      }, { passive: true });
+
+      document.addEventListener('touchend', async () => {
+        if (!pulling) return;
+        pulling = false;
+        if (triggered && !refreshing) {
+          refreshing = true;
+          ptrEl.classList.add('refreshing');
+          ptrText.innerText = 'Memperbarui...';
+          ptrEl.style.transform = 'translate(-50%, 10px)';
+          try {
+            folderCache.clear();
+            await loadDriveData(false);
+          } finally {
+            setTimeout(() => {
+              refreshing = false;
+              ptrEl.classList.remove('visible', 'refreshing');
+              ptrEl.style.transform = 'translate(-50%, -70px)';
+              ptrText.innerText = 'Tarik untuk menyegarkan';
+            }, 300);
+          }
+        } else {
+          ptrEl.classList.remove('visible');
+          ptrEl.style.transform = 'translate(-50%, -70px)';
+        }
+      }, { passive: true });
+    })();
 
     // Initial load
     loadDriveData();
